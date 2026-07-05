@@ -1963,6 +1963,99 @@ get_php_socket() {
 
 # ------------------ Nginx Functions ----------------- #
 
+# ------------------ Panel Detection & Removal ----------------- #
+
+detect_installed_panels() {
+  local found=()
+
+  # Struxa
+  if [ -f "/etc/nginx/sites-available/struxa-panel.conf" ] || [ -d "/var/www/struxa" ]; then
+    found+=("Struxa")
+  fi
+
+  # Pterodactyl
+  if ls /etc/nginx/sites-available/pterodactyl* 2>/dev/null | grep -q . || \
+     [ -d "/var/www/pterodactyl" ] || [ -f "/usr/local/bin/wings" ] || \
+     systemctl is-enabled --quiet pteroq 2>/dev/null; then
+    found+=("Pterodactyl")
+  fi
+
+  # Dokploy
+  if [ -d "/etc/dokploy" ] || docker ps -a 2>/dev/null | grep -qi "dokploy" || \
+     systemctl is-enabled --quiet dokploy 2>/dev/null; then
+    found+=("Dokploy")
+  fi
+
+  # Coolify
+  if [ -d "/etc/coolify" ] || docker ps -a 2>/dev/null | grep -qi "coolify" || \
+     systemctl is-enabled --quiet coolify 2>/dev/null; then
+    found+=("Coolify")
+  fi
+
+  echo "${found[@]}"
+}
+
+remove_struxa() {
+  output "Removing Struxa panel..."
+  rm -f /etc/nginx/sites-available/struxa-panel.conf
+  rm -f /etc/nginx/sites-enabled/struxa-panel.conf
+  rm -rf /var/www/struxa
+  systemctl disable --now nginx 2>/dev/null || true
+  systemctl disable --now php*-fpm 2>/dev/null || true
+  systemctl disable --now mariadb 2>/dev/null || true
+  output "Struxa panel removed."
+}
+
+remove_pterodactyl() {
+  output "Removing Pterodactyl panel..."
+  systemctl disable --now pteroq 2>/dev/null || true
+  systemctl disable --now wings 2>/dev/null || true
+  rm -rf /var/www/pterodactyl
+  rm -f /etc/nginx/sites-available/pterodactyl*
+  rm -f /etc/nginx/sites-enabled/pterodactyl*
+  rm -f /etc/systemd/system/pteroq*
+  rm -f /etc/systemd/system/wings*
+  rm -f /usr/local/bin/wings
+  rm -f /usr/local/bin/elytra
+  systemctl daemon-reload
+  output "Pterodactyl panel removed."
+}
+
+remove_dokploy() {
+  output "Removing Dokploy..."
+  systemctl disable --now dokploy 2>/dev/null || true
+  docker ps -a 2>/dev/null | grep -i "dokploy" | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
+  rm -rf /etc/dokploy
+  rm -f /etc/systemd/system/dokploy*
+  rm -f /etc/nginx/sites-available/dokploy*
+  rm -f /etc/nginx/sites-enabled/dokploy*
+  systemctl daemon-reload
+  output "Dokploy removed."
+}
+
+remove_coolify() {
+  output "Removing Coolify..."
+  systemctl disable --now coolify 2>/dev/null || true
+  docker ps -a 2>/dev/null | grep -i "coolify" | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
+  rm -rf /etc/coolify
+  rm -f /etc/systemd/system/coolify*
+  rm -f /etc/nginx/sites-available/coolify*
+  rm -f /etc/nginx/sites-enabled/coolify*
+  systemctl daemon-reload
+  output "Coolify removed."
+}
+
+remove_all_other_panels() {
+  for panel in Struxa Pterodactyl Dokploy Coolify; do
+    case "$panel" in
+      Struxa) remove_struxa ;;
+      Pterodactyl) remove_pterodactyl ;;
+      Dokploy) remove_dokploy ;;
+      Coolify) remove_coolify ;;
+    esac
+  done
+}
+
 check_port_conflicts() {
   local has_conflict=false
   local conflict_details=""
@@ -2001,48 +2094,125 @@ check_port_conflicts() {
       echo ""
     fi
 
+    local detected_panels
+    detected_panels=($(detect_installed_panels))
+    local has_known_panels=false
+    if [ ${#detected_panels[@]} -gt 0 ]; then
+      has_known_panels=true
+      output "${COLOR_YELLOW}Detected known panels on this server:${COLOR_NC}"
+      for panel in "${detected_panels[@]}"; do
+        output "  ${COLOR_RED}✗${COLOR_NC} $panel"
+      done
+      echo ""
+    fi
+
     output "${COLOR_YELLOW}What would you like to do?${COLOR_NC}"
     output "[${COLOR_ORANGE}0${COLOR_NC}] Stop conflicting services and remove their nginx configs (recommended)"
-    output "[${COLOR_ORANGE}1${COLOR_NC}] Keep existing services - I will configure manually"
-    output "[${COLOR_ORANGE}2${COLOR_NC}] Keep existing services and install on different ports (not recommended)"
+    if [ "$has_known_panels" == true ]; then
+      output "[${COLOR_ORANGE}1${COLOR_NC}] Remove a detected panel completely"
+    fi
+    output "[${COLOR_ORANGE}2${COLOR_NC}] Keep existing services - I will configure manually"
     echo ""
 
+    local max_option=2
+    [ "$has_known_panels" == true ] && max_option=3
+
     local conflict_choice=""
-    while [[ "$conflict_choice" != "0" && "$conflict_choice" != "1" && "$conflict_choice" != "2" ]]; do
-      echo -n "* Select [0-2]: "
+    while true; do
+      echo -n "* Select [0-$((max_option - 1))]: "
       read -r conflict_choice
+      case "$conflict_choice" in
+        0|2) break ;;
+        1)
+          if [ "$has_known_panels" == true ]; then
+            # Show panel removal submenu
+            echo ""
+            output "${COLOR_YELLOW}Select a panel to remove:${COLOR_NC}"
+            local idx=0
+            local panel_indices=()
+            for panel in "${detected_panels[@]}"; do
+              echo -e "  [${COLOR_ORANGE}$idx${COLOR_NC}] Remove $panel"
+              panel_indices+=("$panel")
+              idx=$((idx + 1))
+            done
+            echo -e "  [${COLOR_ORANGE}$idx${COLOR_NC}] Remove all detected panels"
+            echo ""
+
+            local panel_choice=""
+            echo -n "* Select [0-$idx]: "
+            read -r panel_choice
+
+            if [[ "$panel_choice" =~ ^[0-9]+$ ]] && [ "$panel_choice" -ge 0 ] && [ "$panel_choice" -lt "$idx" ]; then
+              local selected="${panel_indices[$panel_choice]}"
+              output "You selected: ${COLOR_RED}$selected${COLOR_NC}"
+              local confirm=""
+              bool_input confirm "Remove $selected? This cannot be undone" "n"
+              if [ "$confirm" == "y" ]; then
+                case "$selected" in
+                  Struxa) remove_struxa ;;
+                  Pterodactyl) remove_pterodactyl ;;
+                  Dokploy) remove_dokploy ;;
+                  Coolify) remove_coolify ;;
+                esac
+                output "Proceeding after $selected removal..."
+                break
+              fi
+            elif [ "$panel_choice" == "$idx" ]; then
+              output "You selected: ${COLOR_RED}All panels${COLOR_NC}"
+              local confirm=""
+              bool_input confirm "Remove all detected panels? This cannot be undone" "n"
+              if [ "$confirm" == "y" ]; then
+                for panel in "${detected_panels[@]}"; do
+                  case "$panel" in
+                    Struxa) remove_struxa ;;
+                    Pterodactyl) remove_pterodactyl ;;
+                    Dokploy) remove_dokploy ;;
+                    Coolify) remove_coolify ;;
+                  esac
+                done
+                output "All panels removed. Proceeding..."
+                break
+              fi
+            fi
+          else
+            error "Invalid option"
+          fi
+          ;;
+        *) error "Invalid option" ;;
+      esac
     done
 
     case "$conflict_choice" in
       0)
-        output "Stopping conflicting services and removing their configs..."
-        local pids
-        pids=$(ss -tlnp 2>/dev/null | grep -oP 'pid=\K[0-9]+' | sort -u)
-        for pid in $pids; do
-          kill "$pid" 2>/dev/null || true
-        done
-        find /etc/nginx/sites-enabled/ -type l -o -type f | grep -v default | while IFS= read -r conf; do
-          rm -f "$conf"
-          local available_link
-          available_link=$(readlink -f "$conf" 2>/dev/null || echo "")
-          [ -n "$available_link" ] && rm -f "$available_link"
-        done
-        find /etc/nginx/sites-available/ -maxdepth 1 -type f | grep -v default | grep -v hydrodactyl | while IFS= read -r conf; do
-          rm -f "$conf"
-        done
-        sleep 1
-        output "Conflicting services stopped. Proceeding with installation..."
-        return 0
+        if [ "$has_known_panels" == false ]; then
+          output "Stopping conflicting services and removing their configs..."
+          local pids
+          pids=$(ss -tlnp 2>/dev/null | grep -oP 'pid=\K[0-9]+' | sort -u)
+          for pid in $pids; do
+            kill "$pid" 2>/dev/null || true
+          done
+          find /etc/nginx/sites-enabled/ -type l -o -type f | grep -v default | while IFS= read -r conf; do
+            rm -f "$conf"
+            local available_link
+            available_link=$(readlink -f "$conf" 2>/dev/null || echo "")
+            [ -n "$available_link" ] && rm -f "$available_link"
+          done
+          find /etc/nginx/sites-available/ -maxdepth 1 -type f | grep -v default | grep -v hydrodactyl | while IFS= read -r conf; do
+            rm -f "$conf"
+          done
+          sleep 1
+          output "Conflicting services stopped. Proceeding with installation..."
+          return 0
+        fi
         ;;
       1)
+        # Panel was already removed in the submenu flow above
+        return 0
+        ;;
+      2)
         output "Skipping nginx configuration. You will need to configure it manually."
         output "Config templates are available at:"
         output "  $(hyperlink "https://github.com/itzzjustmateo/hydro-install/tree/main/configs")"
-        return 1
-        ;;
-      2)
-        output "Using alternative ports is not recommended. The panel requires port 80/443."
-        output "Please configure your existing server to proxy requests to this panel."
         return 1
         ;;
     esac
