@@ -1,6 +1,4 @@
-<p align="center">
-  <img width="1467" height="401" alt="image" src="https://github.com/user-attachments/assets/7d5138a4-acd0-43e5-932b-419c5125c0d7" />
-</p>
+# Hydrodactyl Installer
 
 <p align="center">
   <!-- <a href="https://github.com/itzzjustmateo/hydro-install/releases"><img src="https://img.shields.io/github/v/release/itzzjustmateo/hydro-install?style=for-the-badge&color=orange" alt="Release"></a> -->
