@@ -1113,6 +1113,64 @@ download_release_asset() {
   return 0
 }
 
+# ------------------ Timezone Functions ----------------- #
+
+detect_system_timezone() {
+  local tz=""
+  if command -v timedatectl >/dev/null 2>&1; then
+    tz=$(timedatectl show --property=Timezone --value 2>/dev/null || echo "")
+  fi
+  if [ -z "$tz" ] && [ -f /etc/timezone ]; then
+    tz=$(cat /etc/timezone 2>/dev/null || echo "")
+  fi
+  if [ -z "$tz" ] && [ -L /etc/localtime ]; then
+    tz=$(readlink /etc/localtime 2>/dev/null | sed 's|.*/zoneinfo/||' || echo "")
+  fi
+  echo "${tz:-UTC}"
+}
+
+validate_timezone() {
+  local tz="$1"
+  if [ -z "$tz" ]; then
+    return 1
+  fi
+  if [ -f /usr/share/zoneinfo/"$tz" ] 2>/dev/null; then
+    return 0
+  fi
+  if php -r "echo timezone_open('$tz') ? 'valid' : 'invalid';" 2>/dev/null | grep -q "valid"; then
+    return 0
+  fi
+  local known_timezones
+  known_timezones=$(cat "$(dirname "$(readlink -f "$0")")/configs/valid_timezones.txt" 2>/dev/null || echo "")
+  if [ -n "$known_timezones" ]; then
+    echo "$known_timezones" | grep -qi "^$tz$" && return 0
+  fi
+  local iana_count
+  iana_count=$(ls /usr/share/zoneinfo/*/* 2>/dev/null | head -5 | wc -l)
+  if [ "$iana_count" -gt 0 ] && [ -f "/usr/share/zoneinfo/$tz" ]; then
+    return 0
+  fi
+  return 1
+}
+
+list_timezone_regions() {
+  if [ -f /usr/share/zoneinfo/zone.tab ]; then
+    cut -f3 /usr/share/zoneinfo/zone.tab 2>/dev/null | cut -d/ -f1 | sort -u | grep -v '^$' || true
+  else
+    echo "Africa"
+    echo "America"
+    echo "Antarctica"
+    echo "Arctic"
+    echo "Asia"
+    echo "Atlantic"
+    echo "Australia"
+    echo "Europe"
+    echo "Indian"
+    echo "Pacific"
+    echo "UTC"
+  fi
+}
+
 # ------------------ Input Functions ----------------- #
 
 required_input() {

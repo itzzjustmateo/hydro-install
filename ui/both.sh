@@ -239,20 +239,45 @@ configure_panel_settings() {
   fi
 
   echo ""
+  local sys_tz
+  sys_tz=$(detect_system_timezone)
   output "This timezone setting is used by PHP for all date/time functions."
-  output "Format: Continent/City (e.g., Europe/Berlin, America/New_York, Asia/Tokyo)"
-  output "Examples:"
-  output "  Europe/Berlin       - Central European Time"
-  output "  Europe/London       - Greenwich Mean Time / British Summer Time"
-  output "  America/New_York    - Eastern Time (US)"
-  output "  America/Los_Angeles - Pacific Time (US)"
-  output "  Asia/Tokyo          - Japan Standard Time"
-  output "  Australia/Sydney    - Australian Eastern Time"
-  output "  UTC                 - Coordinated Universal Time (default)"
+  output "Detected system timezone: ${COLOR_ORANGE}${sys_tz}${COLOR_NC}"
   echo ""
-  output "Full list: https://www.php.net/manual/en/timezones.php"
-  echo ""
-  required_input PANEL_TIMEZONE "Timezone [UTC]: " "" "UTC"
+
+  local use_sys=""
+  bool_input use_sys "Use system timezone (${sys_tz})?" "y"
+
+  if [ "$use_sys" != "y" ]; then
+    echo ""
+    output "Format: Continent/City (e.g., Europe/Berlin, America/New_York)"
+    output "Examples:"
+    output "  Europe/Berlin       - Central European Time"
+    output "  Europe/London       - Greenwich Mean Time / British Summer Time"
+    output "  America/New_York    - Eastern Time (US)"
+    output "  America/Los_Angeles - Pacific Time (US)"
+    output "  Asia/Tokyo          - Japan Standard Time"
+    output "  Australia/Sydney    - Australian Eastern Time"
+    output "  UTC                 - Coordinated Universal Time"
+    echo ""
+    output "Full list: $(hyperlink "https://www.php.net/manual/en/timezones.php")"
+    echo ""
+
+    local tz_valid=false
+    while [ "$tz_valid" == false ]; do
+      required_input PANEL_TIMEZONE "Timezone [UTC]: " "" "UTC"
+      if validate_timezone "$PANEL_TIMEZONE"; then
+        tz_valid=true
+      else
+        warning "Timezone '${PANEL_TIMEZONE}' is not recognized"
+        output "Enter a valid timezone (e.g., Continent/City)"
+      fi
+    done
+  else
+    PANEL_TIMEZONE="$sys_tz"
+  fi
+
+  output "Timezone set to: ${COLOR_ORANGE}${PANEL_TIMEZONE}${COLOR_NC}"
 
   echo ""
   email_input PANEL_ADMIN_EMAIL "Admin email: " "Invalid email address"
