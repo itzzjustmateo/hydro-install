@@ -32,6 +32,11 @@ A beautiful, modern, and feature-rich installer for **Hydrodactyl Panel**. Built
 bash <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)
 ```
 
+**Zsh:**
+```zsh
+zsh <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)
+```
+
 Or download and run:
 
 ```bash
