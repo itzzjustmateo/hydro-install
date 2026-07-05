@@ -2163,7 +2163,7 @@ install_hydroq() {
   output "Installing queue worker service..."
 
   # Get service file
-  if ! get_config "hydroq.service" "/etc/systemd/system/hydroq.service"; then
+  if ! get_config "pyroq.service" "/etc/systemd/system/hydroq.service"; then
     exit 1
   fi
 
@@ -2354,6 +2354,10 @@ install_auto_updater_elytra() {
   systemctl enable --now hydrodactyl-wings-auto-update.timer
 
   success "Wings auto-updater installed"
+}
+
+install_auto_updater_wings() {
+  install_auto_updater_elytra
 }
 
 remove_auto_updater_panel() {

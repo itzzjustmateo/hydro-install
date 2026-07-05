@@ -797,9 +797,9 @@ install_wings_daemon() {
   install_rustic
 
   # Get systemd service
-  output "Setting up Elytra service..."
-  if ! get_config "elytra.service" "/etc/systemd/system/elytra.service"; then
-    error "Failed to get Elytra service file"
+  output "Setting up Wings service..."
+  if ! get_config "wings.service" "/etc/systemd/system/wings.service"; then
+    error "Failed to get Wings service file"
     exit 1
   fi
 
@@ -811,9 +811,9 @@ install_wings_daemon() {
   sleep 3
 
   if systemctl is-active --quiet wings; then
-    success "Elytra is running"
+    success "Wings is running"
   else
-    warning "Elytra service may not have started properly"
+    warning "Wings service may not have started properly"
   fi
 
   # Set proper ownership and permissions on Elytra data directories (after service starts)
