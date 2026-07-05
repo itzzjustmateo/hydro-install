@@ -3,15 +3,15 @@
 set -e
 
 # shellcheck source=lib/lib.sh
-source /tmp/pyrodactyl-lib.sh
+source /tmp/hydrodactyl-lib.sh
 
 # Configuration
-PANEL_DIR="/var/www/pyrodactyl"
+PANEL_DIR="/var/www/hydrodactyl"
 ELYTRA_DIR="/etc/elytra"
-PANEL_DATA_DIR="/var/lib/pyrodactyl"
+PANEL_DATA_DIR="/var/lib/hydrodactyl"
 
 remove_panel() {
-    print_flame "Removing Pyrodactyl Panel"
+    print_flame "Removing Hydrodactyl Panel"
 
     # Stop services
     output "Stopping panel services..."
@@ -20,8 +20,8 @@ remove_panel() {
 
     # Remove nginx config
     output "Removing nginx configuration..."
-    rm -f /etc/nginx/sites-available/pyrodactyl.conf
-    rm -f /etc/nginx/sites-enabled/pyrodactyl.conf
+    rm -f /etc/nginx/sites-available/hydrodactyl.conf
+    rm -f /etc/nginx/sites-enabled/hydrodactyl.conf
 
     # Reload nginx if it's running
     if systemctl is-active --quiet nginx; then
@@ -39,7 +39,7 @@ remove_panel() {
     systemctl daemon-reload
 
     # Remove cron job
-    crontab -l 2>/dev/null | grep -v "pyrodactyl" | crontab - 2>/dev/null || true
+    crontab -l 2>/dev/null | grep -v "hydrodactyl" | crontab - 2>/dev/null || true
 
     # Remove SSL certificates if Let's Encrypt was used
     if [ -d "/etc/letsencrypt" ]; then
@@ -84,13 +84,13 @@ remove_elytra() {
     fi
 
     # Remove Elytra version file
-    rm -f /etc/pyrodactyl/elytra-version
+    rm -f /etc/hydrodactyl/elytra-version
 
-    # Remove pyrodactyl user (if it exists)
-    if id -u pyrodactyl >/dev/null 2>&1; then
-        output "Removing pyrodactyl user..."
-        userdel pyrodactyl 2>/dev/null || true
-        groupdel pyrodactyl 2>/dev/null || true
+    # Remove hydrodactyl user (if it exists)
+    if id -u hydrodactyl >/dev/null 2>&1; then
+        output "Removing hydrodactyl user..."
+        userdel hydrodactyl 2>/dev/null || true
+        groupdel hydrodactyl 2>/dev/null || true
     fi
 
     success "Elytra removed"
@@ -106,12 +106,12 @@ remove_auto_updaters() {
     remove_auto_updater_elytra
 
     # Remove backup directories
-    rm -rf /var/backups/pyrodactyl
+    rm -rf /var/backups/hydrodactyl
     rm -rf /var/backups/elytra
 
-    # Remove /etc/pyrodactyl directory if empty
-    if [ -d "/etc/pyrodactyl" ]; then
-        rmdir /etc/pyrodactyl 2>/dev/null || true
+    # Remove /etc/hydrodactyl directory if empty
+    if [ -d "/etc/hydrodactyl" ]; then
+        rmdir /etc/hydrodactyl 2>/dev/null || true
     fi
 
     success "Auto-updaters removed"
@@ -122,9 +122,9 @@ remove_database() {
 
     output "This will remove the panel database and database user."
 
-    if [ -f /root/.config/pyrodactyl/db-credentials ]; then
+    if [ -f /root/.config/hydrodactyl/db-credentials ]; then
         local db_root_pass
-        db_root_pass=$(grep '^root:' /root/.config/pyrodactyl/db-credentials | cut -d':' -f2)
+        db_root_pass=$(grep '^root:' /root/.config/hydrodactyl/db-credentials | cut -d':' -f2)
 
         # Drop database
         output "Dropping database 'panel'..."
@@ -132,14 +132,14 @@ remove_database() {
 
         # Drop user
         output "Dropping database user..."
-        mysql -u root -p"${db_root_pass}" -e "DROP USER IF EXISTS 'pyrodactyl'@'localhost';" 2>/dev/null || true
-        mysql -u root -p"${db_root_pass}" -e "DROP USER IF EXISTS 'pyrodactyl'@'127.0.0.1';" 2>/dev/null || true
-        mysql -u root -p"${db_root_pass}" -e "DROP USER IF EXISTS 'pyrodactyl'@'%';" 2>/dev/null || true
+        mysql -u root -p"${db_root_pass}" -e "DROP USER IF EXISTS 'hydrodactyl'@'localhost';" 2>/dev/null || true
+        mysql -u root -p"${db_root_pass}" -e "DROP USER IF EXISTS 'hydrodactyl'@'127.0.0.1';" 2>/dev/null || true
+        mysql -u root -p"${db_root_pass}" -e "DROP USER IF EXISTS 'hydrodactyl'@'%';" 2>/dev/null || true
         mysql -u root -p"${db_root_pass}" -e "FLUSH PRIVILEGES;" 2>/dev/null || true
 
         # Remove credentials file
-        rm -f /root/.config/pyrodactyl/db-credentials
-        rmdir /root/.config/pyrodactyl 2>/dev/null || true
+        rm -f /root/.config/hydrodactyl/db-credentials
+        rmdir /root/.config/hydrodactyl 2>/dev/null || true
         rmdir /root/.config 2>/dev/null || true
 
         success "Database removed"
@@ -155,8 +155,8 @@ remove_phpmyadmin() {
 
     # Get root password if available
     local db_root_pass=""
-    if [ -f /root/.config/pyrodactyl/db-credentials ]; then
-        db_root_pass=$(grep '^root:' /root/.config/pyrodactyl/db-credentials | cut -d':' -f2)
+    if [ -f /root/.config/hydrodactyl/db-credentials ]; then
+        db_root_pass=$(grep '^root:' /root/.config/hydrodactyl/db-credentials | cut -d':' -f2)
     fi
 
     # Drop phpmyadmin database users
@@ -181,8 +181,8 @@ remove_phpmyadmin() {
     rm -f /etc/phpmyadmin/conf.d/99-custom.php
 
     # Remove phpMyAdmin credentials from file
-    if [ -f /root/.config/pyrodactyl/db-credentials ]; then
-        sed -i '/^phpmyadmin:/d' /root/.config/pyrodactyl/db-credentials
+    if [ -f /root/.config/hydrodactyl/db-credentials ]; then
+        sed -i '/^phpmyadmin:/d' /root/.config/hydrodactyl/db-credentials
     fi
 
     # Purge debconf database for clean reinstall
@@ -204,7 +204,7 @@ remove_data() {
 
     # Remove any remaining Docker volumes
     output "Removing Docker volumes..."
-    docker volume ls -q --filter "name=pyrodactyl" | xargs -r docker volume rm 2>/dev/null || true
+    docker volume ls -q --filter "name=hydrodactyl" | xargs -r docker volume rm 2>/dev/null || true
 
     success "Data files removed"
 }
@@ -284,7 +284,7 @@ main() {
     print_flame "Uninstallation Complete!"
 
     echo ""
-    output "Pyrodactyl has been uninstalled from your system."
+    output "Hydrodactyl has been uninstalled from your system."
     output ""
     output "Note: Some configuration files may remain in:"
     output "  ${COLOR_ORANGE}/etc/nginx/${COLOR_NC}"

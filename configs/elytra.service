@@ -1,5 +1,5 @@
 [Unit]
-Description=Pyrodactyl Elytra Daemon
+Description=Hydrodactyl Elytra Daemon
 Documentation=https://github.com/pyrohost/elytra
 After=docker.service network-online.target
 Wants=network-online.target

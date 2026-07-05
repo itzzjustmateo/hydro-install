@@ -4,11 +4,11 @@ set -e
 
 ######################################################################################
 #                                                                                    #
-# Pyrodactyl Installer Library                                                       #
+# Hydrodactyl Installer Library                                                       #
 #                                                                                    #
 # Copyright (C) 2025, Muspelheim Hosting                                             #
 #                                                                                    #
-# https://github.com/Muspelheim-Hosting/pyrodactyl-installer                         #
+# https://github.com/itzzjustmateo/hydro-install                         #
 #                                                                                    #
 ######################################################################################
 
@@ -16,22 +16,24 @@ set -e
 
 export GITHUB_SOURCE="${GITHUB_SOURCE:-main}"
 export SCRIPT_RELEASE="${SCRIPT_RELEASE:-v1.0.0}"
-export GITHUB_BASE_URL="${GITHUB_BASE_URL:-https://raw.githubusercontent.com/Muspelheim-Hosting/pyrodactyl-installer}"
+export GITHUB_BASE_URL="${GITHUB_BASE_URL:-https://raw.githubusercontent.com/itzzjustmateo/hydro-install}"
 export GITHUB_URL="$GITHUB_BASE_URL/$GITHUB_SOURCE"
 
 
 
 # ------------------ Default Repositories ----------------- #
 
-export DEFAULT_PANEL_REPO="pyrodactyl-oss/pyrodactyl"
-export DEFAULT_ELYTRA_REPO="pyrohost/elytra"
+export DEFAULT_PANEL_REPO="blueprintframework/hydrodactyl"
+export DEFAULT_ELYTRA_REPO="pterodactyl/wings"
+export DEFAULT_WINGS_REPO="pterodactyl/wings"
+export DEFAULT_WINGS_RS_REPO="calagopus/wings"
 
 # ------------------ Path Configuration ----------------- #
 
-export INSTALL_DIR="/var/www/pyrodactyl"
+export INSTALL_DIR="/var/www/hydrodactyl"
 export ELYTRA_DIR="/etc/elytra"
-export PANEL_CONFIG_DIR="/etc/pyrodactyl"
-export LOG_PATH="/var/log/pyrodactyl-installer.log"
+export PANEL_CONFIG_DIR="/etc/hydrodactyl"
+export LOG_PATH="/var/log/hydrodactyl-installer.log"
 
 # ------------------ System Requirements ----------------- #
 
@@ -147,7 +149,7 @@ print_header() {
   echo -e "${GRADIENT_7}    ║  ██║ ╚═╝ ██║╚██████╔╝███████║██║     ███████╗███████╗██║  ██║███████╗██║██║ ╚═╝ ██║  ║"
   echo -e "${GRADIENT_8}    ║  ╚═╝     ╚═╝ ╚═════╝ ╚══════╝╚═╝     ╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝╚═╝╚═╝     ╚═╝  ║"
   echo -e "${GRADIENT_9}    ║                                                                                      ║"
-  echo -e "${GRADIENT_10}    ║                            Pyrodactyl Installation Manager                           ║"
+  echo -e "${GRADIENT_10}    ║                           Hydrodactyl Installation Manager                           ║"
   echo -e "${GRADIENT_11}    ╚══════════════════════════════════════════════════════════════════════════════════════╝"
   echo -e "${COLOR_NC}"
   echo -e "    ${COLOR_ORANGE}Version:${COLOR_NC} ${SCRIPT_RELEASE}  ${COLOR_ORANGE}|${COLOR_NC}  ${COLOR_ORANGE}By:${COLOR_NC} Muspelheim Hosting"
@@ -192,32 +194,32 @@ welcome() {
   echo ""
 
   # Check installed components
-  if [ -d "/var/www/pyrodactyl" ]; then
+  if [ -d "/var/www/hydrodactyl" ]; then
     local panel_version="unknown"
-    if [ -f "/var/www/pyrodactyl/config/app.php" ]; then
-      panel_version=$(grep "'version'" /var/www/pyrodactyl/config/app.php 2>/dev/null | head -1 | cut -d"'" -f4 || echo "unknown")
+    if [ -f "/var/www/hydrodactyl/config/app.php" ]; then
+      panel_version=$(grep "'version'" /var/www/hydrodactyl/config/app.php 2>/dev/null | head -1 | cut -d"'" -f4 || echo "unknown")
     fi
     echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Panel installed${panel_version:+ (v$panel_version)}"
   else
     echo -e "  ${COLOR_RED}✗${COLOR_NC} Panel not installed"
   fi
 
-  if [ -f "/usr/local/bin/elytra" ]; then
-    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Elytra installed"
+  if [ -f "/usr/local/bin/wings" ]; then
+    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Wings installed"
   else
-    echo -e "  ${COLOR_RED}✗${COLOR_NC} Elytra not installed"
+    echo -e "  ${COLOR_RED}✗${COLOR_NC} Wings not installed"
   fi
 
-  if systemctl is-enabled --quiet pyrodactyl-panel-auto-update.timer 2>/dev/null; then
+  if systemctl is-enabled --quiet hydrodactyl-panel-auto-update.timer 2>/dev/null; then
     echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Panel auto-updater enabled"
   else
     echo -e "  ${COLOR_RED}✗${COLOR_NC} Panel auto-updater not installed"
   fi
 
-  if systemctl is-enabled --quiet pyrodactyl-elytra-auto-update.timer 2>/dev/null; then
-    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Elytra auto-updater enabled"
+  if systemctl is-enabled --quiet hydrodactyl-wings-auto-update.timer 2>/dev/null; then
+    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Wings auto-updater enabled"
   else
-    echo -e "  ${COLOR_RED}✗${COLOR_NC} Elytra auto-updater not installed"
+    echo -e "  ${COLOR_RED}✗${COLOR_NC} Wings auto-updater not installed"
   fi
 
   echo ""
@@ -576,6 +578,46 @@ check_docker_compatibility() {
   return 0
 }
 
+# Ask which Wings variant to install
+select_wings_variant() {
+  echo ""
+  output "Which Wings variant would you like to install?"
+  echo ""
+  output "[${COLOR_ORANGE}0${COLOR_NC}] Pterodactyl Wings (Go)"
+  output "    The official Pterodactyl server daemon, written in Go."
+  output "    Most stable, widely used, and battle-tested in production."
+  output "    Best for: production environments, maximum compatibility."
+  echo ""
+  output "[${COLOR_ORANGE}1${COLOR_NC}] wings-rs (Rust)"
+  output "    A lightweight Rust reimplementation of Wings."
+  output "    Lower memory usage, faster startup, additional features."
+  output "    Best for: resource-constrained servers, advanced users."
+  echo ""
+
+  local variant_choice=""
+  while [[ "$variant_choice" != "0" && "$variant_choice" != "1" ]]; do
+    echo -n "* Select [0-1]: "
+    read -r variant_choice
+    if [[ "$variant_choice" != "0" && "$variant_choice" != "1" ]]; then
+      error "Invalid selection. Please enter 0 or 1."
+    fi
+  done
+
+  if [ "$variant_choice" == "0" ]; then
+    WINGS_VARIANT="go"
+    WINGS_REPO="${WINGS_REPO:-$DEFAULT_WINGS_REPO}"
+    export WINGS_VARIANT="go"
+    export WINGS_REPO
+    output "Selected: Pterodactyl Wings (Go)"
+  else
+    WINGS_VARIANT="rs"
+    WINGS_REPO="${WINGS_REPO:-$DEFAULT_WINGS_RS_REPO}"
+    export WINGS_VARIANT="rs"
+    export WINGS_REPO
+    output "Selected: wings-rs (Rust)"
+  fi
+}
+
 # ------------------ Validation Functions ----------------- #
 
 check_fqdn() {
@@ -610,7 +652,7 @@ cmd_exists() {
 # Usage: load_existing_db_credentials [variable_name]
 # Returns 0 if credentials loaded successfully, 1 otherwise
 load_existing_db_credentials() {
-  local creds_file="/root/.config/pyrodactyl/db-credentials"
+  local creds_file="/root/.config/hydrodactyl/db-credentials"
 
   if [ -f "$creds_file" ]; then
     output "Found existing database credentials, loading..." >&2
@@ -636,11 +678,11 @@ check_existing_installation() {
   local component="$1"
   local has_existing=false
 
-  if [ "$component" == "panel" ] && [ -d "/var/www/pyrodactyl" ]; then
-    warning "Existing panel installation detected at /var/www/pyrodactyl"
+  if [ "$component" == "panel" ] && [ -d "/var/www/hydrodactyl" ]; then
+    warning "Existing panel installation detected at /var/www/hydrodactyl"
     has_existing=true
-  elif [ "$component" == "elytra" ] && [ -f "/usr/local/bin/elytra" ]; then
-    warning "Existing Elytra installation detected at /usr/local/bin/elytra"
+  elif [ "$component" == "elytra" ] && [ -f "/usr/local/bin/wings" ]; then
+    warning "Existing Wings installation detected at /usr/local/bin/wings"
     has_existing=true
   fi
 
@@ -1264,7 +1306,7 @@ configure_mariadb_tcp() {
   mkdir -p "$mariadb_conf_dir"
 
   # Create configuration file
-  cat > "${mariadb_conf_dir}/99-pyrodactyl.cnf" <<EOF
+  cat > "${mariadb_conf_dir}/99-hydrodactyl.cnf" <<EOF
 [mysqld]
 bind-address = 0.0.0.0
 port = 3306
@@ -1744,13 +1786,13 @@ install_phpmyadmin() {
   " 2>/dev/null || warning "Could not create phpMyAdmin user (may already exist)"
 
   # Save credentials to file
-  mkdir -p /root/.config/pyrodactyl
-  echo "phpmyadmin:${PHPMYADMIN_PASSWORD}" >> /root/.config/pyrodactyl/db-credentials
+  mkdir -p /root/.config/hydrodactyl
+  echo "phpmyadmin:${PHPMYADMIN_PASSWORD}" >> /root/.config/hydrodactyl/db-credentials
 
   output "Setting up phpMyAdmin configuration..."
   cat > /etc/phpmyadmin/conf.d/99-custom.php << 'PHPEOF'
 <?php
-# Custom phpMyAdmin configuration for Pyrodactyl
+# Custom phpMyAdmin configuration for Hydrodactyl
 $cfg['Servers'][$i]['AllowNoPassword'] = false;
 $cfg['Servers'][$i]['auth_type'] = 'cookie';
 $cfg['LoginCookieValidity'] = 3600;
@@ -1830,10 +1872,10 @@ try {
 php_fpm_conf() {
   output "Configuring PHP-FPM..."
 
-  local config_file="/etc/php-fpm.d/www-pyrodactyl.conf"
+  local config_file="/etc/php-fpm.d/www-hydrodactyl.conf"
 
   # Download or copy config
-  if ! get_config "www-pyrodactyl.conf" "$config_file"; then
+  if ! get_config "www-hydrodactyl.conf" "$config_file"; then
     exit 1
   fi
 
@@ -1853,7 +1895,7 @@ get_php_socket() {
       echo "/run/php/php${PHP_VERSION}-fpm.sock"
       ;;
     rocky|almalinux|fedora|rhel|centos)
-      echo "/run/php-fpm/www-pyrodactyl.sock"
+      echo "/run/php-fpm/www-hydrodactyl.sock"
       ;;
     *)
       echo "/run/php/php${PHP_VERSION}-fpm.sock"
@@ -1872,7 +1914,7 @@ install_nginx_config() {
 
   output "Installing Nginx configuration..."
 
-  local config_file="/etc/nginx/sites-available/pyrodactyl.conf"
+  local config_file="/etc/nginx/sites-available/hydrodactyl.conf"
 
   if [ "$ssl" == true ] && [ -n "$cert_path" ] && [ -n "$key_path" ]; then
     # Get SSL config
@@ -1896,7 +1938,7 @@ install_nginx_config() {
 
   # Enable site
   mkdir -p /etc/nginx/sites-enabled
-  ln -sf "$config_file" /etc/nginx/sites-enabled/pyrodactyl.conf
+  ln -sf "$config_file" /etc/nginx/sites-enabled/hydrodactyl.conf
 
   # Remove default site
   rm -f /etc/nginx/sites-enabled/default
@@ -1941,28 +1983,28 @@ setup_certbot_renewal() {
   mkdir -p /etc/letsencrypt/renewal-hooks/deploy
 
   # Create deploy hook script to restart services after renewal
-  cat > /etc/letsencrypt/renewal-hooks/deploy/pyrodactyl-services.sh << 'EOF'
+  cat > /etc/letsencrypt/renewal-hooks/deploy/hydrodactyl-services.sh << 'EOF'
 #!/bin/bash
-# Pyrodactyl/Elytra service restart hook for Certbot
+# Hydrodactyl/Elytra service restart hook for Certbot
 # This script runs after successful certificate renewal
 
 # Log the renewal
-echo "[$(date)] Certificate renewed, restarting services..." >> /var/log/pyrodactyl-certbot-renewal.log
+echo "[$(date)] Certificate renewed, restarting services..." >> /var/log/hydrodactyl-certbot-renewal.log
 
 # Restart nginx
 if systemctl is-active --quiet nginx 2>/dev/null; then
-    systemctl restart nginx 2>/dev/null && echo "[$(date)] nginx restarted successfully" >> /var/log/pyrodactyl-certbot-renewal.log
+    systemctl restart nginx 2>/dev/null && echo "[$(date)] nginx restarted successfully" >> /var/log/hydrodactyl-certbot-renewal.log
 fi
 
 # Restart Elytra if installed
 if systemctl is-active --quiet elytra 2>/dev/null; then
-    systemctl restart elytra 2>/dev/null && echo "[$(date)] Elytra restarted successfully" >> /var/log/pyrodactyl-certbot-renewal.log
+    systemctl restart elytra 2>/dev/null && echo "[$(date)] Elytra restarted successfully" >> /var/log/hydrodactyl-certbot-renewal.log
 fi
 
 exit 0
 EOF
 
-  chmod +x /etc/letsencrypt/renewal-hooks/deploy/pyrodactyl-services.sh
+  chmod +x /etc/letsencrypt/renewal-hooks/deploy/hydrodactyl-services.sh
 
   # Check if systemd timer is available (preferred method)
   if systemctl list-timers 2>/dev/null | grep -q "certbot"; then
@@ -1982,20 +2024,20 @@ EOF
     # Add renewal cron job with randomization (twice daily as recommended by Let's Encrypt)
     # Random sleep prevents thundering herd against Let's Encrypt servers
     local random_sleep=$(awk 'BEGIN{srand(); print int(rand()*(3600+1))}')
-    echo "0 0,12 * * * root sleep ${random_sleep} && certbot renew --quiet >> /var/log/pyrodactyl-certbot-renewal.log 2>&1" >> /etc/crontab
+    echo "0 0,12 * * * root sleep ${random_sleep} && certbot renew --quiet >> /var/log/hydrodactyl-certbot-renewal.log 2>&1" >> /etc/crontab
 
     output "Cron job installed: Certbot will check for renewals twice daily (with ${random_sleep}s random delay)"
   fi
 
   # Create log file
-  touch /var/log/pyrodactyl-certbot-renewal.log
+  touch /var/log/hydrodactyl-certbot-renewal.log
 
   # Log initial setup
-  echo "[$(date)] Certbot auto-renewal configured for Pyrodactyl" >> /var/log/pyrodactyl-certbot-renewal.log
+  echo "[$(date)] Certbot auto-renewal configured for Hydrodactyl" >> /var/log/hydrodactyl-certbot-renewal.log
 
   success "Automatic certificate renewal configured"
   output "Services will automatically restart after certificate renewal"
-  output "Renewal logs: /var/log/pyrodactyl-certbot-renewal.log"
+  output "Renewal logs: /var/log/hydrodactyl-certbot-renewal.log"
 }
 
 # Verify certbot renewal configuration
@@ -2014,17 +2056,17 @@ verify_certbot_renewal() {
   output "✓ Certbot is installed"
 
   # Check for renewal hooks
-  if [ -f "/etc/letsencrypt/renewal-hooks/deploy/pyrodactyl-services.sh" ]; then
-    output "✓ Pyrodactyl renewal hook script exists"
+  if [ -f "/etc/letsencrypt/renewal-hooks/deploy/hydrodactyl-services.sh" ]; then
+    output "✓ Hydrodactyl renewal hook script exists"
 
-    if [ -x "/etc/letsencrypt/renewal-hooks/deploy/pyrodactyl-services.sh" ]; then
+    if [ -x "/etc/letsencrypt/renewal-hooks/deploy/hydrodactyl-services.sh" ]; then
       output "✓ Renewal hook script is executable"
     else
       warning "Renewal hook script is not executable"
       has_errors=true
     fi
   else
-    warning "Pyrodactyl renewal hook script not found"
+    warning "Hydrodactyl renewal hook script not found"
     has_errors=true
   fi
 
@@ -2047,12 +2089,12 @@ verify_certbot_renewal() {
   fi
 
   # Check renewal logs
-  if [ -f "/var/log/pyrodactyl-certbot-renewal.log" ]; then
+  if [ -f "/var/log/hydrodactyl-certbot-renewal.log" ]; then
     output "✓ Renewal log file exists"
 
     # Show last renewal
     local last_renewal
-    last_renewal=$(grep "Certificate renewed" /var/log/pyrodactyl-certbot-renewal.log 2>/dev/null | tail -1)
+    last_renewal=$(grep "Certificate renewed" /var/log/hydrodactyl-certbot-renewal.log 2>/dev/null | tail -1)
     if [ -n "$last_renewal" ]; then
       output "  Last renewal: $last_renewal"
     fi
@@ -2110,39 +2152,39 @@ selinux_allow() {
 insert_cronjob() {
   output "Installing cron job..."
 
-  (crontab -l 2>/dev/null | grep -v "schedule:run"; echo "* * * * * php /var/www/pyrodactyl/artisan schedule:run >> /dev/null 2>&1") | crontab -
+  (crontab -l 2>/dev/null | grep -v "schedule:run"; echo "* * * * * php /var/www/hydrodactyl/artisan schedule:run >> /dev/null 2>&1") | crontab -
 
   success "Cron job installed"
 }
 
 # ------------------ Queue Worker Functions ----------------- #
 
-install_pyroq() {
+install_hydroq() {
   output "Installing queue worker service..."
 
   # Get service file
-  if ! get_config "pyroq.service" "/etc/systemd/system/pyroq.service"; then
+  if ! get_config "hydroq.service" "/etc/systemd/system/hydroq.service"; then
     exit 1
   fi
 
   # Replace placeholder with actual user
-  sed -i "s|<user>|$WEBUSER|g" /etc/systemd/system/pyroq.service
+  sed -i "s|<user>|$WEBUSER|g" /etc/systemd/system/hydroq.service
 
   systemctl daemon-reload
-  systemctl enable pyroq
-  systemctl start pyroq
+  systemctl enable hydroq
+  systemctl start hydroq
 
   # Wait for service to start
   sleep 2
 
   # Verify installation
-  if ! systemctl is-active --quiet pyroq 2>/dev/null; then
+  if ! systemctl is-active --quiet hydroq 2>/dev/null; then
     warning "Queue worker service failed to start - attempting restart..."
-    systemctl restart pyroq
+    systemctl restart hydroq
     sleep 2
 
-    if ! systemctl is-active --quiet pyroq 2>/dev/null; then
-      warning "Queue worker service failed to start. Check logs with: journalctl -u pyroq"
+    if ! systemctl is-active --quiet hydroq 2>/dev/null; then
+      warning "Queue worker service failed to start. Check logs with: journalctl -u hydroq"
     fi
   fi
 
@@ -2150,24 +2192,24 @@ install_pyroq() {
 }
 
 # Verify queue worker is running and healthy
-verify_pyroq() {
+verify_hydroq() {
   local panel_dir="${1:-$INSTALL_DIR}"
   local has_errors=false
 
   # Check if service is active
-  if ! systemctl is-active --quiet pyroq 2>/dev/null; then
-    warning "Queue worker (pyroq) is not running"
+  if ! systemctl is-active --quiet hydroq 2>/dev/null; then
+    warning "Queue worker (hydroq) is not running"
     has_errors=true
   else
-    output "✓ Queue worker (pyroq) is running"
+    output "✓ Queue worker (hydroq) is running"
   fi
 
   # Check if service is enabled
-  if ! systemctl is-enabled --quiet pyroq 2>/dev/null; then
-    warning "Queue worker (pyroq) is not enabled to start on boot"
+  if ! systemctl is-enabled --quiet hydroq 2>/dev/null; then
+    warning "Queue worker (hydroq) is not enabled to start on boot"
     has_errors=true
   else
-    output "✓ Queue worker (pyroq) is enabled"
+    output "✓ Queue worker (hydroq) is enabled"
   fi
 
   # Check for failed jobs if panel is installed
@@ -2191,17 +2233,17 @@ verify_pyroq() {
 }
 
 # Get queue worker status summary
-get_pyroq_status() {
+get_hydroq_status() {
   local status="unknown"
   local enabled="unknown"
 
-  if systemctl is-active --quiet pyroq 2>/dev/null; then
+  if systemctl is-active --quiet hydroq 2>/dev/null; then
     status="running"
   else
     status="stopped"
   fi
 
-  if systemctl is-enabled --quiet pyroq 2>/dev/null; then
+  if systemctl is-enabled --quiet hydroq 2>/dev/null; then
     enabled="enabled"
   else
     enabled="disabled"
@@ -2211,10 +2253,10 @@ get_pyroq_status() {
 }
 
 # Restart queue worker and verify
-restart_pyroq() {
+restart_hydroq() {
   output "Restarting queue worker..."
 
-  systemctl restart pyroq 2>/dev/null || {
+  systemctl restart hydroq 2>/dev/null || {
     error "Failed to restart queue worker"
     return 1
   }
@@ -2223,7 +2265,7 @@ restart_pyroq() {
   sleep 2
 
   # Verify it's running
-  if systemctl is-active --quiet pyroq 2>/dev/null; then
+  if systemctl is-active --quiet hydroq 2>/dev/null; then
     success "Queue worker restarted successfully"
     return 0
   else
@@ -2237,17 +2279,17 @@ restart_pyroq() {
 install_auto_updater_panel() {
   output "Installing Panel auto-updater..."
 
-  mkdir -p /etc/pyrodactyl
+  mkdir -p /etc/hydrodactyl
 
   # Get auto-update script
-  if ! get_script "installers" "auto-update-panel" "/usr/local/bin/pyrodactyl-auto-update-panel.sh"; then
+  if ! get_script "installers" "auto-update-panel" "/usr/local/bin/hydrodactyl-auto-update-panel.sh"; then
     error "Failed to get auto-update script"
     exit 1
   fi
 
   # Auto-detect update method based on installation type
   local update_method="releases"
-  if [ -d "/var/www/pyrodactyl/.git" ]; then
+  if [ -d "/var/www/hydrodactyl/.git" ]; then
     update_method="git"
     output "Detected git-based installation - will use git for updates"
   else
@@ -2255,76 +2297,76 @@ install_auto_updater_panel() {
   fi
 
   # Create config
-  echo "PANEL_REPO=\"${PANEL_REPO:-pyrodactyl-oss/pyrodactyl}\"" > /etc/pyrodactyl/auto-update-panel.env
-  echo "GITHUB_TOKEN=\"${GITHUB_TOKEN:-}\"" >> /etc/pyrodactyl/auto-update-panel.env
-  echo "UPDATE_METHOD=\"${update_method}\"" >> /etc/pyrodactyl/auto-update-panel.env
-  echo "PANEL_REPO_PRIVATE=\"${PANEL_REPO_PRIVATE:-false}\"" >> /etc/pyrodactyl/auto-update-panel.env
-  chmod 600 /etc/pyrodactyl/auto-update-panel.env
+  echo "PANEL_REPO=\"${PANEL_REPO:-blueprintframework/hydrodactyl}\"" > /etc/hydrodactyl/auto-update-panel.env
+  echo "GITHUB_TOKEN=\"${GITHUB_TOKEN:-}\"" >> /etc/hydrodactyl/auto-update-panel.env
+  echo "UPDATE_METHOD=\"${update_method}\"" >> /etc/hydrodactyl/auto-update-panel.env
+  echo "PANEL_REPO_PRIVATE=\"${PANEL_REPO_PRIVATE:-false}\"" >> /etc/hydrodactyl/auto-update-panel.env
+  chmod 600 /etc/hydrodactyl/auto-update-panel.env
 
   # Get systemd service
-  if ! get_config "auto-update-panel.service" "/etc/systemd/system/pyrodactyl-panel-auto-update.service"; then
+  if ! get_config "auto-update-panel.service" "/etc/systemd/system/hydrodactyl-panel-auto-update.service"; then
     exit 1
   fi
 
   # Get systemd timer
-  if ! get_config "auto-update-panel.timer" "/etc/systemd/system/pyrodactyl-panel-auto-update.timer"; then
+  if ! get_config "auto-update-panel.timer" "/etc/systemd/system/hydrodactyl-panel-auto-update.timer"; then
     exit 1
   fi
 
   systemctl daemon-reload
-  systemctl enable --now pyrodactyl-panel-auto-update.timer
+  systemctl enable --now hydrodactyl-panel-auto-update.timer
 
   success "Panel auto-updater installed"
 }
 
 install_auto_updater_elytra() {
-  output "Installing Elytra auto-updater..."
+  output "Installing Wings auto-updater..."
 
-  mkdir -p /etc/pyrodactyl
+  mkdir -p /etc/hydrodactyl
 
   # Get auto-update script
-  if ! get_script "installers" "auto-update-elytra" "/usr/local/bin/pyrodactyl-auto-update-elytra.sh"; then
+  if ! get_script "installers" "auto-update-wings" "/usr/local/bin/hydrodactyl-auto-update-wings.sh"; then
     error "Failed to get auto-update script"
     exit 1
   fi
 
-  # Elytra always uses release-based updates (distributed as binary)
-  output "Elytra uses release-based updates"
+  # Wings always uses release-based updates (distributed as binary)
+  output "Wings uses release-based updates"
 
   # Create config
-  echo "ELYTRA_REPO=\"${ELYTRA_REPO:-pyrohost/elytra}\"" > /etc/pyrodactyl/auto-update-elytra.env
-  echo "GITHUB_TOKEN=\"${GITHUB_TOKEN:-}\"" >> /etc/pyrodactyl/auto-update-elytra.env
-  echo "UPDATE_METHOD=\"releases\"" >> /etc/pyrodactyl/auto-update-elytra.env
-  echo "ELYTRA_REPO_PRIVATE=\"${ELYTRA_REPO_PRIVATE:-false}\"" >> /etc/pyrodactyl/auto-update-elytra.env
-  chmod 600 /etc/pyrodactyl/auto-update-elytra.env
+  echo "WINGS_REPO=\"${WINGS_REPO:-pterodactyl/wings}\"" > /etc/hydrodactyl/auto-update-wings.env
+  echo "GITHUB_TOKEN=\"${GITHUB_TOKEN:-}\"" >> /etc/hydrodactyl/auto-update-wings.env
+  echo "UPDATE_METHOD=\"releases\"" >> /etc/hydrodactyl/auto-update-wings.env
+  echo "WINGS_REPO_PRIVATE=\"${WINGS_REPO_PRIVATE:-false}\"" >> /etc/hydrodactyl/auto-update-wings.env
+  chmod 600 /etc/hydrodactyl/auto-update-wings.env
 
   # Get systemd service
-  if ! get_config "auto-update-elytra.service" "/etc/systemd/system/pyrodactyl-elytra-auto-update.service"; then
+  if ! get_config "auto-update-wings.service" "/etc/systemd/system/hydrodactyl-wings-auto-update.service"; then
     exit 1
   fi
 
   # Get systemd timer
-  if ! get_config "auto-update-elytra.timer" "/etc/systemd/system/pyrodactyl-elytra-auto-update.timer"; then
+  if ! get_config "auto-update-wings.timer" "/etc/systemd/system/hydrodactyl-wings-auto-update.timer"; then
     exit 1
   fi
 
   systemctl daemon-reload
-  systemctl enable --now pyrodactyl-elytra-auto-update.timer
+  systemctl enable --now hydrodactyl-wings-auto-update.timer
 
-  success "Elytra auto-updater installed"
+  success "Wings auto-updater installed"
 }
 
 remove_auto_updater_panel() {
   output "Removing Panel auto-updater..."
 
-  systemctl stop pyrodactyl-panel-auto-update.timer 2>/dev/null || true
-  systemctl disable pyrodactyl-panel-auto-update.timer 2>/dev/null || true
+  systemctl stop hydrodactyl-panel-auto-update.timer 2>/dev/null || true
+  systemctl disable hydrodactyl-panel-auto-update.timer 2>/dev/null || true
 
-  rm -f /etc/systemd/system/pyrodactyl-panel-auto-update.service
-  rm -f /etc/systemd/system/pyrodactyl-panel-auto-update.timer
-  rm -f /usr/local/bin/pyrodactyl-auto-update-panel.sh
-  rm -f /etc/pyrodactyl/auto-update-panel.conf
-  rm -f /etc/pyrodactyl/auto-update-panel.env
+  rm -f /etc/systemd/system/hydrodactyl-panel-auto-update.service
+  rm -f /etc/systemd/system/hydrodactyl-panel-auto-update.timer
+  rm -f /usr/local/bin/hydrodactyl-auto-update-panel.sh
+  rm -f /etc/hydrodactyl/auto-update-panel.conf
+  rm -f /etc/hydrodactyl/auto-update-panel.env
 
   systemctl daemon-reload
 
@@ -2332,20 +2374,20 @@ remove_auto_updater_panel() {
 }
 
 remove_auto_updater_elytra() {
-  output "Removing Elytra auto-updater..."
+  output "Removing Wings auto-updater..."
 
-  systemctl stop pyrodactyl-elytra-auto-update.timer 2>/dev/null || true
-  systemctl disable pyrodactyl-elytra-auto-update.timer 2>/dev/null || true
+  systemctl stop hydrodactyl-wings-auto-update.timer 2>/dev/null || true
+  systemctl disable hydrodactyl-wings-auto-update.timer 2>/dev/null || true
 
-  rm -f /etc/systemd/system/pyrodactyl-elytra-auto-update.service
-  rm -f /etc/systemd/system/pyrodactyl-elytra-auto-update.timer
-  rm -f /usr/local/bin/pyrodactyl-auto-update-elytra.sh
-  rm -f /etc/pyrodactyl/auto-update-elytra.conf
-  rm -f /etc/pyrodactyl/auto-update-elytra.env
+  rm -f /etc/systemd/system/hydrodactyl-wings-auto-update.service
+  rm -f /etc/systemd/system/hydrodactyl-wings-auto-update.timer
+  rm -f /usr/local/bin/hydrodactyl-auto-update-wings.sh
+  rm -f /etc/hydrodactyl/auto-update-wings.conf
+  rm -f /etc/hydrodactyl/auto-update-wings.env
 
   systemctl daemon-reload
 
-  success "Elytra auto-updater removed"
+  success "Wings auto-updater removed"
 }
 
 # ------------------ Script Execution Functions ----------------- #
@@ -2521,10 +2563,10 @@ get_system_memory() {
 }
 
 get_system_disk() {
-  # Get available disk space in MB for /var/lib/pyrodactyl or root
+  # Get available disk space in MB for /var/lib/hydrodactyl or root
   local disk_gb
-  if [ -d "/var/lib/pyrodactyl" ]; then
-    disk_gb=$(df -BG /var/lib/pyrodactyl | awk 'NR==2 {gsub(/G/,""); print $4}')
+  if [ -d "/var/lib/hydrodactyl" ]; then
+    disk_gb=$(df -BG /var/lib/hydrodactyl | awk 'NR==2 {gsub(/G/,""); print $4}')
   else
     disk_gb=$(df -BG / | awk 'NR==2 {gsub(/G/,""); print $4}')
   fi
@@ -3164,7 +3206,7 @@ detect_os
 # ------------------ Installation Info Functions ----------------- #
 
 # Directory for storing installation information
-INSTALL_INFO_DIR="/etc/pyrodactyl/install-info"
+INSTALL_INFO_DIR="/etc/hydrodactyl/install-info"
 
 # Save panel installation information
 save_panel_install_info() {
@@ -3179,7 +3221,7 @@ save_panel_install_info() {
   output "Saving panel installation information..."
 
   {
-    echo "# Pyrodactyl Panel Installation Information"
+    echo "# Hydrodactyl Panel Installation Information"
     echo "# Generated: $(date)"
     echo "# Type: $install_type"
     echo ""
@@ -3303,7 +3345,7 @@ display_panel_install_info() {
 
   print_brake 70
   echo ""
-  echo -e "  ${COLOR_ORANGE}Pyrodactyl Panel Installation Information${COLOR_NC}"
+  echo -e "  ${COLOR_ORANGE}Hydrodactyl Panel Installation Information${COLOR_NC}"
   echo ""
   print_brake 70
   echo ""
@@ -3381,7 +3423,7 @@ show_panel_completion() {
   echo ""
   print_brake 70
   echo ""
-  output "Your Pyrodactyl panel has been installed and configured."
+  output "Your Hydrodactyl panel has been installed and configured."
   echo ""
   [ -n "$FQDN" ] && output "Panel URL: https://$FQDN"
   [ -n "$user_email" ] && output "Admin Email: $user_email"
@@ -3438,7 +3480,7 @@ show_both_completion() {
   echo ""
   print_brake 70
   echo ""
-  output "Both Pyrodactyl Panel and Elytra Daemon have been installed."
+  output "Both Hydrodactyl Panel and Elytra Daemon have been installed."
   echo ""
   [ -n "$FQDN" ] && output "Panel URL: https://$FQDN"
   [ -n "$user_email" ] && output "Admin Email: $user_email"
@@ -3567,7 +3609,7 @@ check_panel_health() {
   fi
 
   # Check queue worker with detailed verification
-  if ! verify_pyroq "$panel_dir"; then
+  if ! verify_hydroq "$panel_dir"; then
     has_errors=true
   fi
 

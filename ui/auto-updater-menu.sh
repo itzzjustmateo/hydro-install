@@ -4,7 +4,7 @@ set -e
 
 ######################################################################################
 #                                                                                    #
-# Pyrodactyl Auto-Updater Management UI                                              #
+# Hydrodactyl Auto-Updater Management UI                                              #
 #                                                                                    #
 # Copyright (C) 2025, Muspelheim Hosting                                             #
 #                                                                                    #
@@ -14,17 +14,17 @@ set -e
 fn_exists() { declare -F "$1" >/dev/null; }
 if ! fn_exists lib_loaded; then
   # Try temp file first (when run through install.sh)
-  if [ -f /tmp/pyrodactyl-lib.sh ]; then
+  if [ -f /tmp/hydrodactyl-lib.sh ]; then
     # shellcheck source=/dev/null
-    if ! source /tmp/pyrodactyl-lib.sh 2>/dev/null; then
+    if ! source /tmp/hydrodactyl-lib.sh 2>/dev/null; then
       # Temp file exists but failed to load (corrupt/invalid) - remove it
-      rm -f /tmp/pyrodactyl-lib.sh
+      rm -f /tmp/hydrodactyl-lib.sh
     fi
   fi
   # Fall back to downloading if temp file didn't load or doesn't exist
   if ! fn_exists lib_loaded; then
     # shellcheck source=/dev/null
-    source <(curl -sSL "${GITHUB_BASE_URL:-"https://raw.githubusercontent.com/Muspelheim-Hosting/pyrodactyl-installer"}/${GITHUB_SOURCE:-"main"}/lib/lib.sh")
+    source <(curl -sSL "${GITHUB_BASE_URL:-"https://raw.githubusercontent.com/itzzjustmateo/hydro-install"}/${GITHUB_SOURCE:-"main"}/lib/lib.sh")
   fi
   ! fn_exists lib_loaded && echo "* ERROR: Could not load lib script" && exit 1
 fi
@@ -55,7 +55,7 @@ configure_panel_auto_updater() {
   print_header
   print_flame "Panel Auto-Updater Configuration"
 
-  output "The default Pyrodactyl Panel repository is:"
+  output "The default Hydrodactyl Panel repository is:"
   output "  ${COLOR_ORANGE}${DEFAULT_PANEL_REPO}${COLOR_NC}"
   echo ""
 
@@ -111,7 +111,7 @@ configure_panel_auto_updater() {
   fi
 
   # Auto-detect update method based on existing installation
-  if [ -d "/var/www/pyrodactyl/.git" ]; then
+  if [ -d "/var/www/hydrodactyl/.git" ]; then
     output "Detected git-based panel installation - will use git for updates"
     output "Verifying git repository access..."
     
@@ -256,11 +256,11 @@ show_remove_menu() {
   local panel_updater_installed=false
   local elytra_updater_installed=false
 
-  if systemctl is-enabled --quiet pyrodactyl-panel-auto-update.timer 2>/dev/null; then
+  if systemctl is-enabled --quiet hydrodactyl-panel-auto-update.timer 2>/dev/null; then
     panel_updater_installed=true
   fi
 
-  if systemctl is-enabled --quiet pyrodactyl-elytra-auto-update.timer 2>/dev/null; then
+  if systemctl is-enabled --quiet hydrodactyl-elytra-auto-update.timer 2>/dev/null; then
     elytra_updater_installed=true
   fi
 
@@ -356,7 +356,7 @@ trigger_panel_update() {
   print_header
   print_flame "Trigger Panel Update"
 
-  if ! systemctl is-enabled --quiet pyrodactyl-panel-auto-update.timer 2>/dev/null; then
+  if ! systemctl is-enabled --quiet hydrodactyl-panel-auto-update.timer 2>/dev/null; then
     error "Panel auto-updater is not installed."
     echo ""
     output "Please install the auto-updater first."
@@ -364,19 +364,19 @@ trigger_panel_update() {
   fi
 
   output "This will manually trigger the panel update check."
-  output "Update method: $([ -d "/var/www/pyrodactyl/.git" ] && echo "git-based" || echo "release-based")"
+  output "Update method: $([ -d "/var/www/hydrodactyl/.git" ] && echo "git-based" || echo "release-based")"
   echo ""
 
   # Get current and latest versions for display
   local current_version="unknown"
   local latest_version="unknown"
   
-  if [ -f "/var/www/pyrodactyl/config/app.php" ]; then
-    current_version=$(grep "'version'" "/var/www/pyrodactyl/config/app.php" 2>/dev/null | head -1 | sed -E "s/.*'version' => '([^']+)'.*/\1/" || echo "unknown")
+  if [ -f "/var/www/hydrodactyl/config/app.php" ]; then
+    current_version=$(grep "'version'" "/var/www/hydrodactyl/config/app.php" 2>/dev/null | head -1 | sed -E "s/.*'version' => '([^']+)'.*/\1/" || echo "unknown")
   fi
   
   # Get latest version from GitHub
-  local panel_repo="${PANEL_REPO:-pyrodactyl-oss/pyrodactyl}"
+  local panel_repo="${PANEL_REPO:-hydrodactyl-oss/hydrodactyl}"
   local github_token="${GITHUB_TOKEN_PANEL:-$GITHUB_TOKEN}"
   local curl_opts=(-sL --max-time 10)
   if [ -n "$github_token" ]; then
@@ -404,7 +404,7 @@ trigger_panel_update() {
     output "Running panel auto-updater..."
     echo ""
 
-    if /usr/local/bin/pyrodactyl-auto-update-panel.sh --verbose; then
+    if /usr/local/bin/hydrodactyl-auto-update-panel.sh --verbose; then
       success "Panel update check completed successfully"
     else
       warning "Panel update check finished with issues (see output above)"
@@ -420,7 +420,7 @@ trigger_elytra_update() {
   print_header
   print_flame "Trigger Elytra Update"
 
-  if ! systemctl is-enabled --quiet pyrodactyl-elytra-auto-update.timer 2>/dev/null; then
+  if ! systemctl is-enabled --quiet hydrodactyl-elytra-auto-update.timer 2>/dev/null; then
     error "Elytra auto-updater is not installed."
     echo ""
     output "Please install the auto-updater first."
@@ -434,8 +434,8 @@ trigger_elytra_update() {
   local current_version="unknown"
   local latest_version="unknown"
   
-  if [ -f "/etc/pyrodactyl/elytra-version" ]; then
-    current_version=$(cat "/etc/pyrodactyl/elytra-version" 2>/dev/null || echo "unknown")
+  if [ -f "/etc/hydrodactyl/elytra-version" ]; then
+    current_version=$(cat "/etc/hydrodactyl/elytra-version" 2>/dev/null || echo "unknown")
   elif [ -x "/usr/local/bin/elytra" ]; then
     current_version=$(/usr/local/bin/elytra --version 2>/dev/null || echo "unknown")
   fi
@@ -469,7 +469,7 @@ trigger_elytra_update() {
     output "Running Elytra auto-updater..."
     echo ""
 
-    if /usr/local/bin/pyrodactyl-auto-update-elytra.sh --verbose; then
+    if /usr/local/bin/hydrodactyl-auto-update-elytra.sh --verbose; then
       success "Elytra update check completed successfully"
     else
       warning "Elytra update check finished with issues (see output above)"
@@ -488,11 +488,11 @@ show_main_menu() {
   local panel_updater_installed=false
   local elytra_updater_installed=false
 
-  if systemctl is-enabled --quiet pyrodactyl-panel-auto-update.timer 2>/dev/null; then
+  if systemctl is-enabled --quiet hydrodactyl-panel-auto-update.timer 2>/dev/null; then
     panel_updater_installed=true
   fi
 
-  if systemctl is-enabled --quiet pyrodactyl-elytra-auto-update.timer 2>/dev/null; then
+  if systemctl is-enabled --quiet hydrodactyl-elytra-auto-update.timer 2>/dev/null; then
     elytra_updater_installed=true
   fi
 
@@ -561,10 +561,10 @@ show_main_menu() {
       5)
         show_remove_menu
         # Refresh status after potential removal
-        if ! systemctl is-enabled --quiet pyrodactyl-panel-auto-update.timer 2>/dev/null; then
+        if ! systemctl is-enabled --quiet hydrodactyl-panel-auto-update.timer 2>/dev/null; then
           panel_updater_installed=false
         fi
-        if ! systemctl is-enabled --quiet pyrodactyl-elytra-auto-update.timer 2>/dev/null; then
+        if ! systemctl is-enabled --quiet hydrodactyl-elytra-auto-update.timer 2>/dev/null; then
           elytra_updater_installed=false
         fi
         ;;

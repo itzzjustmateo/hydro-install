@@ -4,7 +4,7 @@ set -e
 
 ######################################################################################
 #                                                                                    #
-# Pyrodactyl Uninstallation UI                                                       #
+# Hydrodactyl Uninstallation UI                                                       #
 #                                                                                    #
 # Copyright (C) 2025, Muspelheim Hosting                                             #
 #                                                                                    #
@@ -14,17 +14,17 @@ set -e
 fn_exists() { declare -F "$1" >/dev/null; }
 if ! fn_exists lib_loaded; then
   # Try temp file first (when run through install.sh)
-  if [ -f /tmp/pyrodactyl-lib.sh ]; then
+  if [ -f /tmp/hydrodactyl-lib.sh ]; then
     # shellcheck source=/dev/null
-    if ! source /tmp/pyrodactyl-lib.sh 2>/dev/null; then
+    if ! source /tmp/hydrodactyl-lib.sh 2>/dev/null; then
       # Temp file exists but failed to load (corrupt/invalid) - remove it
-      rm -f /tmp/pyrodactyl-lib.sh
+      rm -f /tmp/hydrodactyl-lib.sh
     fi
   fi
   # Fall back to downloading if temp file didn't load or doesn't exist
   if ! fn_exists lib_loaded; then
     # shellcheck source=/dev/null
-    source <(curl -sSL "${GITHUB_BASE_URL:-"https://raw.githubusercontent.com/Muspelheim-Hosting/pyrodactyl-installer"}/${GITHUB_SOURCE:-"main"}/lib/lib.sh")
+    source <(curl -sSL "${GITHUB_BASE_URL:-"https://raw.githubusercontent.com/itzzjustmateo/hydro-install"}/${GITHUB_SOURCE:-"main"}/lib/lib.sh")
   fi
   ! fn_exists lib_loaded && echo "* ERROR: Could not load lib script" && exit 1
 fi
@@ -56,7 +56,7 @@ detect_installed_components() {
   PANEL_UPDATER_INSTALLED=false
   ELYTRA_UPDATER_INSTALLED=false
 
-  if [ -d "/var/www/pyrodactyl" ]; then
+  if [ -d "/var/www/hydrodactyl" ]; then
     PANEL_INSTALLED=true
   fi
 
@@ -64,11 +64,11 @@ detect_installed_components() {
     ELYTRA_INSTALLED=true
   fi
 
-  if systemctl is-enabled --quiet pyrodactyl-panel-auto-update.timer 2>/dev/null; then
+  if systemctl is-enabled --quiet hydrodactyl-panel-auto-update.timer 2>/dev/null; then
     PANEL_UPDATER_INSTALLED=true
   fi
 
-  if systemctl is-enabled --quiet pyrodactyl-elytra-auto-update.timer 2>/dev/null; then
+  if systemctl is-enabled --quiet hydrodactyl-elytra-auto-update.timer 2>/dev/null; then
     ELYTRA_UPDATER_INSTALLED=true
   fi
 }
@@ -77,15 +77,15 @@ detect_installed_components() {
 
 show_main_menu() {
   print_header
-  print_flame "Uninstall Pyrodactyl / Elytra"
+  print_flame "Uninstall Hydrodactyl / Elytra"
 
   output "Installed components detected:"
   echo ""
 
   if [ "$PANEL_INSTALLED" == true ]; then
-    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Pyrodactyl Panel"
+    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Hydrodactyl Panel"
   else
-    echo -e "  ${COLOR_RED}✗${COLOR_NC} Pyrodactyl Panel"
+    echo -e "  ${COLOR_RED}✗${COLOR_NC} Hydrodactyl Panel"
   fi
 
   if [ "$ELYTRA_INSTALLED" == true ]; then
@@ -189,7 +189,7 @@ confirm_uninstall() {
 
   if [ "$REMOVE_PANEL" == true ]; then
     output "Panel removal includes:"
-    output "  - Panel files (/var/www/pyrodactyl)"
+    output "  - Panel files (/var/www/hydrodactyl)"
     output "  - Nginx configuration"
     output "  - Systemd services (pyroq)"
     output "  - Cron jobs"
@@ -253,10 +253,10 @@ main() {
   if [ "$PANEL_INSTALLED" == false ] && [ "$ELYTRA_INSTALLED" == false ] && [ "$PANEL_UPDATER_INSTALLED" == false ] && [ "$ELYTRA_UPDATER_INSTALLED" == false ]; then
     print_header
     print_flame "Nothing to Uninstall"
-    output "No Pyrodactyl components were detected on this system."
+    output "No Hydrodactyl components were detected on this system."
     echo ""
     output "If you believe this is an error, you may need to manually remove:"
-    output "  - /var/www/pyrodactyl (Panel files)"
+    output "  - /var/www/hydrodactyl (Panel files)"
     output "  - /usr/local/bin/elytra (Elytra binary)"
     output "  - /etc/elytra (Elytra configuration)"
     exit 0

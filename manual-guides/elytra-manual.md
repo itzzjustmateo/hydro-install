@@ -1,6 +1,6 @@
 # Elytra Daemon - Manual Installation Guide
 
-This guide provides step-by-step instructions for manually installing the Elytra Daemon on your game server nodes. Elytra is the game server management daemon that communicates with the Pyrodactyl Panel and manages Docker containers for game servers.
+This guide provides step-by-step instructions for manually installing the Elytra Daemon on your game server nodes. Elytra is the game server management daemon that communicates with the Hydrodactyl Panel and manages Docker containers for game servers.
 
 ## Table of Contents
 
@@ -13,7 +13,7 @@ This guide provides step-by-step instructions for manually installing the Elytra
 7. [Step 5: Configure Elytra](#step-5-configure-elytra)
 8. [Step 6: Configure SSL/TLS](#step-6-configure-ssltls)
 9. [Step 7: Firewall Configuration](#step-7-firewall-configuration)
-10. [Step 8: Connect to Pyrodactyl Panel](#step-8-connect-to-pyrodactyl-panel)
+10. [Step 8: Connect to Hydrodactyl Panel](#step-8-connect-to-hydrodactyl-panel)
 11. [Verification](#verification)
 12. [Troubleshooting](#troubleshooting)
 
@@ -62,7 +62,7 @@ If you see this warning, you may need to enable swap accounting (see Step 3).
 
 Before beginning, ensure you have:
 - Root access to the server
-- Pyrodactyl Panel already installed and accessible
+- Hydrodactyl Panel already installed and accessible
 - A registered domain or subdomain pointed to this server (for SSL)
 - The server should be able to communicate with the Panel over HTTPS
 
@@ -195,9 +195,9 @@ docker network ls
 ### Create Data Directories
 
 ```bash
-mkdir -p /var/lib/pyrodactyl/volumes
-mkdir -p /var/lib/pyrodactyl/archives
-mkdir -p /var/lib/pyrodactyl/backups
+mkdir -p /var/lib/hydrodactyl/volumes
+mkdir -p /var/lib/hydrodactyl/archives
+mkdir -p /var/lib/hydrodactyl/backups
 mkdir -p /etc/elytra
 ```
 
@@ -238,11 +238,11 @@ Elytra runs as a dedicated user (UID 8888):
 
 ```bash
 # Create group and user
-groupadd --system --gid 8888 pyrodactyl 2>/dev/null || true
-useradd --system --no-create-home --shell /usr/sbin/nologin --uid 8888 --gid 8888 pyrodactyl 2>/dev/null || true
+groupadd --system --gid 8888 hydrodactyl 2>/dev/null || true
+useradd --system --no-create-home --shell /usr/sbin/nologin --uid 8888 --gid 8888 hydrodactyl 2>/dev/null || true
 
 # Set proper ownership
-chown -R 8888:8888 /var/lib/pyrodactyl
+chown -R 8888:8888 /var/lib/hydrodactyl
 chown -R 8888:8888 /etc/elytra
 
 # Set permissions
@@ -250,9 +250,9 @@ chown -R 8888:8888 /etc/elytra
 # run as various UIDs and must read/write game data, logs, and backups.
 # This grants all users read/write/execute access to these directories.
 # Ensure these directories are only accessible to trusted users.
-chmod -R 777 /var/lib/pyrodactyl/volumes
-chmod -R 777 /var/lib/pyrodactyl/archives
-chmod -R 777 /var/lib/pyrodactyl/backups
+chmod -R 777 /var/lib/hydrodactyl/volumes
+chmod -R 777 /var/lib/hydrodactyl/archives
+chmod -R 777 /var/lib/hydrodactyl/backups
 ```
 
 ---
@@ -268,7 +268,7 @@ nano /etc/elytra/config.yml
 
 ### Basic Configuration Template
 
-Create the configuration file. **Note:** You'll need to get the `uuid`, `token-id`, and `token` from the Pyrodactyl Panel after creating a node.
+Create the configuration file. **Note:** You'll need to get the `uuid`, `token-id`, and `token` from the Hydrodactyl Panel after creating a node.
 
 ```yaml
 debug: false
@@ -287,9 +287,9 @@ api:
     trusted-proxies: []
 
 system:
-    data: /var/lib/pyrodactyl/volumes
-    archive: /var/lib/pyrodactyl/archives
-    backup: /var/lib/pyrodactyl/backups
+    data: /var/lib/hydrodactyl/volumes
+    archive: /var/lib/hydrodactyl/archives
+    backup: /var/lib/hydrodactyl/backups
     tmpfs_size: 100
     websocket_log_count: 150
 
@@ -336,7 +336,7 @@ installed: true
 - `<UUID>` - Get from Panel after creating node
 - `<TOKEN_ID>` - Get from Panel after creating node
 - `<TOKEN>` - Get from Panel after creating node
-- `https://your-panel-domain.com` - Your Pyrodactyl Panel URL
+- `https://your-panel-domain.com` - Your Hydrodactyl Panel URL
 
 ### Set Permissions on Config
 
@@ -519,11 +519,11 @@ firewall-cmd --reload
 
 ---
 
-## Step 8: Connect to Pyrodactyl Panel
+## Step 8: Connect to Hydrodactyl Panel
 
 ### Create Node in Panel
 
-1. Log into your Pyrodactyl Panel
+1. Log into your Hydrodactyl Panel
 2. Go to **Admin** → **Nodes**
 3. Click **Create New**
 4. Fill in the details:
@@ -750,8 +750,8 @@ docker stats
 htop
 
 # Disk usage
-df -h /var/lib/pyrodactyl
-du -sh /var/lib/pyrodactyl/volumes/*
+df -h /var/lib/hydrodactyl
+du -sh /var/lib/hydrodactyl/volumes/*
 ```
 
 ### Clean Up Docker
@@ -779,14 +779,14 @@ Now that Elytra is installed and connected:
 4. **Configure server settings**
 5. **Start the server**
 
-For help creating servers and managing them, refer to the Pyrodactyl Panel documentation.
+For help creating servers and managing them, refer to the Hydrodactyl Panel documentation.
 
 ---
 
 ## Support
 
 - GitHub Issues: https://github.com/pyrohost/elytra/issues
-- Pyrodactyl Documentation: https://github.com/pyrodactyl-oss/pyrodactyl/tree/main/docs
+- Hydrodactyl Documentation: https://github.com/hydrodactyl-oss/hydrodactyl/tree/main/docs
 - Docker Documentation: https://docs.docker.com/
 
 ---

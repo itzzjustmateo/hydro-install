@@ -4,13 +4,13 @@ set -e
 
 ######################################################################################
 #                                                                                    #
-# Pyrodactyl Installation Info Viewer                                                #
+# Hydrodactyl Installation Info Viewer                                                #
 #                                                                                    #
 # Displays saved installation information for Panel and/or Elytra                    #
 #                                                                                    #
 # Copyright (C) 2025, Muspelheim Hosting                                             #
 #                                                                                    #
-# https://github.com/Muspelheim-Hosting/pyrodactyl-installer                         #
+# https://github.com/itzzjustmateo/hydro-install                         #
 #                                                                                    #
 ######################################################################################
 
@@ -18,17 +18,17 @@ set -e
 fn_exists() { declare -F "$1" >/dev/null; }
 if ! fn_exists lib_loaded; then
   # Try temp file first (when run through install.sh)
-  if [ -f /tmp/pyrodactyl-lib.sh ]; then
+  if [ -f /tmp/hydrodactyl-lib.sh ]; then
     # shellcheck source=/dev/null
-    if ! source /tmp/pyrodactyl-lib.sh 2>/dev/null; then
+    if ! source /tmp/hydrodactyl-lib.sh 2>/dev/null; then
       # Temp file exists but failed to load (corrupt/invalid) - remove it
-      rm -f /tmp/pyrodactyl-lib.sh
+      rm -f /tmp/hydrodactyl-lib.sh
     fi
   fi
   # Fall back to downloading if temp file didn't load or doesn't exist
   if ! fn_exists lib_loaded; then
     # shellcheck source=/dev/null
-    source <(curl -sSL "${GITHUB_BASE_URL:-"https://raw.githubusercontent.com/Muspelheim-Hosting/pyrodactyl-installer"}/${GITHUB_SOURCE:-"main"}/lib/lib.sh")
+    source <(curl -sSL "${GITHUB_BASE_URL:-"https://raw.githubusercontent.com/itzzjustmateo/hydro-install"}/${GITHUB_SOURCE:-"main"}/lib/lib.sh")
   fi
   ! fn_exists lib_loaded && echo "* ERROR: Could not load lib script" && exit 1
 fi
@@ -63,7 +63,7 @@ main() {
     warning "No installation information found."
     echo ""
     output "Installation information is saved when you:"
-    output "  - Install Pyrodactyl Panel"
+    output "  - Install Hydrodactyl Panel"
     output "  - Install Elytra Daemon"
     echo ""
     output "If you just completed an installation, the information"
@@ -91,7 +91,7 @@ main() {
   # Check for health check failure logs
   local has_health_check_failures=false
   
-  if [ -f "/etc/pyrodactyl/update-health-check-failure.log" ]; then
+  if [ -f "/etc/hydrodactyl/update-health-check-failure.log" ]; then
     has_health_check_failures=true
   fi
   
@@ -110,10 +110,10 @@ main() {
     
     if [ "$view_health" == "y" ]; then
       echo ""
-      if [ -f "/etc/pyrodactyl/update-health-check-failure.log" ]; then
+      if [ -f "/etc/hydrodactyl/update-health-check-failure.log" ]; then
         output "Panel Health Check Failure Log:"
         echo "---"
-        cat "/etc/pyrodactyl/update-health-check-failure.log" 2>/dev/null || echo "Could not read file"
+        cat "/etc/hydrodactyl/update-health-check-failure.log" 2>/dev/null || echo "Could not read file"
         echo "---"
         echo ""
       fi

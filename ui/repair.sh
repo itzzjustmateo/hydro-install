@@ -4,13 +4,13 @@ set -e
 
 ######################################################################################
 #                                                                                    #
-# Pyrodactyl Repair Tool UI                                                          #
+# Hydrodactyl Repair Tool UI                                                          #
 #                                                                                    #
-# Repair and fix common issues with Pyrodactyl Panel and Elytra                      #
+# Repair and fix common issues with Hydrodactyl Panel and Elytra                      #
 #                                                                                    #
 # Copyright (C) 2025, Muspelheim Hosting                                             #
 #                                                                                    #
-# https://github.com/Muspelheim-Hosting/pyrodactyl-installer                         #
+# https://github.com/itzzjustmateo/hydro-install                         #
 #                                                                                    #
 ######################################################################################
 
@@ -18,17 +18,17 @@ set -e
 fn_exists() { declare -F "$1" >/dev/null; }
 if ! fn_exists lib_loaded; then
   # Try temp file first (when run through install.sh)
-  if [ -f /tmp/pyrodactyl-lib.sh ]; then
+  if [ -f /tmp/hydrodactyl-lib.sh ]; then
     # shellcheck source=/dev/null
-    if ! source /tmp/pyrodactyl-lib.sh 2>/dev/null; then
+    if ! source /tmp/hydrodactyl-lib.sh 2>/dev/null; then
       # Temp file exists but failed to load (corrupt/invalid) - remove it
-      rm -f /tmp/pyrodactyl-lib.sh
+      rm -f /tmp/hydrodactyl-lib.sh
     fi
   fi
   # Fall back to downloading if temp file didn't load or doesn't exist
   if ! fn_exists lib_loaded; then
     # shellcheck source=/dev/null
-    source <(curl -sSL "${GITHUB_BASE_URL:-"https://raw.githubusercontent.com/Muspelheim-Hosting/pyrodactyl-installer"}/${GITHUB_SOURCE:-"main"}/lib/lib.sh")
+    source <(curl -sSL "${GITHUB_BASE_URL:-"https://raw.githubusercontent.com/itzzjustmateo/hydro-install"}/${GITHUB_SOURCE:-"main"}/lib/lib.sh")
   fi
   ! fn_exists lib_loaded && echo "* ERROR: Could not load lib script" && exit 1
 fi
@@ -47,17 +47,17 @@ check_root
 # ------------------ Detection Functions ----------------- #
 
 detect_panel_location() {
-  # Check for Pyrodactyl first (install script location)
-  if [ -d "/var/www/pyrodactyl" ] && [ -f "/var/www/pyrodactyl/artisan" ]; then
-    echo "/var/www/pyrodactyl"
+  # Check for Hydrodactyl first (install script location)
+  if [ -d "/var/www/hydrodactyl" ] && [ -f "/var/www/hydrodactyl/artisan" ]; then
+    echo "/var/www/hydrodactyl"
     return 0
   fi
   
-  # Check for Pterodactyl location (might be Pyrodactyl migrated)
+  # Check for Pterodactyl location (might be Hydrodactyl migrated)
   if [ -d "/var/www/pterodactyl" ] && [ -f "/var/www/pterodactyl/artisan" ]; then
-    # Verify it's actually Pyrodactyl
-    if grep -q "Pyrodactyl" "/var/www/pterodactyl/config/app.php" 2>/dev/null || \
-       grep -q "pyrodactyl" "/var/www/pterodactyl/composer.json" 2>/dev/null; then
+    # Verify it's actually Hydrodactyl
+    if grep -q "Hydrodactyl" "/var/www/pterodactyl/config/app.php" 2>/dev/null || \
+       grep -q "hydrodactyl" "/var/www/pterodactyl/composer.json" 2>/dev/null; then
       echo "/var/www/pterodactyl"
       return 0
     fi
@@ -111,7 +111,7 @@ fix_panel_permissions() {
   local panel_dir
   panel_dir=$(detect_panel_location) || {
     error "Panel installation not found at any standard location"
-    output "Searched: /var/www/pyrodactyl, /var/www/pterodactyl"
+    output "Searched: /var/www/hydrodactyl, /var/www/pterodactyl"
     return 1
   }
 
@@ -349,12 +349,12 @@ fix_database_permissions() {
 
   local db_root_pass=""
 
-  if [ -f /root/.config/pyrodactyl/db-credentials ]; then
-    db_root_pass=$(grep '^root:' /root/.config/pyrodactyl/db-credentials 2>/dev/null | cut -d':' -f2)
+  if [ -f /root/.config/hydrodactyl/db-credentials ]; then
+    db_root_pass=$(grep '^root:' /root/.config/hydrodactyl/db-credentials 2>/dev/null | cut -d':' -f2)
   fi
 
   if [ -z "$db_root_pass" ]; then
-    error "Database root password not found in /root/.config/pyrodactyl/db-credentials"
+    error "Database root password not found in /root/.config/hydrodactyl/db-credentials"
     echo ""
     output "Please enter the MySQL/MariaDB root password:"
     read -r -s db_root_pass
@@ -367,28 +367,28 @@ fix_database_permissions() {
     return 1
   fi
 
-  # Extract and validate pyrodactyl password
+  # Extract and validate hydrodactyl password
   local pyro_pass
-  pyro_pass=$(grep '^pyrodactyl:' /root/.config/pyrodactyl/db-credentials 2>/dev/null | cut -d':' -f2)
+  pyro_pass=$(grep '^hydrodactyl:' /root/.config/hydrodactyl/db-credentials 2>/dev/null | cut -d':' -f2)
 
   if [ -z "$pyro_pass" ]; then
-    error "pyrodactyl user password not found in credentials file"
+    error "hydrodactyl user password not found in credentials file"
     return 1
   fi
 
   # Escape single quotes in password for SQL (replace ' with '')
   local pyro_pass_escaped="${pyro_pass//\'/''}"
 
-  output "Ensuring pyrodactyl database user exists..."
+  output "Ensuring hydrodactyl database user exists..."
   mysql -u root -p"${db_root_pass}" -e "
-    GRANT ALL PRIVILEGES ON panel.* TO 'pyrodactyl'@'127.0.0.1' IDENTIFIED BY '${pyro_pass_escaped}' WITH GRANT OPTION;
+    GRANT ALL PRIVILEGES ON panel.* TO 'hydrodactyl'@'127.0.0.1' IDENTIFIED BY '${pyro_pass_escaped}' WITH GRANT OPTION;
     FLUSH PRIVILEGES;
-  " 2>/dev/null || warning "Failed to update pyrodactyl user permissions"
+  " 2>/dev/null || warning "Failed to update hydrodactyl user permissions"
 
   output "Testing database connectivity..."
   local db_pass
-  db_pass=$(grep '^pyrodactyl:' /root/.config/pyrodactyl/db-credentials 2>/dev/null | cut -d':' -f2)
-  if mysql -u pyrodactyl -p"${db_pass}" -h 127.0.0.1 -e "SELECT 1" panel >/dev/null 2>&1; then
+  db_pass=$(grep '^hydrodactyl:' /root/.config/hydrodactyl/db-credentials 2>/dev/null | cut -d':' -f2)
+  if mysql -u hydrodactyl -p"${db_pass}" -h 127.0.0.1 -e "SELECT 1" panel >/dev/null 2>&1; then
     success "Database connection successful"
   else
     warning "Database connection test failed"

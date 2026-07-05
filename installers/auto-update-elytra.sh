@@ -4,7 +4,7 @@ set -e
 
 ######################################################################################
 #                                                                                    #
-# Pyrodactyl Elytra Auto-Updater                                                     #
+# Hydrodactyl Elytra Auto-Updater                                                     #
 #                                                                                    #
 # Advanced auto-updater with cron support, dry-run mode, backups, and notifications  #
 #                                                                                    #
@@ -20,20 +20,20 @@ set -e
 # ------------------ Configuration ----------------- #
 
 # Load environment file if it exists (for systemd service)
-if [ -f /etc/pyrodactyl/auto-update-elytra.env ]; then
+if [ -f /etc/hydrodactyl/auto-update-elytra.env ]; then
   # shellcheck source=/dev/null
-  source /etc/pyrodactyl/auto-update-elytra.env
+  source /etc/hydrodactyl/auto-update-elytra.env
 fi
 
-# Default config (can be overridden by /etc/pyrodactyl/auto-update-elytra.env)
+# Default config (can be overridden by /etc/hydrodactyl/auto-update-elytra.env)
 ELYTRA_REPO="${ELYTRA_REPO:-pyrohost/elytra}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 INSTALL_DIR="${INSTALL_DIR:-/etc/elytra}"
-LOG_FILE="${LOG_FILE:-/var/log/pyrodactyl-elytra-auto-update.log}"
+LOG_FILE="${LOG_FILE:-/var/log/hydrodactyl-elytra-auto-update.log}"
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/elytra}"
-LOCK_FILE="${LOCK_FILE:-/var/run/pyrodactyl-elytra-update.lock}"
-CONFIG_FILE="${CONFIG_FILE:-/etc/pyrodactyl/auto-update-elytra.env}"
-VERSION_FILE="${VERSION_FILE:-/etc/pyrodactyl/elytra-version}"
+LOCK_FILE="${LOCK_FILE:-/var/run/hydrodactyl-elytra-update.lock}"
+CONFIG_FILE="${CONFIG_FILE:-/etc/hydrodactyl/auto-update-elytra.env}"
+VERSION_FILE="${VERSION_FILE:-/etc/hydrodactyl/elytra-version}"
 KEEP_BACKUPS="${KEEP_BACKUPS:-5}"
 AUTO_UPDATE="${AUTO_UPDATE:-true}"
 CHECK_INTERVAL="${CHECK_INTERVAL:-3600}"
@@ -540,7 +540,7 @@ EOF
 
       echo "" >> "$INSTALL_DIR/update-health-check-failure.log"
       echo "Please run the Repair Tool or check manually:" >> "$INSTALL_DIR/update-health-check-failure.log"
-      echo "bash <(curl -sSL https://pyrodactyl-installer.muspelheim.host)" >> "$INSTALL_DIR/update-health-check-failure.log"
+      echo "bash <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)" >> "$INSTALL_DIR/update-health-check-failure.log"
       echo "And select option [7] Repair / Fix Common Issues" >> "$INSTALL_DIR/update-health-check-failure.log"
 
       error "Update completed but health check failed. See: $INSTALL_DIR/update-health-check-failure.log"
@@ -795,7 +795,7 @@ parse_arguments() {
 
 show_help() {
   cat << EOF
-Pyrodactyl Elytra Auto-Updater
+Hydrodactyl Elytra Auto-Updater
 
 Usage: $(basename "$0") [OPTIONS]
 

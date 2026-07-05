@@ -4,7 +4,7 @@ set -e
 
 ######################################################################################
 #                                                                                    #
-# Hydrodactyl Elytra Installation UI                                                  #
+# Hydrodactyl Wings Installation UI                                                  #
 #                                                                                    #
 # Copyright (C) 2025, Muspelheim Hosting                                             #
 #                                                                                    #
@@ -31,10 +31,11 @@ fi
 
 # ------------------ Configuration Variables ----------------- #
 
-ELYTRA_REPO=""
-ELYTRA_REPO_PRIVATE=false
+WINGS_REPO=""
+WINGS_VARIANT=""
+WINGS_REPO_PRIVATE=false
 GITHUB_TOKEN=""
-ELYTRA_RELEASE_VERSION="${ELYTRA_RELEASE_VERSION:-latest}"
+WINGS_RELEASE_VERSION="${WINGS_RELEASE_VERSION:-latest}"
 PANEL_URL=""
 NODE_TOKEN=""
 NODE_ID=""
@@ -46,7 +47,46 @@ SSL_KEY_PATH=""
 SSL_EMAIL=""
 BEHIND_PROXY=false
 FQDN=""
-ELYTRA_INSTALL_DIR="/etc/elytra"
+WINGS_INSTALL_DIR="/etc/pterodactyl"
+
+# ------------------ Wings Variant Selection ----------------- #
+
+configure_wings_variant() {
+  print_header
+  print_flame "Wings Variant Selection"
+
+  output "Which Wings variant would you like to install?"
+  echo ""
+  output "[${COLOR_ORANGE}0${COLOR_NC}] Pterodactyl Wings (Go)"
+  output "    The official Pterodactyl server daemon, written in Go."
+  output "    Most stable, widely used, and battle-tested in production."
+  output "    Best for: production environments, maximum compatibility."
+  echo ""
+  output "[${COLOR_ORANGE}1${COLOR_NC}] wings-rs (Rust)"
+  output "    A lightweight Rust reimplementation of Wings."
+  output "    Lower memory usage, faster startup, additional features."
+  output "    Best for: resource-constrained servers, advanced users."
+  echo ""
+
+  local variant_choice=""
+  while [[ "$variant_choice" != "0" && "$variant_choice" != "1" ]]; do
+    echo -n "* Select [0-1]: "
+    read -r variant_choice
+    if [[ "$variant_choice" != "0" && "$variant_choice" != "1" ]]; then
+      error "Invalid selection. Please enter 0 or 1."
+    fi
+  done
+
+  if [ "$variant_choice" == "0" ]; then
+    WINGS_VARIANT="go"
+    WINGS_REPO="$DEFAULT_WINGS_REPO"
+    output "Selected: Pterodactyl Wings (Go) - ${COLOR_ORANGE}${WINGS_REPO}${COLOR_NC}"
+  else
+    WINGS_VARIANT="rs"
+    WINGS_REPO="$DEFAULT_WINGS_RS_REPO"
+    output "Selected: wings-rs (Rust) - ${COLOR_ORANGE}${WINGS_REPO}${COLOR_NC}"
+  fi
+}
 
 # ------------------ Repository Configuration ----------------- #
 
@@ -54,34 +94,33 @@ configure_github_repository() {
   print_header
   print_flame "GitHub Repository Configuration"
 
-  output "The default Elytra repository is:"
-  output "  ${COLOR_ORANGE}${DEFAULT_ELYTRA_REPO}${COLOR_NC}"
+  output "The default repository for this variant is:"
+  output "  ${COLOR_ORANGE}${WINGS_REPO}${COLOR_NC}"
   echo ""
 
   local use_default=""
   bool_input use_default "Use default repository?" "y"
 
   if [ "$use_default" == "y" ]; then
-    ELYTRA_REPO="$DEFAULT_ELYTRA_REPO"
+    WINGS_REPO="$WINGS_REPO"
   else
-    required_input ELYTRA_REPO "Enter the GitHub repository (format: owner/repo): " "Repository cannot be empty"
+    required_input WINGS_REPO "Enter the GitHub repository (format: owner/repo): " "Repository cannot be empty"
 
-    if [[ ! "$ELYTRA_REPO" =~ ^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$ ]]; then
+    if [[ ! "$WINGS_REPO" =~ ^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$ ]]; then
       error "Invalid repository format. Must be 'owner/repo'"
       exit 1
     fi
   fi
 
   echo ""
-  output "Repository: ${COLOR_ORANGE}${ELYTRA_REPO}${COLOR_NC}"
+  output "Repository: ${COLOR_ORANGE}${WINGS_REPO}${COLOR_NC}"
 
-  # Only ask about private repo if not using default (default is public)
   if [ "$use_default" == "n" ]; then
     local is_private=""
     bool_input is_private "Is this a private repository?" "n"
-    ELYTRA_REPO_PRIVATE=$([ "$is_private" == "y" ] && echo "true" || echo "false")
+    WINGS_REPO_PRIVATE=$([ "$is_private" == "y" ] && echo "true" || echo "false")
 
-    if [ "$ELYTRA_REPO_PRIVATE" == "true" ]; then
+    if [ "$WINGS_REPO_PRIVATE" == "true" ]; then
       echo ""
       output "A GitHub Personal Access Token is required for private repositories."
       output "Create one at: $(hyperlink "https://github.com/settings/tokens")"
@@ -93,7 +132,7 @@ configure_github_repository() {
         password_input GITHUB_TOKEN "Enter your GitHub token: " "Token cannot be empty"
 
         output "Validating token..."
-        if validate_github_token "$GITHUB_TOKEN" "$ELYTRA_REPO"; then
+        if validate_github_token "$GITHUB_TOKEN" "$WINGS_REPO"; then
           success "Token validated successfully"
           token_valid=true
         else
@@ -102,19 +141,19 @@ configure_github_repository() {
       done
     fi
   else
-    ELYTRA_REPO_PRIVATE="false"
+    WINGS_REPO_PRIVATE="false"
   fi
 
   output "Checking for releases in repository..."
-  if ! check_releases_exist "$ELYTRA_REPO" "$GITHUB_TOKEN"; then
+  if ! check_releases_exist "$WINGS_REPO" "$GITHUB_TOKEN"; then
     echo ""
-    error "No releases found in repository: ${ELYTRA_REPO}"
-    warning "Elytra must be installed from a release."
+    error "No releases found in repository: ${WINGS_REPO}"
+    warning "Wings must be installed from a release."
     exit 1
   fi
 
   local latest_release
-  latest_release=$(get_latest_release "$ELYTRA_REPO" "$GITHUB_TOKEN")
+  latest_release=$(get_latest_release "$WINGS_REPO" "$GITHUB_TOKEN")
   success "Found releases in repository"
 }
 
@@ -125,21 +164,21 @@ configure_release_version() {
   print_flame "Release Version Selection"
 
   local selected_version
-  selected_version=$(select_release_version "$ELYTRA_REPO" "elytra" "$GITHUB_TOKEN")
+  selected_version=$(select_release_version "$WINGS_REPO" "elytra" "$GITHUB_TOKEN")
 
   if [ -z "$selected_version" ]; then
     error "Failed to select release version"
     exit 1
   fi
 
-  ELYTRA_RELEASE_VERSION="$selected_version"
+  WINGS_RELEASE_VERSION="$selected_version"
 
-  if [ "$ELYTRA_RELEASE_VERSION" == "latest" ]; then
+  if [ "$WINGS_RELEASE_VERSION" == "latest" ]; then
     local latest
-    latest=$(get_latest_release "$ELYTRA_REPO" "$GITHUB_TOKEN")
+    latest=$(get_latest_release "$WINGS_REPO" "$GITHUB_TOKEN")
     success "Will install latest release: ${latest}"
   else
-    success "Will install release: ${ELYTRA_RELEASE_VERSION}"
+    success "Will install release: ${WINGS_RELEASE_VERSION}"
   fi
 }
 
@@ -164,12 +203,12 @@ configure_api_key() {
     output "Enter your panel URL"
     output "Example: ${COLOR_ORANGE}https://panel.example.com${COLOR_NC}"
     required_input PANEL_URL "Panel URL: " "Panel URL is required"
-    PANEL_URL="${PANEL_URL%/}"  # Remove trailing slash
+    PANEL_URL="${PANEL_URL%/}"
 
     output ""
     output "Enter a name for this node"
     output "This will be used to identify the node in the panel"
-    required_input NODE_NAME "Node name [Elytra-Node]: " "" "Elytra-Node"
+    required_input NODE_NAME "Node name [Wings-Node]: " "" "Wings-Node"
     
     success "API key configured - automatic setup will be used"
     USE_API_KEY=true
@@ -185,7 +224,6 @@ configure_panel_connection() {
   print_header
   print_flame "Panel Connection Configuration"
 
-  # Skip if using API key
   if [ "$USE_API_KEY" == "true" ]; then
     output "Using API key for automatic configuration - manual connection details not required"
     return 0
@@ -196,7 +234,7 @@ configure_panel_connection() {
   echo ""
 
   required_input PANEL_URL "Panel URL: " "Panel URL is required"
-  PANEL_URL="${PANEL_URL%/}"  # Remove trailing slash
+  PANEL_URL="${PANEL_URL%/}"
 
   output ""
   output "To connect this node to the panel, you need to:"
@@ -255,14 +293,12 @@ configure_ssl() {
         CONFIGURE_LETSENCRYPT=true
         output "Will use Let's Encrypt for SSL"
 
-        # Prompt for FQDN if not already set
         if [ -z "$FQDN" ]; then
           echo ""
           output "Let's Encrypt requires a fully qualified domain name (FQDN)."
           required_input FQDN "Enter this node's FQDN (e.g., node.example.com): " "FQDN is required for Let's Encrypt"
         fi
 
-        # Prompt for email (optional but recommended)
         echo ""
         output "An email address is recommended for Let's Encrypt (expiry notifications)."
         local ssl_email_input=""
@@ -296,7 +332,7 @@ configure_auto_updater() {
   echo ""
 
   local install_auto_update=""
-  bool_input install_auto_update "Install auto-updater for Elytra?" "n"
+  bool_input install_auto_update "Install auto-updater for Wings?" "n"
 
   if [ "$install_auto_update" == "y" ]; then
     INSTALL_AUTO_UPDATER=true
@@ -324,7 +360,8 @@ show_summary() {
 
   output "Please review the following configuration:"
   echo ""
-  echo -e "  ${COLOR_ORANGE}Repository:${COLOR_NC}        ${ELYTRA_REPO} $([ "$ELYTRA_REPO_PRIVATE" == "true" ] && echo '(private)' || echo '(public)')"
+  echo -e "  ${COLOR_ORANGE}Variant:${COLOR_NC}            $([ "$WINGS_VARIANT" == "go" ] && echo 'Pterodactyl Wings (Go)' || echo 'wings-rs (Rust)')"
+  echo -e "  ${COLOR_ORANGE}Repository:${COLOR_NC}        ${WINGS_REPO} $([ "$WINGS_REPO_PRIVATE" == "true" ] && echo '(private)' || echo '(public)')"
   echo -e "  ${COLOR_ORANGE}Panel URL:${COLOR_NC}         ${PANEL_URL}"
   if [ "$USE_API_KEY" == "true" ]; then
     echo -e "  ${COLOR_ORANGE}Setup Method:${COLOR_NC}      Automatic (via API key)"
@@ -353,10 +390,11 @@ show_summary() {
 # ------------------ Export and Run ----------------- #
 
 export_variables() {
-  export ELYTRA_REPO
-  export ELYTRA_REPO_PRIVATE
+  export WINGS_VARIANT
+  export WINGS_REPO
+  export WINGS_REPO_PRIVATE
   export GITHUB_TOKEN
-  export ELYTRA_RELEASE_VERSION
+  export WINGS_RELEASE_VERSION
   export PANEL_URL
   export PANEL_API_KEY
   export NODE_NAME
@@ -370,9 +408,8 @@ export_variables() {
   export SSL_KEY_PATH
   export BEHIND_PROXY
   export FQDN
-  export ELYTRA_INSTALL_DIR
+  export WINGS_INSTALL_DIR
 
-  # Set ASSUME_SSL=true when SSL is configured (matches panel.sh/both.sh behavior)
   if [ "$CONFIGURE_LETSENCRYPT" == true ] || { [ -n "$SSL_CERT_PATH" ] && [ -n "$SSL_KEY_PATH" ]; }; then
     export ASSUME_SSL=true
   else
@@ -383,8 +420,9 @@ export_variables() {
 # ------------------ Main ----------------- #
 
 main() {
-  print_flame "Welcome to the Elytra Daemon Installer"
+  print_flame "Welcome to the Wings Daemon Installer"
 
+  configure_wings_variant
   configure_github_repository
   configure_release_version
   configure_api_key
@@ -398,7 +436,7 @@ main() {
   export_variables
 
   output "Starting installation..."
-  run_installer "elytra"
+  run_installer "wings"
 }
 
 main
