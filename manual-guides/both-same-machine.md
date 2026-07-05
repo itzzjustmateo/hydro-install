@@ -1,6 +1,8 @@
-# Pyrodactyl Panel + Elytra Daemon - Same Machine Installation Guide
+# Hydrodactyl Panel + Elytra Daemon - Same Machine Installation Guide (Deprecated)
 
-This guide covers installing both the Pyrodactyl Panel and Elytra Daemon on the same physical or virtual server. This setup is suitable for small deployments, development environments, or single-node installations.
+> ⚠️ **Elytra is no longer supported.** This guide is kept for reference only. Existing users should migrate to **Wings** or **Wings-RS** ([https://github.com/calagopus/wings](https://github.com/calagopus/wings)) as a replacement daemon.
+
+This guide covers installing both the Hydrodactyl Panel and Elytra Daemon on the same physical or virtual server. This setup is suitable for small deployments, development environments, or single-node installations.
 
 ## Table of Contents
 
@@ -10,7 +12,7 @@ This guide covers installing both the Pyrodactyl Panel and Elytra Daemon on the 
 4. [Step 1: System Preparation](#step-1-system-preparation)
 5. [Step 2: Install Dependencies](#step-2-install-dependencies)
 6. [Step 3: Database Setup](#step-3-database-setup)
-7. [Step 4: Install and Configure Pyrodactyl Panel](#step-4-install-and-configure-pyrodactyl-panel)
+7. [Step 4: Install and Configure Hydrodactyl Panel](#step-4-install-and-configure-hydrodactyl-panel)
 8. [Step 5: Install and Configure Elytra Daemon](#step-5-install-and-configure-elytra-daemon)
 9. [Step 6: SSL/TLS Configuration](#step-6-ssltls-configuration)
 10. [Step 7: Configure Firewall](#step-7-configure-firewall)
@@ -29,7 +31,7 @@ When running both Panel and Daemon on the same machine:
 │                  Single Server                      │
 │                                                     │
 │  ┌──────────────────────────────────────────┐       │
-│  │          Pyrodactyl Panel                │       │
+│  │          Hydrodactyl Panel                │       │
 │  │   - Nginx (Port 80/443)                  │       │
 │  │   - PHP-FPM (Unix Socket)                │       │
 │  │   - MariaDB (Port 3306)                  │       │
@@ -202,8 +204,8 @@ mysql_secure_installation
 ```bash
 mysql -u root -p <<EOF
 CREATE DATABASE panel CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'pyrodactyl'@'127.0.0.1' IDENTIFIED BY 'YOUR_SECURE_PASSWORD';
-GRANT ALL PRIVILEGES ON panel.* TO 'pyrodactyl'@'127.0.0.1' WITH GRANT OPTION;
+CREATE USER 'hydrodactyl'@'127.0.0.1' IDENTIFIED BY 'YOUR_SECURE_PASSWORD';
+GRANT ALL PRIVILEGES ON panel.* TO 'hydrodactyl'@'127.0.0.1' WITH GRANT OPTION;
 FLUSH PRIVILEGES;
 EOF
 ```
@@ -212,30 +214,30 @@ Save the password - you'll need it twice (for Panel and Elytra doesn't need it b
 
 ---
 
-## Step 4: Install and Configure Pyrodactyl Panel
+## Step 4: Install and Configure Hydrodactyl Panel
 
 ### Create Directory
 ```bash
-mkdir -p /var/www/pyrodactyl
-cd /var/www/pyrodactyl
+mkdir -p /var/www/hydrodactyl
+cd /var/www/hydrodactyl
 ```
 
 ### Download Panel
 ```bash
-curl -Lo panel.tar.gz $(curl -s https://api.github.com/repos/pyrodactyl-oss/pyrodactyl/releases/latest | grep "tarball_url" | cut -d'"' -f4)
+curl -Lo panel.tar.gz $(curl -s https://api.github.com/repos/hydrodactyl-oss/hydrodactyl/releases/latest | grep "tarball_url" | cut -d'"' -f4)
 tar -xzf panel.tar.gz --strip-components=1
 rm panel.tar.gz
 ```
 
 ### Set Permissions
 ```bash
-chown -R www-data:www-data /var/www/pyrodactyl
-chmod -R 755 /var/www/pyrodactyl
+chown -R www-data:www-data /var/www/hydrodactyl
+chmod -R 755 /var/www/hydrodactyl
 ```
 
 ### Install Dependencies
 ```bash
-cd /var/www/pyrodactyl
+cd /var/www/hydrodactyl
 composer install --no-dev --optimize-autoloader --no-interaction
 ```
 
@@ -251,7 +253,7 @@ APP_URL=https://panel.yourdomain.com
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_DATABASE=panel
-DB_USERNAME=pyrodactyl
+DB_USERNAME=hydrodactyl
 DB_PASSWORD=YOUR_SECURE_PASSWORD
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
@@ -276,12 +278,12 @@ php artisan view:cache
 ```
 
 ### Configure Nginx
-Create `/etc/nginx/sites-available/pyrodactyl`:
+Create `/etc/nginx/sites-available/hydrodactyl`:
 ```nginx
 server {
     listen 80;
     server_name panel.yourdomain.com;
-    root /var/www/pyrodactyl/public;
+    root /var/www/hydrodactyl/public;
     index index.php;
 
     location / {
@@ -309,7 +311,7 @@ server {
 
 Enable:
 ```bash
-ln -s /etc/nginx/sites-available/pyrodactyl /etc/nginx/sites-enabled/
+ln -s /etc/nginx/sites-available/hydrodactyl /etc/nginx/sites-enabled/
 rm /etc/nginx/sites-enabled/default 2>/dev/null || true
 nginx -t
 systemctl restart nginx
@@ -319,7 +321,7 @@ systemctl restart nginx
 Create `/etc/systemd/system/pyroq.service`:
 ```ini
 [Unit]
-Description=Pyrodactyl Queue Worker
+Description=Hydrodactyl Queue Worker
 After=redis-server.service mariadb.service
 
 [Service]
@@ -327,7 +329,7 @@ Type=simple
 User=www-data
 Group=www-data
 Restart=always
-ExecStart=/usr/bin/php /var/www/pyrodactyl/artisan queue:work --queue=high,standard,low --sleep=3 --tries=3 --max-time=3600 --max-jobs=1000 --memory=512
+ExecStart=/usr/bin/php /var/www/hydrodactyl/artisan queue:work --queue=high,standard,low --sleep=3 --tries=3 --max-time=3600 --max-jobs=1000 --memory=512
 OOMScoreAdjust=-100
 RestartSec=5s
 
@@ -345,7 +347,7 @@ systemctl enable --now pyroq
 ```bash
 crontab -e
 # Add:
-* * * * * cd /var/www/pyrodactyl && php artisan schedule:run >> /dev/null 2>&1
+* * * * * cd /var/www/hydrodactyl && php artisan schedule:run >> /dev/null 2>&1
 ```
 
 ---
@@ -354,7 +356,7 @@ crontab -e
 
 ### Create Directories
 ```bash
-mkdir -p /var/lib/pyrodactyl/volumes /var/lib/pyrodactyl/archives /var/lib/pyrodactyl/backups /etc/elytra
+mkdir -p /var/lib/hydrodactyl/volumes /var/lib/hydrodactyl/archives /var/lib/hydrodactyl/backups /etc/elytra
 ```
 
 ### Download Elytra
@@ -366,8 +368,8 @@ chmod +x /usr/local/bin/elytra
 
 ### Create System User
 ```bash
-groupadd --system --gid 8888 pyrodactyl 2>/dev/null || true
-useradd --system --no-create-home --shell /usr/sbin/nologin --uid 8888 --gid 8888 pyrodactyl 2>/dev/null || true
+groupadd --system --gid 8888 hydrodactyl 2>/dev/null || true
+useradd --system --no-create-home --shell /usr/sbin/nologin --uid 8888 --gid 8888 hydrodactyl 2>/dev/null || true
 
 chown -R 8888:8888 /var/lib/elytra /etc/elytra
 
@@ -396,9 +398,9 @@ api:
     upload-limit: 100
 
 system:
-    data: /var/lib/pyrodactyl/volumes
-    archive: /var/lib/pyrodactyl/archives
-    backup: /var/lib/pyrodactyl/backups
+    data: /var/lib/hydrodactyl/volumes
+    archive: /var/lib/hydrodactyl/archives
+    backup: /var/lib/hydrodactyl/backups
 
 remote: https://panel.yourdomain.com
 
@@ -480,7 +482,7 @@ Create `/etc/letsencrypt/renewal-hooks/deploy/combined-restart.sh`:
 ```bash
 cat > /etc/letsencrypt/renewal-hooks/deploy/combined-restart.sh << 'EOF'
 #!/bin/bash
-echo "[$(date)] Certificate renewed" >> /var/log/pyrodactyl-certbot-renewal.log
+echo "[$(date)] Certificate renewed" >> /var/log/hydrodactyl-certbot-renewal.log
 
 # Ensure Elytra certificate symlinks are valid (re-create if needed)
 # Symlinks automatically point to latest certs, just need to ensure they exist
@@ -490,7 +492,7 @@ if [ -d "/etc/letsencrypt/live/daemon.yourdomain.com" ]; then
     chown 8888:8888 /etc/elytra/certificate.*
     chmod 644 /etc/elytra/certificate.pem
     chmod 600 /etc/elytra/certificate.key
-    echo "[$(date)] Elytra certificates updated" >> /var/log/pyrodactyl-certbot-renewal.log
+    echo "[$(date)] Elytra certificates updated" >> /var/log/hydrodactyl-certbot-renewal.log
 fi
 
 systemctl restart nginx
@@ -616,7 +618,7 @@ docker ps
 
 echo "=== Resources ==="
 free -h
-df -h /var/lib/pyrodactyl
+df -h /var/lib/hydrodactyl
 ```
 
 ### Test Panel Access
@@ -669,7 +671,7 @@ lsof -i :8080
 **Solution:**
 ```bash
 # Test connection
-mysql -u pyrodactyl -p -h 127.0.0.1 panel -e "SELECT 1"
+mysql -u hydrodactyl -p -h 127.0.0.1 panel -e "SELECT 1"
 
 # Check if MariaDB is bound to localhost
 grep bind-address /etc/mysql/mariadb.conf.d/50-server.cnf
@@ -748,26 +750,26 @@ reboot
 
 Create a weekly update check:
 ```bash
-cat > /etc/cron.weekly/pyrodactyl-update << 'EOF'
+cat > /etc/cron.weekly/hydrodactyl-update << 'EOF'
 #!/bin/bash
 # Update check script
 # Only run git fetch if this is a git installation
-if [ -d /var/www/pyrodactyl/.git ]; then
-  cd /var/www/pyrodactyl && git fetch origin
+if [ -d /var/www/hydrodactyl/.git ]; then
+  cd /var/www/hydrodactyl && git fetch origin
 fi
 /usr/local/bin/elytra --version
 EOF
 
-chmod +x /etc/cron.weekly/pyrodactyl-update
+chmod +x /etc/cron.weekly/hydrodactyl-update
 ```
 
 ### Backup Strategy
 
 Create backup script:
 ```bash
-cat > /usr/local/bin/backup-pyrodactyl << 'EOF'
+cat > /usr/local/bin/backup-hydrodactyl << 'EOF'
 #!/bin/bash
-BACKUP_DIR="/var/backups/pyrodactyl"
+BACKUP_DIR="/var/backups/hydrodactyl"
 DATE=$(date +%Y%m%d_%H%M%S)
 
 mkdir -p $BACKUP_DIR
@@ -776,7 +778,7 @@ mkdir -p $BACKUP_DIR
 mysqldump -u root panel > $BACKUP_DIR/panel_$DATE.sql
 
 # Backup Panel files
-tar -czf $BACKUP_DIR/panel_files_$DATE.tar.gz -C /var/www pyrodactyl
+tar -czf $BACKUP_DIR/panel_files_$DATE.tar.gz -C /var/www hydrodactyl
 
 # Backup Elytra config
 tar -czf $BACKUP_DIR/elytra_config_$DATE.tar.gz -C /etc elytra
@@ -788,12 +790,12 @@ ls -t $BACKUP_DIR/*.tar.gz | tail -n +8 | xargs -r rm
 echo "Backup completed: $DATE"
 EOF
 
-chmod +x /usr/local/bin/backup-pyrodactyl
+chmod +x /usr/local/bin/backup-hydrodactyl
 ```
 
 Run daily:
 ```bash
-echo "0 2 * * * root /usr/local/bin/backup-pyrodactyl" >> /etc/crontab
+echo "0 2 * * * root /usr/local/bin/backup-hydrodactyl" >> /etc/crontab
 ```
 
 ### Monitoring
@@ -812,11 +814,11 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 
 ## Support
 
-- Pyrodactyl Issues: https://github.com/pyrodactyl-oss/pyrodactyl/issues
+- Hydrodactyl Issues: https://github.com/hydrodactyl-oss/hydrodactyl/issues
 - Elytra Issues: https://github.com/pyrohost/elytra/issues
 - Docker Docs: https://docs.docker.com/
-- Community Discord: [Pyrodactyl Community]
+- Community Discord: [Hydrodactyl Community]
 
 ---
 
-**Congratulations!** You now have a complete Pyrodactyl Panel and Elytra Daemon installation on a single server. You can begin creating and managing game servers.
+**Congratulations!** You now have a complete Hydrodactyl Panel and Elytra Daemon installation on a single server. You can begin creating and managing game servers.

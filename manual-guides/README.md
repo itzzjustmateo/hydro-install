@@ -1,14 +1,16 @@
-# Pyrodactyl Manual Installation Guides
+# Hydrodactyl Manual Installation Guides
 
-This directory contains comprehensive manual installation guides for Pyrodactyl Panel and Elytra Daemon. These guides are designed for users who prefer to install and configure each component manually, or for those who want to understand the installation process in detail.
+This directory contains comprehensive manual installation guides for Hydrodactyl Panel and Elytra Daemon. These guides are designed for users who prefer to install and configure each component manually, or for those who want to understand the installation process in detail.
 
 ## 📚 Available Guides
 
 | Guide | Description | Use Case |
 |-------|-------------|----------|
-| [Pyrodactyl Panel Manual](./pyrodactyl-panel-manual.md) | Complete standalone Panel installation | Control panel only, separate from game servers |
-| [Elytra Daemon Manual](./elytra-manual.md) | Complete standalone Daemon installation | Game server node only, connects to existing Panel |
-| [Both Same Machine](./both-same-machine.md) | Combined Panel + Daemon installation | Single-server setup for small deployments |
+| [Hydrodactyl Panel Manual](./hydrodactyl-panel-manual.md) | Complete standalone Panel installation | Control panel only, separate from game servers |
+| [Elytra Daemon Manual](./elytra-manual.md) (Deprecated) | Complete standalone Daemon installation | Game server node only, connects to existing Panel |
+| [Both Same Machine](./both-same-machine.md) (Deprecated) | Combined Panel + Daemon installation | Single-server setup for small deployments |
+
+> ⚠️ **Elytra is no longer supported.** Migrate to **Wings** or **Wings-RS** ([https://github.com/calagopus/wings](https://github.com/calagopus/wings)).
 
 ## 🤔 Which Guide Should I Use?
 
@@ -19,7 +21,7 @@ This directory contains comprehensive manual installation guides for Pyrodactyl 
 - You already have Elytra installed elsewhere
 
 ### Use the **Elytra Only** guide if:
-- You already have a Pyrodactyl Panel running
+- You already have a Hydrodactyl Panel running
 - You're adding a new game server node
 - You want dedicated game server hardware
 - You're expanding an existing setup
@@ -83,7 +85,7 @@ If you encounter issues with manual installation:
 1. **Check the Troubleshooting section** in the specific guide
 2. **Review logs**: `journalctl -u <service>` for systemd services
 3. **Check our GitHub Issues**:
-   - [Pyrodactyl Issues](https://github.com/pyrodactyl-oss/pyrodactyl/issues)
+   - [Hydrodactyl Issues](https://github.com/hydrodactyl-oss/hydrodactyl/issues)
    - [Elytra Issues](https://github.com/pyrohost/elytra/issues)
 4. **Community Support**: Join our Discord community
 
@@ -99,7 +101,7 @@ Each manual guide follows this structure:
 
 ## 🎓 Learning Path
 
-New to Pyrodactyl? Follow this path:
+New to Hydrodactyl? Follow this path:
 
 1. **Start with the "Both Same Machine" guide** - Get everything running quickly
 2. **Experiment and learn** - Understand how components interact
@@ -111,14 +113,14 @@ New to Pyrodactyl? Follow this path:
 
 Found an error in a guide? Want to improve documentation?
 
-- Submit a PR to the [pyrodactyl-installer repository](https://github.com/Muspelheim-Hosting/pyrodactyl-installer)
+- Submit a PR to the [hydrodactyl-installer repository](https://github.com/itzzjustmateo/hydro-install)
 - Report issues via GitHub Issues
 - Suggest improvements based on your experience
 
 ## 🔗 Quick Links
 
 - [Main Installer](../install.sh) - Automated one-command installer
-- [Panel Guide](./pyrodactyl-panel-manual.md) - Panel-only installation
+- [Panel Guide](./hydrodactyl-panel-manual.md) - Panel-only installation
 - [Elytra Guide](./elytra-manual.md) - Daemon-only installation
 - [Combined Guide](./both-same-machine.md) - Both on same server
 

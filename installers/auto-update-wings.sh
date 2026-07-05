@@ -4,42 +4,42 @@ set -e
 
 ######################################################################################
 #                                                                                    #
-# Hydrodactyl Elytra Auto-Updater                                                     #
+# Hydrodactyl Wings Auto-Updater                                                     #
 #                                                                                    #
 # Advanced auto-updater with cron support, dry-run mode, backups, and notifications  #
 #                                                                                    #
 # Usage:                                                                             #
-#   auto-update-elytra.sh                    # Interactive mode with colors          #
-#   auto-update-elytra.sh --cron             # Cron mode (no colors, log to file)    #
-#   auto-update-elytra.sh --dry-run          # Check only, don't actually update      #
-#   auto-update-elytra.sh --notify-only      # Only send notification if update avail #
-#   auto-update-elytra.sh --force            # Force update even if versions match    #
+#   auto-update-wings.sh                    # Interactive mode with colors          #
+#   auto-update-wings.sh --cron             # Cron mode (no colors, log to file)    #
+#   auto-update-wings.sh --dry-run          # Check only, don't actually update      #
+#   auto-update-wings.sh --notify-only      # Only send notification if update avail #
+#   auto-update-wings.sh --force            # Force update even if versions match    #
 #                                                                                    #
 ######################################################################################
 
 # ------------------ Configuration ----------------- #
 
 # Load environment file if it exists (for systemd service)
-if [ -f /etc/hydrodactyl/auto-update-elytra.env ]; then
+if [ -f /etc/hydrodactyl/auto-update-wings.env ]; then
   # shellcheck source=/dev/null
-  source /etc/hydrodactyl/auto-update-elytra.env
+  source /etc/hydrodactyl/auto-update-wings.env
 fi
 
-# Default config (can be overridden by /etc/hydrodactyl/auto-update-elytra.env)
-ELYTRA_REPO="${ELYTRA_REPO:-pyrohost/elytra}"
+# Default config (can be overridden by /etc/hydrodactyl/auto-update-wings.env)
+WINGS_REPO="${WINGS_REPO:-pyrohost/wings}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
-INSTALL_DIR="${INSTALL_DIR:-/etc/elytra}"
-LOG_FILE="${LOG_FILE:-/var/log/hydrodactyl-elytra-auto-update.log}"
-BACKUP_DIR="${BACKUP_DIR:-/var/backups/elytra}"
-LOCK_FILE="${LOCK_FILE:-/var/run/hydrodactyl-elytra-update.lock}"
-CONFIG_FILE="${CONFIG_FILE:-/etc/hydrodactyl/auto-update-elytra.env}"
-VERSION_FILE="${VERSION_FILE:-/etc/hydrodactyl/elytra-version}"
+INSTALL_DIR="${INSTALL_DIR:-/etc/wings}"
+LOG_FILE="${LOG_FILE:-/var/log/hydrodactyl-wings-auto-update.log}"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/wings}"
+LOCK_FILE="${LOCK_FILE:-/var/run/hydrodactyl-wings-update.lock}"
+CONFIG_FILE="${CONFIG_FILE:-/etc/hydrodactyl/auto-update-wings.env}"
+VERSION_FILE="${VERSION_FILE:-/etc/hydrodactyl/wings-version}"
 KEEP_BACKUPS="${KEEP_BACKUPS:-5}"
 AUTO_UPDATE="${AUTO_UPDATE:-true}"
 CHECK_INTERVAL="${CHECK_INTERVAL:-3600}"
-# Elytra is always updated via releases (distributed as binary)
+# Wings is always updated via releases (distributed as binary)
 UPDATE_METHOD="releases"
-ELYTRA_REPO_PRIVATE="${ELYTRA_REPO_PRIVATE:-false}"
+WINGS_REPO_PRIVATE="${WINGS_REPO_PRIVATE:-false}"
 
 # ------------------ Runtime Flags ----------------- #
 
@@ -166,9 +166,9 @@ get_current_version() {
   fi
 
   # Fall back to binary --version (for backwards compatibility)
-  if [ -x "/usr/local/bin/elytra" ]; then
+  if [ -x "/usr/local/bin/wings" ]; then
     local binary_version
-    binary_version=$(/usr/local/bin/elytra --version 2>/dev/null)
+    binary_version=$(/usr/local/bin/wings --version 2>/dev/null)
     if [ -n "$binary_version" ] && [ "$binary_version" != "unknown" ]; then
       echo "$binary_version"
       return 0
@@ -199,7 +199,7 @@ get_latest_release() {
 
   local release_json
   release_json=$(curl "${curl_opts[@]}" \
-    "https://api.github.com/repos/$ELYTRA_REPO/releases/latest" 2>/dev/null)
+    "https://api.github.com/repos/$WINGS_REPO/releases/latest" 2>/dev/null)
 
   if [ -z "$release_json" ] || echo "$release_json" | grep -q '"message":"Not Found"'; then
     return 1
@@ -221,7 +221,7 @@ get_release_asset_info() {
   encoded_version=$(printf '%s' "$version" | jq -sRr @uri 2>/dev/null || echo "$version")
 
   curl "${curl_opts[@]}" \
-    "https://api.github.com/repos/$ELYTRA_REPO/releases/tags/$encoded_version" 2>/dev/null
+    "https://api.github.com/repos/$WINGS_REPO/releases/tags/$encoded_version" 2>/dev/null
 }
 
 # Version comparison
@@ -239,13 +239,13 @@ create_backup() {
 
   local timestamp
   timestamp=$(date +%Y%m%d-%H%M%S)
-  local backup_name="elytra-backup-${timestamp}"
+  local backup_name="wings-backup-${timestamp}"
   local backup_path="${BACKUP_DIR}/${backup_name}"
 
   # Backup binary
-  debug "Backing up Elytra binary..."
-  if [ -f "/usr/local/bin/elytra" ]; then
-    cp "/usr/local/bin/elytra" "${backup_path}.binary" 2>/dev/null || {
+  debug "Backing up Wings binary..."
+  if [ -f "/usr/local/bin/wings" ]; then
+    cp "/usr/local/bin/wings" "${backup_path}.binary" 2>/dev/null || {
       warning "Failed to backup binary"
     }
   fi
@@ -261,7 +261,7 @@ create_backup() {
   # Create restore info
   cat > "${backup_path}.info" << EOF
 Backup created: $(date)
-Elytra version: $(get_current_version)
+Wings version: $(get_current_version)
 Backup type: pre-update
 EOF
 
@@ -275,56 +275,56 @@ EOF
 cleanup_old_backups() {
   debug "Cleaning up old backups (keeping last $KEEP_BACKUPS)"
 
-  ls -t ${BACKUP_DIR}/elytra-backup-*.tar.gz 2>/dev/null | \
+  ls -t ${BACKUP_DIR}/wings-backup-*.tar.gz 2>/dev/null | \
     tail -n +$((KEEP_BACKUPS + 1)) | \
     xargs -r rm -f 2>/dev/null || true
 
-  ls -t ${BACKUP_DIR}/elytra-backup-*.binary 2>/dev/null | \
+  ls -t ${BACKUP_DIR}/wings-backup-*.binary 2>/dev/null | \
     tail -n +$((KEEP_BACKUPS + 1)) | \
     xargs -r rm -f 2>/dev/null || true
 
-  ls -t ${BACKUP_DIR}/elytra-backup-*.info 2>/dev/null | \
+  ls -t ${BACKUP_DIR}/wings-backup-*.info 2>/dev/null | \
     tail -n +$((KEEP_BACKUPS + 1)) | \
     xargs -r rm -f 2>/dev/null || true
 }
 
 # ------------------ Service Functions ----------------- #
 
-stop_elytra() {
-  info "Stopping Elytra service..."
-  if systemctl is-active --quiet elytra 2>/dev/null; then
-    systemctl stop elytra
+stop_wings() {
+  info "Stopping Wings service..."
+  if systemctl is-active --quiet wings 2>/dev/null; then
+    systemctl stop wings
     sleep 2
-    success "Elytra stopped"
+    success "Wings stopped"
   else
-    info "Elytra was not running"
+    info "Wings was not running"
   fi
 }
 
-start_elytra() {
-  info "Starting Elytra service..."
-  systemctl start elytra
+start_wings() {
+  info "Starting Wings service..."
+  systemctl start wings
   sleep 3
 
-  if systemctl is-active --quiet elytra; then
-    success "Elytra started successfully"
+  if systemctl is-active --quiet wings; then
+    success "Wings started successfully"
     return 0
   else
-    error "Elytra failed to start"
+    error "Wings failed to start"
     return 1
   fi
 }
 
-restart_elytra() {
-  info "Restarting Elytra service..."
-  systemctl restart elytra
+restart_wings() {
+  info "Restarting Wings service..."
+  systemctl restart wings
   sleep 3
 
-  if systemctl is-active --quiet elytra; then
-    success "Elytra restarted successfully"
+  if systemctl is-active --quiet wings; then
+    success "Wings restarted successfully"
     return 0
   else
-    error "Elytra failed to restart"
+    error "Wings failed to restart"
     return 1
   fi
 }
@@ -339,7 +339,7 @@ get_download_url() {
   arch=$(uname -m)
   [[ $arch == x86_64 ]] && arch=amd64 || arch=arm64
 
-  local asset_name="elytra_linux_${arch}"
+  local asset_name="wings_linux_${arch}"
 
   # Get asset download URL from GitHub API
   local release_info
@@ -439,17 +439,17 @@ perform_update() {
   fi
 
   # Stop service
-  stop_elytra
+  stop_wings
 
   # Download new binary
   local temp_file
   temp_file=$(mktemp)
 
-  info "Downloading Elytra $new_version..."
+  info "Downloading Wings $new_version..."
   if ! download_binary "$new_version" "$temp_file"; then
     error "Download failed"
     rm -f "$temp_file"
-    start_elytra || true
+    start_wings || true
     return $EXIT_DOWNLOAD_FAILED
   fi
 
@@ -458,35 +458,35 @@ perform_update() {
   if ! verify_binary "$temp_file"; then
     error "Binary verification failed"
     rm -f "$temp_file"
-    start_elytra || true
+    start_wings || true
     return $EXIT_DOWNLOAD_FAILED
   fi
 
   # Install new binary
   info "Installing new binary..."
-  if ! mv "$temp_file" "/usr/local/bin/elytra"; then
+  if ! mv "$temp_file" "/usr/local/bin/wings"; then
     error "Failed to install binary"
     rm -f "$temp_file"
-    start_elytra || true
+    start_wings || true
     return $EXIT_UPDATE_FAILED
   fi
 
-  chmod +x /usr/local/bin/elytra
+  chmod +x /usr/local/bin/wings
 
   # Start service
-  if ! start_elytra; then
-    error "Failed to start Elytra after update"
+  if ! start_wings; then
+    error "Failed to start Wings after update"
     error "Attempting rollback..."
 
     # Attempt rollback
     local latest_backup
-    latest_backup=$(ls -t ${BACKUP_DIR}/elytra-backup-*.binary 2>/dev/null | head -1)
+    latest_backup=$(ls -t ${BACKUP_DIR}/wings-backup-*.binary 2>/dev/null | head -1)
 
     if [ -n "$latest_backup" ]; then
       info "Restoring from backup: $latest_backup"
-      cp "$latest_backup" "/usr/local/bin/elytra"
-      chmod +x "/usr/local/bin/elytra"
-      restart_elytra || true
+      cp "$latest_backup" "/usr/local/bin/wings"
+      chmod +x "/usr/local/bin/wings"
+      restart_wings || true
     fi
 
     return $EXIT_UPDATE_FAILED
@@ -496,7 +496,7 @@ perform_update() {
   info "Running post-update health check..."
   if ! post_update_health_check; then
     warning "Health check detected issues, attempting auto-fix..."
-    auto_fix_elytra_issues
+    auto_fix_wings_issues
 
     # Run second health check after auto-fix
     info "Running second health check after auto-fix..."
@@ -506,7 +506,7 @@ perform_update() {
       # Log failure information
       mkdir -p "$INSTALL_DIR"
       cat > "$INSTALL_DIR/update-health-check-failure.log" << EOF
-[$(date)] Elytra Update Health Check Failed
+[$(date)] Wings Update Health Check Failed
 Version: ${new_version}
 Status: Auto-fix applied but issues persist
 
@@ -514,17 +514,17 @@ Failed Checks:
 EOF
 
       # Append specific failed checks to log
-      if [ ! -f "/usr/local/bin/elytra" ]; then
-        echo "- Elytra binary not found" >> "$INSTALL_DIR/update-health-check-failure.log"
-      elif [ ! -x "/usr/local/bin/elytra" ]; then
-        echo "- Elytra binary is not executable" >> "$INSTALL_DIR/update-health-check-failure.log"
+      if [ ! -f "/usr/local/bin/wings" ]; then
+        echo "- Wings binary not found" >> "$INSTALL_DIR/update-health-check-failure.log"
+      elif [ ! -x "/usr/local/bin/wings" ]; then
+        echo "- Wings binary is not executable" >> "$INSTALL_DIR/update-health-check-failure.log"
       fi
 
       if [ ! -f "$INSTALL_DIR/config.yml" ]; then
-        echo "- Elytra config file not found" >> "$INSTALL_DIR/update-health-check-failure.log"
+        echo "- Wings config file not found" >> "$INSTALL_DIR/update-health-check-failure.log"
       fi
 
-      for dir in /var/lib/elytra/volumes /var/lib/elytra/archives /var/lib/elytra/backups; do
+      for dir in /var/lib/wings/volumes /var/lib/wings/archives /var/lib/wings/backups; do
         if [ ! -d "$dir" ]; then
           echo "- Data directory missing: $dir" >> "$INSTALL_DIR/update-health-check-failure.log"
         fi
@@ -534,8 +534,8 @@ EOF
         echo "- Docker is not running" >> "$INSTALL_DIR/update-health-check-failure.log"
       fi
 
-      if ! systemctl is-active --quiet elytra 2>/dev/null; then
-        echo "- Elytra service is not running" >> "$INSTALL_DIR/update-health-check-failure.log"
+      if ! systemctl is-active --quiet wings 2>/dev/null; then
+        echo "- Wings service is not running" >> "$INSTALL_DIR/update-health-check-failure.log"
       fi
 
       echo "" >> "$INSTALL_DIR/update-health-check-failure.log"
@@ -548,12 +548,12 @@ EOF
       # Attempt rollback since health check failed
       error "Attempting rollback..."
       local latest_backup
-      latest_backup=$(ls -t ${BACKUP_DIR}/elytra-backup-*.binary 2>/dev/null | head -1)
+      latest_backup=$(ls -t ${BACKUP_DIR}/wings-backup-*.binary 2>/dev/null | head -1)
       if [ -n "$latest_backup" ]; then
         info "Restoring from backup: $latest_backup"
-        cp "$latest_backup" "/usr/local/bin/elytra"
-        chmod +x "/usr/local/bin/elytra"
-        restart_elytra || true
+        cp "$latest_backup" "/usr/local/bin/wings"
+        chmod +x "/usr/local/bin/wings"
+        restart_wings || true
       fi
       
       return $EXIT_UPDATE_FAILED
@@ -575,25 +575,25 @@ EOF
 post_update_health_check() {
   local has_errors=false
 
-  debug "Checking Elytra binary..."
-  if [ ! -f "/usr/local/bin/elytra" ]; then
-    error "Elytra binary not found"
+  debug "Checking Wings binary..."
+  if [ ! -f "/usr/local/bin/wings" ]; then
+    error "Wings binary not found"
     return 1
   fi
 
-  if [ ! -x "/usr/local/bin/elytra" ]; then
-    warning "Elytra binary is not executable"
+  if [ ! -x "/usr/local/bin/wings" ]; then
+    warning "Wings binary is not executable"
     has_errors=true
   fi
 
-  debug "Checking Elytra config..."
+  debug "Checking Wings config..."
   if [ ! -f "$INSTALL_DIR/config.yml" ]; then
-    warning "Elytra config file not found"
+    warning "Wings config file not found"
     has_errors=true
   fi
 
   debug "Checking data directories..."
-  for dir in /var/lib/elytra/volumes /var/lib/elytra/archives /var/lib/elytra/backups; do
+  for dir in /var/lib/wings/volumes /var/lib/wings/archives /var/lib/wings/backups; do
     if [ ! -d "$dir" ]; then
       warning "Data directory missing: $dir"
       has_errors=true
@@ -606,9 +606,9 @@ post_update_health_check() {
     has_errors=true
   fi
 
-  debug "Checking Elytra service..."
-  if ! systemctl is-active --quiet elytra 2>/dev/null; then
-    warning "Elytra service is not running"
+  debug "Checking Wings service..."
+  if ! systemctl is-active --quiet wings 2>/dev/null; then
+    warning "Wings service is not running"
     has_errors=true
   fi
 
@@ -620,67 +620,65 @@ post_update_health_check() {
   return 0
 }
 
-auto_fix_elytra_issues() {
+auto_fix_wings_issues() {
   info "Attempting to auto-fix issues..."
 
   # Fix binary permissions
-  if [ -f "/usr/local/bin/elytra" ]; then
+  if [ -f "/usr/local/bin/wings" ]; then
     info "Fixing binary permissions..."
-    chmod +x /usr/local/bin/elytra
+    chmod +x /usr/local/bin/wings
   fi
 
   # Fix data directory permissions
   info "Fixing data directory permissions..."
-  mkdir -p /var/lib/elytra/volumes /var/lib/elytra/archives /var/lib/elytra/backups
+  mkdir -p /var/lib/wings/volumes /var/lib/wings/archives /var/lib/wings/backups
 
-  chown -R 8888:8888 /var/lib/elytra/volumes 2>/dev/null || true
-  chown -R 8888:8888 /var/lib/elytra/archives 2>/dev/null || true
-  chown -R 8888:8888 /var/lib/elytra/backups 2>/dev/null || true
-  chown -R 8888:8888 /etc/elytra 2>/dev/null || true
+  chown -R 8888:8888 /var/lib/wings/volumes 2>/dev/null || true
+  chown -R 8888:8888 /var/lib/wings/archives 2>/dev/null || true
+  chown -R 8888:8888 /var/lib/wings/backups 2>/dev/null || true
+  chown -R 8888:8888 /etc/wings 2>/dev/null || true
 
   # Fix permissions
-  info "Fixing Elytra permissions..."
+  info "Fixing Wings permissions..."
   
   # Create directories if they don't exist
-  mkdir -p /var/lib/elytra/volumes /var/lib/elytra/archives /var/lib/elytra/backups
+  mkdir -p /var/lib/wings/volumes /var/lib/wings/archives /var/lib/wings/backups
   
   # Set permissions for containerized game servers
   # Note: 777 is required because game server containers run as arbitrary UIDs
   # and must be able to read/write/execute in these directories
   info "Setting 777 permissions on data directories for container access..."
-  # Ensure parent /var/lib/elytra is accessible
-  chmod 755 /var/lib/elytra 2>/dev/null || true
+  # Ensure parent /var/lib/wings is accessible
+  chmod 755 /var/lib/wings 2>/dev/null || true
   # Ensure the volumes directory itself and all contents have 777
-  chmod 777 /var/lib/elytra/volumes 2>/dev/null || true
-  chmod -R 777 /var/lib/elytra/volumes/* 2>/dev/null || true
-  chmod 777 /var/lib/elytra/archives 2>/dev/null || true
-  chmod -R 777 /var/lib/elytra/archives/* 2>/dev/null || true
-  chmod 777 /var/lib/elytra/backups 2>/dev/null || true
-  chmod -R 777 /var/lib/elytra/backups/* 2>/dev/null || true
+  chmod 777 /var/lib/wings/volumes 2>/dev/null || true
+  chmod -R 777 /var/lib/wings/volumes/* 2>/dev/null || true
+  chmod 777 /var/lib/wings/archives 2>/dev/null || true
+  chmod -R 777 /var/lib/wings/archives/* 2>/dev/null || true
+  chmod 777 /var/lib/wings/backups 2>/dev/null || true
+  chmod -R 777 /var/lib/wings/backups/* 2>/dev/null || true
   
-  # Disable check_permissions_on_boot to prevent Elytra from resetting permissions
-  if [ -f "/etc/elytra/config.yml" ]; then
-    info "Disabling permission checks in Elytra config..."
-    sed -i 's/check_permissions_on_boot: true/check_permissions_on_boot: false/' /etc/elytra/config.yml 2>/dev/null || true
+  if [ -f "/etc/wings/config.yml" ]; then
+    info "Disabling permission checks in Wings config..."
   fi
   
-  # Elytra config directory - create if needed and set more restrictive permissions
-  mkdir -p /etc/elytra
-  find /etc/elytra -type d -exec chmod 755 {} \; 2>/dev/null || true
+  # Wings config directory - create if needed and set more restrictive permissions
+  mkdir -p /etc/wings
+  find /etc/wings -type d -exec chmod 755 {} \; 2>/dev/null || true
   # SECURITY: Config contains daemon credentials - restrict to owner-only
-  find /etc/elytra -type f -name "config.yml" -exec chmod 600 {} \; 2>/dev/null || true
-  find /etc/elytra -type f ! -name "config.yml" -exec chmod 640 {} \; 2>/dev/null || true
+  find /etc/wings -type f -name "config.yml" -exec chmod 600 {} \; 2>/dev/null || true
+  find /etc/wings -type f ! -name "config.yml" -exec chmod 640 {} \; 2>/dev/null || true
 
-  # Restart Elytra service
-  info "Restarting Elytra service..."
-  systemctl restart elytra 2>/dev/null || true
+  # Restart Wings service
+  info "Restarting Wings service..."
+  systemctl restart wings 2>/dev/null || true
 
-  # Verify Elytra started
+  # Verify Wings started
   sleep 3
-  if systemctl is-active --quiet elytra 2>/dev/null; then
-    success "Elytra is now running"
+  if systemctl is-active --quiet wings 2>/dev/null; then
+    success "Wings is now running"
   else
-    warning "Elytra may still have issues - manual intervention may be required"
+    warning "Wings may still have issues - manual intervention may be required"
   fi
 
   success "Auto-fix completed"
@@ -698,8 +696,8 @@ send_notification() {
 # ------------------ Main Check Function ----------------- #
 
 check_for_updates() {
-  info "Checking for Elytra updates..."
-  debug "Repository: $ELYTRA_REPO"
+  info "Checking for Wings updates..."
+  debug "Repository: $WINGS_REPO"
   debug "Install directory: $INSTALL_DIR"
 
   local current_version
@@ -731,7 +729,7 @@ check_for_updates() {
   success "Update available: $latest_version"
 
   if [ "$NOTIFY_ONLY" == true ]; then
-    send_notification "UPDATE_AVAILABLE" "Elytra update available: $latest_version"
+    send_notification "UPDATE_AVAILABLE" "Wings update available: $latest_version"
     return $EXIT_SUCCESS
   fi
 
@@ -742,10 +740,10 @@ check_for_updates() {
 
   # Perform update
   if perform_update "$latest_version"; then
-    send_notification "UPDATE_SUCCESS" "Elytra updated to $latest_version"
+    send_notification "UPDATE_SUCCESS" "Wings updated to $latest_version"
     return $EXIT_SUCCESS
   else
-    send_notification "UPDATE_FAILED" "Failed to update Elytra"
+    send_notification "UPDATE_FAILED" "Failed to update Wings"
     return $EXIT_UPDATE_FAILED
   fi
 }
@@ -795,7 +793,7 @@ parse_arguments() {
 
 show_help() {
   cat << EOF
-Hydrodactyl Elytra Auto-Updater
+Hydrodactyl Wings Auto-Updater
 
 Usage: $(basename "$0") [OPTIONS]
 
@@ -832,16 +830,16 @@ main() {
     exit $EXIT_ERROR
   fi
 
-  # Check if Elytra is installed
-  if [ ! -f "/usr/local/bin/elytra" ]; then
-    error "Elytra not found at /usr/local/bin/elytra"
+  # Check if Wings is installed
+  if [ ! -f "/usr/local/bin/wings" ]; then
+    error "Wings not found at /usr/local/bin/wings"
     exit $EXIT_ERROR
   fi
 
   # Acquire lock
   acquire_lock
 
-  info "Starting Elytra auto-update check"
+  info "Starting Wings auto-update check"
   info "Mode: $([ "$DRY_RUN" == true ] && echo "DRY RUN" || echo "LIVE")"
 
   local exit_code

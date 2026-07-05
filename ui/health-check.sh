@@ -4,13 +4,13 @@ set -e
 
 ######################################################################################
 #                                                                                    #
-# Pyrodactyl Health Check UI                                                         #
+# Hydrodactyl Health Check UI                                                         #
 #                                                                                    #
-# Health check and diagnostics for Pyrodactyl Panel and Elytra                       #
+# Health check and diagnostics for Hydrodactyl Panel and Elytra                       #
 #                                                                                    #
 # Copyright (C) 2025, Muspelheim Hosting                                             #
 #                                                                                    #
-# https://github.com/Muspelheim-Hosting/pyrodactyl-installer                         #
+# https://github.com/itzzjustmateo/hydro-install                         #
 #                                                                                    #
 ######################################################################################
 
@@ -18,17 +18,17 @@ set -e
 fn_exists() { declare -F "$1" >/dev/null; }
 if ! fn_exists lib_loaded; then
   # Try temp file first (when run through install.sh)
-  if [ -f /tmp/pyrodactyl-lib.sh ]; then
+  if [ -f /tmp/hydrodactyl-lib.sh ]; then
     # shellcheck source=/dev/null
-    if ! source /tmp/pyrodactyl-lib.sh 2>/dev/null; then
+    if ! source /tmp/hydrodactyl-lib.sh 2>/dev/null; then
       # Temp file exists but failed to load (corrupt/invalid) - remove it
-      rm -f /tmp/pyrodactyl-lib.sh
+      rm -f /tmp/hydrodactyl-lib.sh
     fi
   fi
   # Fall back to downloading if temp file didn't load or doesn't exist
   if ! fn_exists lib_loaded; then
     # shellcheck source=/dev/null
-    source <(curl -sSL "${GITHUB_BASE_URL:-"https://raw.githubusercontent.com/Muspelheim-Hosting/pyrodactyl-installer"}/${GITHUB_SOURCE:-"main"}/lib/lib.sh")
+    source <(curl -sSL "${GITHUB_BASE_URL:-"https://raw.githubusercontent.com/itzzjustmateo/hydro-install"}/${GITHUB_SOURCE:-"main"}/lib/lib.sh")
   fi
   ! fn_exists lib_loaded && echo "* ERROR: Could not load lib script" && exit 1
 fi
@@ -115,17 +115,17 @@ check_system_resources_health() {
 # ------------------ Detection Functions ----------------- #
 
 detect_panel_location() {
-  # Check for Pyrodactyl first (install script location)
-  if [ -d "/var/www/pyrodactyl" ] && [ -f "/var/www/pyrodactyl/artisan" ]; then
-    echo "/var/www/pyrodactyl"
+  # Check for Hydrodactyl first (install script location)
+  if [ -d "/var/www/hydrodactyl" ] && [ -f "/var/www/hydrodactyl/artisan" ]; then
+    echo "/var/www/hydrodactyl"
     return 0
   fi
 
-  # Check for Pterodactyl location (might be Pyrodactyl migrated)
+  # Check for Pterodactyl location (might be Hydrodactyl migrated)
   if [ -d "/var/www/pterodactyl" ] && [ -f "/var/www/pterodactyl/artisan" ]; then
-    # Verify it's actually Pyrodactyl
-    if grep -q "Pyrodactyl" "/var/www/pterodactyl/config/app.php" 2>/dev/null || \
-       grep -q "pyrodactyl" "/var/www/pterodactyl/composer.json" 2>/dev/null; then
+    # Verify it's actually Hydrodactyl
+    if grep -q "Hydrodactyl" "/var/www/pterodactyl/config/app.php" 2>/dev/null || \
+       grep -q "hydrodactyl" "/var/www/pterodactyl/composer.json" 2>/dev/null; then
       echo "/var/www/pterodactyl"
       return 0
     fi
@@ -183,7 +183,7 @@ show_health_menu() {
         local panel_dir
         panel_dir=$(detect_panel_location) || {
           error "Panel installation not found"
-          output "Searched: /var/www/pyrodactyl, /var/www/pterodactyl"
+          output "Searched: /var/www/hydrodactyl, /var/www/pterodactyl"
           sleep 2
           continue
         }

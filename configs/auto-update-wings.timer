@@ -1,5 +1,5 @@
 [Unit]
-Description=Run Hydrodactyl Elytra Auto-Updater periodically
+Description=Run Hydrodactyl Wings Auto-Updater periodically
 
 [Timer]
 OnBootSec=5min

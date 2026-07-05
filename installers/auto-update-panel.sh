@@ -4,7 +4,7 @@ set -e
 
 ######################################################################################
 #                                                                                    #
-# Pyrodactyl Panel Auto-Updater                                                      #
+# Hydrodactyl Panel Auto-Updater                                                      #
 #                                                                                    #
 # Advanced auto-updater with cron support, dry-run mode, backups, and notifications  #
 #                                                                                    #
@@ -20,26 +20,26 @@ set -e
 # ------------------ Configuration ----------------- #
 
 # Load environment file if it exists (for systemd service)
-if [ -f /etc/pyrodactyl/auto-update-panel.env ]; then
+if [ -f /etc/hydrodactyl/auto-update-panel.env ]; then
   # shellcheck source=/dev/null
-  source /etc/pyrodactyl/auto-update-panel.env
+  source /etc/hydrodactyl/auto-update-panel.env
 fi
 
-# Default config (can be overridden by /etc/pyrodactyl/auto-update-panel.env)
-PANEL_REPO="${PANEL_REPO:-pyrodactyl-oss/pyrodactyl}"
+# Default config (can be overridden by /etc/hydrodactyl/auto-update-panel.env)
+PANEL_REPO="${PANEL_REPO:-hydrodactyl-oss/hydrodactyl}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
-INSTALL_DIR="${INSTALL_DIR:-/var/www/pyrodactyl}"
-LOG_FILE="${LOG_FILE:-/var/log/pyrodactyl-panel-auto-update.log}"
-BACKUP_DIR="${BACKUP_DIR:-/var/backups/pyrodactyl}"
-LOCK_FILE="${LOCK_FILE:-/var/run/pyrodactyl-panel-update.lock}"
-CONFIG_FILE="${CONFIG_FILE:-/etc/pyrodactyl/auto-update-panel.env}"
+INSTALL_DIR="${INSTALL_DIR:-/var/www/hydrodactyl}"
+LOG_FILE="${LOG_FILE:-/var/log/hydrodactyl-panel-auto-update.log}"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/hydrodactyl}"
+LOCK_FILE="${LOCK_FILE:-/var/run/hydrodactyl-panel-update.lock}"
+CONFIG_FILE="${CONFIG_FILE:-/etc/hydrodactyl/auto-update-panel.env}"
 KEEP_BACKUPS="${KEEP_BACKUPS:-5}"
 AUTO_UPDATE="${AUTO_UPDATE:-true}"
 CHECK_INTERVAL="${CHECK_INTERVAL:-3600}"
 UPDATE_METHOD="${UPDATE_METHOD:-releases}"
 PANEL_REPO_PRIVATE="${PANEL_REPO_PRIVATE:-false}"
-PANEL_CONFIG_DIR="${PANEL_CONFIG_DIR:-/etc/pyrodactyl}"
-GITHUB_BASE_URL="${GITHUB_BASE_URL:-https://raw.githubusercontent.com/Muspelheim-Hosting/pyrodactyl-installer}"
+PANEL_CONFIG_DIR="${PANEL_CONFIG_DIR:-/etc/hydrodactyl}"
+GITHUB_BASE_URL="${GITHUB_BASE_URL:-https://raw.githubusercontent.com/itzzjustmateo/hydro-install}"
 GITHUB_SOURCE="${GITHUB_SOURCE:-main}"
 
 # ------------------ Runtime Flags ----------------- #
@@ -155,9 +155,9 @@ load_config() {
 
 get_current_version() {
   # Primary: Read from version file (written by installer from GitHub release tag)
-  if [ -f "/etc/pyrodactyl/panel-version" ]; then
+  if [ -f "/etc/hydrodactyl/panel-version" ]; then
     local version
-    version=$(cat "/etc/pyrodactyl/panel-version" 2>/dev/null)
+    version=$(cat "/etc/hydrodactyl/panel-version" 2>/dev/null)
     if [ -n "$version" ]; then
       echo "$version"
       return 0
@@ -372,8 +372,8 @@ create_backup() {
   # Backup database
   debug "Backing up database..."
   local db_root_pass=""
-  if [ -f /root/.config/pyrodactyl/db-credentials ]; then
-    db_root_pass=$(grep '^root:' /root/.config/pyrodactyl/db-credentials 2>/dev/null | cut -d':' -f2)
+  if [ -f /root/.config/hydrodactyl/db-credentials ]; then
+    db_root_pass=$(grep '^root:' /root/.config/hydrodactyl/db-credentials 2>/dev/null | cut -d':' -f2)
   fi
 
   if [ -n "$db_root_pass" ]; then
@@ -694,9 +694,9 @@ EOF
   fi
 
   # Save new version to version file
-  mkdir -p /etc/pyrodactyl
-  echo "$new_version" > /etc/pyrodactyl/panel-version
-  chmod 644 /etc/pyrodactyl/panel-version
+  mkdir -p /etc/hydrodactyl
+  echo "$new_version" > /etc/hydrodactyl/panel-version
+  chmod 644 /etc/hydrodactyl/panel-version
 
   # Log update
   echo "[$(date)] Updated to ${new_version}" >> "${BACKUP_DIR}/update-history.log"
@@ -928,9 +928,9 @@ EOF
   # Save git commit hash as version
   local new_commit
   new_commit=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
-  mkdir -p /etc/pyrodactyl
-  echo "git:${new_commit}" > /etc/pyrodactyl/panel-version
-  chmod 644 /etc/pyrodactyl/panel-version
+  mkdir -p /etc/hydrodactyl
+  echo "git:${new_commit}" > /etc/hydrodactyl/panel-version
+  chmod 644 /etc/hydrodactyl/panel-version
 
   success "Update to latest git commit completed successfully!"
   return 0
@@ -1117,7 +1117,7 @@ parse_arguments() {
 
 show_help() {
   cat << EOF
-Pyrodactyl Panel Auto-Updater
+Hydrodactyl Panel Auto-Updater
 
 Usage: $(basename "$0") [OPTIONS]
 

@@ -1,6 +1,6 @@
-# Pyrodactyl Panel - Manual Installation Guide
+# Hydrodactyl Panel - Manual Installation Guide
 
-This guide provides step-by-step instructions for manually installing the Pyrodactyl Panel on your server. Pyrodactyl is a modern, open-source game server management panel built with PHP and Laravel.
+This guide provides step-by-step instructions for manually installing the Hydrodactyl Panel on your server. Hydrodactyl is a modern, open-source game server management panel built with PHP and Laravel.
 
 ## Table of Contents
 
@@ -10,7 +10,7 @@ This guide provides step-by-step instructions for manually installing the Pyroda
 4. [Step 2: Install Required Packages](#step-2-install-required-packages)
 5. [Step 3: Configure MariaDB Database](#step-3-configure-mariadb-database)
 6. [Step 4: Configure Redis](#step-4-configure-redis)
-7. [Step 5: Download and Configure Pyrodactyl](#step-5-download-and-configure-pyrodactyl)
+7. [Step 5: Download and Configure Hydrodactyl](#step-5-download-and-configure-hydrodactyl)
 8. [Step 6: Configure Nginx](#step-6-configure-nginx)
 9. [Step 7: SSL/TLS Configuration](#step-7-ssltls-configuration)
 10. [Step 8: Queue Worker Setup](#step-8-queue-worker-setup)
@@ -166,10 +166,10 @@ mysql -e "FLUSH PRIVILEGES;"
 mysql -u root -p -e "CREATE DATABASE panel;"
 
 # Create user
-mysql -u root -p -e "CREATE USER 'pyrodactyl'@'127.0.0.1' IDENTIFIED BY 'your_secure_db_password';"
+mysql -u root -p -e "CREATE USER 'hydrodactyl'@'127.0.0.1' IDENTIFIED BY 'your_secure_db_password';"
 
 # Grant privileges
-mysql -u root -p -e "GRANT ALL PRIVILEGES ON panel.* TO 'pyrodactyl'@'127.0.0.1' WITH GRANT OPTION;"
+mysql -u root -p -e "GRANT ALL PRIVILEGES ON panel.* TO 'hydrodactyl'@'127.0.0.1' WITH GRANT OPTION;"
 
 # Flush privileges
 mysql -u root -p -e "FLUSH PRIVILEGES;"
@@ -195,20 +195,20 @@ systemctl status redis-server
 
 ---
 
-## Step 5: Download and Configure Pyrodactyl
+## Step 5: Download and Configure Hydrodactyl
 
 ### Create Directory Structure
 
 ```bash
-mkdir -p /var/www/pyrodactyl
-cd /var/www/pyrodactyl
+mkdir -p /var/www/hydrodactyl
+cd /var/www/hydrodactyl
 ```
 
 ### Download Latest Release
 
 ```bash
 # Get the latest release URL from GitHub
-LATEST_URL=$(curl -s https://api.github.com/repos/pyrodactyl-oss/pyrodactyl/releases/latest | grep "tarball_url" | cut -d'"' -f4)
+LATEST_URL=$(curl -s https://api.github.com/repos/hydrodactyl-oss/hydrodactyl/releases/latest | grep "tarball_url" | cut -d'"' -f4)
 
 # Download and extract
 curl -Lo panel.tar.gz "$LATEST_URL"
@@ -219,8 +219,8 @@ rm panel.tar.gz
 ### Set Proper Permissions
 
 ```bash
-chown -R www-data:www-data /var/www/pyrodactyl
-chmod -R 755 /var/www/pyrodactyl
+chown -R www-data:www-data /var/www/hydrodactyl
+chmod -R 755 /var/www/hydrodactyl
 ```
 
 ### Install Composer Dependencies
@@ -230,7 +230,7 @@ chmod -R 755 /var/www/pyrodactyl
 curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
 # Install dependencies
-cd /var/www/pyrodactyl
+cd /var/www/hydrodactyl
 composer install --no-dev --optimize-autoloader
 ```
 
@@ -243,7 +243,7 @@ cp .env.example .env
 Edit `.env` file with your settings:
 
 ```bash
-nano /var/www/pyrodactyl/.env
+nano /var/www/hydrodactyl/.env
 ```
 
 Required changes:
@@ -253,7 +253,7 @@ APP_URL=https://your-domain.com
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_DATABASE=panel
-DB_USERNAME=pyrodactyl
+DB_USERNAME=hydrodactyl
 DB_PASSWORD=your_secure_db_password
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
@@ -262,7 +262,7 @@ REDIS_PORT=6379
 ### Generate Application Key
 
 ```bash
-cd /var/www/pyrodactyl
+cd /var/www/hydrodactyl
 php artisan key:generate --force
 ```
 
@@ -297,7 +297,7 @@ php artisan view:cache
 Create a new configuration file:
 
 ```bash
-nano /etc/nginx/sites-available/pyrodactyl
+nano /etc/nginx/sites-available/hydrodactyl
 ```
 
 Add the following configuration (adjust for your domain):
@@ -308,7 +308,7 @@ server {
     listen [::]:80;
     server_name your-domain.com;
 
-    root /var/www/pyrodactyl/public;
+    root /var/www/hydrodactyl/public;
     index index.php;
 
     # Security headers
@@ -345,7 +345,7 @@ server {
 
 **Debian/Ubuntu:**
 ```bash
-ln -s /etc/nginx/sites-available/pyrodactyl /etc/nginx/sites-enabled/
+ln -s /etc/nginx/sites-available/hydrodactyl /etc/nginx/sites-enabled/
 nginx -t
 systemctl restart nginx
 ```
@@ -355,7 +355,7 @@ On RHEL-family distributions, nginx uses `/etc/nginx/conf.d/` instead of `sites-
 
 ```bash
 # Copy the config to conf.d (sites-enabled pattern doesn't exist)
-cp /etc/nginx/sites-available/pyrodactyl /etc/nginx/conf.d/pyrodactyl.conf
+cp /etc/nginx/sites-available/hydrodactyl /etc/nginx/conf.d/hydrodactyl.conf
 # Remove the default server block if it conflicts
 rm -f /etc/nginx/conf.d/default.conf
 nginx -t
@@ -392,13 +392,13 @@ Create a hook to restart services after renewal:
 
 ```bash
 mkdir -p /etc/letsencrypt/renewal-hooks/deploy
-cat > /etc/letsencrypt/renewal-hooks/deploy/pyrodactyl-services.sh << 'EOF'
+cat > /etc/letsencrypt/renewal-hooks/deploy/hydrodactyl-services.sh << 'EOF'
 #!/bin/bash
-echo "[$(date)] Certificate renewed" >> /var/log/pyrodactyl-certbot-renewal.log
+echo "[$(date)] Certificate renewed" >> /var/log/hydrodactyl-certbot-renewal.log
 systemctl restart nginx
 EOF
 
-chmod +x /etc/letsencrypt/renewal-hooks/deploy/pyrodactyl-services.sh
+chmod +x /etc/letsencrypt/renewal-hooks/deploy/hydrodactyl-services.sh
 ```
 
 ---
@@ -417,7 +417,7 @@ Add the following content:
 
 ```ini
 [Unit]
-Description=Pyrodactyl Queue Worker
+Description=Hydrodactyl Queue Worker
 After=redis-server.service mariadb.service
 Requires=redis-server.service
 
@@ -436,7 +436,7 @@ KillSignal=SIGTERM
 KillMode=process
 
 # Memory leak prevention: restart after 1 hour or 1000 jobs
-ExecStart=/usr/bin/php /var/www/pyrodactyl/artisan queue:work --queue=high,standard,low --sleep=3 --tries=3 --max-time=3600 --max-jobs=1000 --memory=512
+ExecStart=/usr/bin/php /var/www/hydrodactyl/artisan queue:work --queue=high,standard,low --sleep=3 --tries=3 --max-time=3600 --max-jobs=1000 --memory=512
 
 OOMScoreAdjust=-100
 
@@ -468,7 +468,7 @@ systemctl status pyroq
 
 ## Step 9: Cron Job Setup
 
-Set up the scheduler for Pyrodactyl:
+Set up the scheduler for Hydrodactyl:
 
 ```bash
 crontab -e
@@ -477,7 +477,7 @@ crontab -e
 Add this line:
 
 ```cron
-* * * * * cd /var/www/pyrodactyl && php artisan schedule:run >> /dev/null 2>&1
+* * * * * cd /var/www/hydrodactyl && php artisan schedule:run >> /dev/null 2>&1
 ```
 
 ---
@@ -528,12 +528,12 @@ systemctl status pyroq
 
 ### Test Panel Accessibility
 
-Visit `https://your-domain.com` in your browser. You should see the Pyrodactyl login page.
+Visit `https://your-domain.com` in your browser. You should see the Hydrodactyl login page.
 
 ### Check Panel Health
 
 ```bash
-cd /var/www/pyrodactyl
+cd /var/www/hydrodactyl
 php artisan p:info
 ```
 
@@ -567,19 +567,19 @@ php artisan queue:monitor
 
 Fix permissions:
 ```bash
-chown -R www-data:www-data /var/www/pyrodactyl
+chown -R www-data:www-data /var/www/hydrodactyl
 # Set 755 on directories and 644 on files
-find /var/www/pyrodactyl/storage -type d -exec chmod 755 {} \;
-find /var/www/pyrodactyl/storage -type f -exec chmod 644 {} \;
-find /var/www/pyrodactyl/bootstrap/cache -type d -exec chmod 755 {} \;
-find /var/www/pyrodactyl/bootstrap/cache -type f -exec chmod 644 {} \;
+find /var/www/hydrodactyl/storage -type d -exec chmod 755 {} \;
+find /var/www/hydrodactyl/storage -type f -exec chmod 644 {} \;
+find /var/www/hydrodactyl/bootstrap/cache -type d -exec chmod 755 {} \;
+find /var/www/hydrodactyl/bootstrap/cache -type f -exec chmod 644 {} \;
 ```
 
 ### Database Connection Errors
 
 Verify credentials in `.env` and test:
 ```bash
-mysql -u pyrodactyl -p -h 127.0.0.1 panel -e "SELECT 1"
+mysql -u hydrodactyl -p -h 127.0.0.1 panel -e "SELECT 1"
 ```
 
 ### Queue Worker Not Processing Jobs
@@ -624,9 +624,9 @@ echo "vm.swappiness=10" >> /etc/sysctl.conf
 Set up automated backups:
 
 ```bash
-mkdir -p /var/backups/pyrodactyl
-mysqldump -u root -p panel > /var/backups/pyrodactyl/panel-$(date +%Y%m%d).sql
-tar -czf /var/backups/pyrodactyl/panel-files-$(date +%Y%m%d).tar.gz /var/www/pyrodactyl
+mkdir -p /var/backups/hydrodactyl
+mysqldump -u root -p panel > /var/backups/hydrodactyl/panel-$(date +%Y%m%d).sql
+tar -czf /var/backups/hydrodactyl/panel-files-$(date +%Y%m%d).tar.gz /var/www/hydrodactyl
 ```
 
 ---
@@ -646,10 +646,10 @@ For Elytra installation, refer to the [Elytra Manual Installation Guide](./elytr
 
 ## Support
 
-- GitHub Issues: https://github.com/pyrodactyl-oss/pyrodactyl/issues
-- Documentation: https://github.com/pyrodactyl-oss/pyrodactyl/tree/main/docs
-- Discord: [Pyrodactyl Community Discord]
+- GitHub Issues: https://github.com/hydrodactyl-oss/hydrodactyl/issues
+- Documentation: https://github.com/hydrodactyl-oss/hydrodactyl/tree/main/docs
+- Discord: [Hydrodactyl Community Discord]
 
 ---
 
-**Congratulations!** Your Pyrodactyl Panel is now installed and ready to use.
+**Congratulations!** Your Hydrodactyl Panel is now installed and ready to use.

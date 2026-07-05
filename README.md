@@ -3,11 +3,13 @@
 </p>
 
 <p align="center">
-  <!-- <a href="https://github.com/Muspelheim-Hosting/pyrodactyl-installer/releases"><img src="https://img.shields.io/github/v/release/Muspelheim-Hosting/pyrodactyl-installer?style=for-the-badge&color=orange" alt="Release"></a> -->
-  <a href="https://github.com/Muspelheim-Hosting/pyrodactyl-installer/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Muspelheim-Hosting/pyrodactyl-installer?style=for-the-badge&color=orange" alt="License"></a>
+  <!-- <a href="https://github.com/itzzjustmateo/hydro-install/releases"><img src="https://img.shields.io/github/v/release/itzzjustmateo/hydro-install?style=for-the-badge&color=orange" alt="Release"></a> -->
+  <a href="https://github.com/itzzjustmateo/hydro-install/blob/main/LICENSE"><img src="https://img.shields.io/github/license/itzzjustmateo/hydro-install?style=for-the-badge&color=orange" alt="License"></a>
 </p>
 
-A beautiful, modern, and feature-rich installer for **Pyrodactyl Panel** and **Elytra Daemon**. Built with an elegant flame-inspired UI and designed for ease of use.
+A beautiful, modern, and feature-rich installer for **Hydrodactyl Panel**. Built with an elegant flame-inspired UI and designed for ease of use.
+
+> ⚠️ **Elytra is no longer supported.** Existing users should migrate to **Wings** or **Wings-RS** ([https://github.com/calagopus/wings](https://github.com/calagopus/wings)) as a replacement daemon.
 
 ## ✨ Features
 
@@ -27,13 +29,13 @@ A beautiful, modern, and feature-rich installer for **Pyrodactyl Panel** and **E
 ## 🚀 Quick Start
 
 ```bash
-bash <(curl -sSL https://pyrodactyl-installer.muspelheim.host)
+bash <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)
 ```
 
 Or download and run:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/Muspelheim-Hosting/pyrodactyl-installer/main/install.sh -o install.sh
+curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh -o install.sh
 bash install.sh
 ```
 
@@ -62,12 +64,14 @@ bash install.sh
 
 > ⚠️ **Docker Compatibility:** Elytra requires Docker to run game servers. OpenVZ, LXC, or Virtuozzo virtualization are **not supported**. KVM, VMware, or dedicated servers work best. Run `systemd-detect-virt` to check your virtualization type.
 
+> ⚠️ **Elytra is no longer supported.** Migrate to **Wings** or **Wings-RS** ([https://github.com/calagopus/wings](https://github.com/calagopus/wings)).
+
 ## 🔧 Installation Options
 
 <img width="848" height="504" alt="image" src="https://github.com/user-attachments/assets/9974e217-f667-4488-8a13-8745a9d2498f" />
 
 ```bash
-bash <(curl -sSL https://pyrodactyl-installer.muspelheim.host)
+bash <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)
 ```
 
 ## 🔧 Maintenance Tools
@@ -78,7 +82,7 @@ The built-in repair tool can fix common issues:
 - **Fix Elytra Permissions** - Sets correct permissions for Elytra directories (UID 8888)
 - **Clear Laravel Caches** - Clears config, cache, view, and route caches
 - **Restart All Services** - Restarts nginx, PHP-FPM, pyroq, redis, and elytra
-- **Fix Database Permissions** - Re-grants privileges to pyrodactyl database user
+- **Fix Database Permissions** - Re-grants privileges to hydrodactyl database user
 - **Setup Swap File** - Configure swap space for systems with limited RAM (1GB, 2GB, 4GB, or custom)
 
 ### Health Check (Option 8)
@@ -99,7 +103,7 @@ The installer automatically displays system resources on startup:
 When Let's Encrypt is configured, the installer automatically sets up:
 - **Automatic Renewal** - Certificates renewed twice daily (as recommended by Let's Encrypt)
 - **Service Restart Hooks** - nginx and Elytra automatically restart after successful renewal
-- **Renewal Logging** - All renewal activity logged to `/var/log/pyrodactyl-certbot-renewal.log`
+- **Renewal Logging** - All renewal activity logged to `/var/log/hydrodactyl-certbot-renewal.log`
 - **Health Verification** - Dry-run testing to ensure renewal configuration is valid
 
 ## 🔐 Private Repository Support
@@ -124,7 +128,7 @@ The installer fully supports private GitHub repositories:
 You can install from custom forks or private builds:
 
 ### Default Repositories
-- **Panel**: `pyrodactyl-oss/pyrodactyl`
+- **Panel**: `hydrodactyl-oss/hydrodactyl`
 - **Elytra**: `pyrohost/elytra`
 
 ### Using Custom Repositories
@@ -151,14 +155,14 @@ During installation, select "Use custom repository" and provide:
 ## 📁 Directory Structure
 
 ```
-/var/www/pyrodactyl/         # Panel installation
+/var/www/hydrodactyl/         # Panel installation
 /etc/elytra/                 # Elytra configuration
-/etc/pyrodactyl/             # Panel configuration
+/etc/hydrodactyl/             # Panel configuration
 /var/lib/elytra/volumes      # Game server data (containers)
 /var/lib/elytra/archives     # Server archives
 /var/lib/elytra/backups      # Server backups
-/var/log/pyrodactyl-*.log    # Installation/update logs
-/var/backups/pyrodactyl/     # Panel backups
+/var/log/hydrodactyl-*.log    # Installation/update logs
+/var/backups/hydrodactyl/     # Panel backups
 /var/backups/elytra/         # Elytra backups
 ```
 
@@ -184,7 +188,7 @@ During installation, select "Use custom repository" and provide:
 **Panel not accessible**
 ```bash
 # Use the built-in Repair Tool (Option 7)
-bash <(curl -sSL https://pyrodactyl-installer.muspelheim.host)
+bash <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)
 
 # Or manually check services:
 systemctl status nginx
@@ -192,10 +196,11 @@ systemctl status pyroq
 journalctl -u pyroq -f
 ```
 
-**Elytra not connecting**
+**Elytra not connecting (Deprecated)**
+> ⚠️ Elytra is no longer supported. Migrate to **Wings** or **Wings-RS** ([https://github.com/calagopus/wings](https://github.com/calagopus/wings)).
 ```bash
 # Check Elytra health via Health Check (Option 8)
-bash <(curl -sSL https://pyrodactyl-installer.muspelheim.host)
+bash <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)
 
 # Or manually check:
 systemctl status elytra
@@ -230,7 +235,7 @@ systemctl status pyroq
 journalctl -u pyroq -f
 
 # Check for failed jobs
-cd /var/www/pyrodactyl
+cd /var/www/hydrodactyl
 php artisan queue:failed
 php artisan queue:retry all  # Retry failed jobs
 ```
@@ -275,11 +280,11 @@ firewall-cmd --reload
 
 All installation and update operations are logged:
 
-- **Installation**: `/var/log/pyrodactyl-installer.log`
-- **Panel Updates**: `/var/log/pyrodactyl-panel-auto-update.log`
-- **Elytra Updates**: `/var/log/pyrodactyl-elytra-auto-update.log`
-- **SSL Renewal**: `/var/log/pyrodactyl-certbot-renewal.log`
-- **Health Check Failures**: `/etc/pyrodactyl/update-health-check-failure.log` (Panel) or `/etc/elytra/update-health-check-failure.log` (Elytra)
+- **Installation**: `/var/log/hydrodactyl-installer.log`
+- **Panel Updates**: `/var/log/hydrodactyl-panel-auto-update.log`
+- **Elytra Updates**: `/var/log/hydrodactyl-elytra-auto-update.log`
+- **SSL Renewal**: `/var/log/hydrodactyl-certbot-renewal.log`
+- **Health Check Failures**: `/etc/hydrodactyl/update-health-check-failure.log` (Panel) or `/etc/elytra/update-health-check-failure.log` (Elytra)
 
 ## 🎮 Game Server Ports
 
@@ -315,7 +320,7 @@ With all port ranges combined (approximately 2,000+ ports), you can host:
 
 ```
 ┌─────────────────────────────────────┐
-│           Pyrodactyl Panel          │
+│           Hydrodactyl Panel          │
 │   ┌─────────────────────────────┐   │
 │   │      Nginx (Web Server)     │   │
 │   │    PHP 8.3-FPM + Laravel    │   │
@@ -357,8 +362,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Credits
 
-- [Pyrodactyl](https://github.com/pyrodactyl-oss/pyrodactyl) - The panel software
-- [Elytra](https://github.com/pyrohost/elytra) - The daemon software
+- [Hydrodactyl](https://github.com/hydrodactyl-oss/hydrodactyl) - The panel software
+- [Elytra](https://github.com/pyrohost/elytra) - The daemon software (deprecated — migrate to [Wings-RS](https://github.com/calagopus/wings))
 - [Pterodactyl Installer](https://github.com/pterodactyl-installer/pterodactyl-installer) - Inspiration
 
 ---

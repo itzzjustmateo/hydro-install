@@ -4,7 +4,7 @@ set -e
 
 ######################################################################################
 #                                                                                    #
-# Pyrodactyl + Elytra Combined Installer                                             #
+# Hydrodactyl + Wings Combined Installer                                             #
 #                                                                                    #
 # Installs both Panel and Elytra on the same machine with automatic configuration    #
 #                                                                                    #
@@ -14,17 +14,17 @@ set -e
 fn_exists() { declare -F "$1" >/dev/null; }
 if ! fn_exists lib_loaded; then
   # Try temp file first (when run through install.sh)
-  if [ -f /tmp/pyrodactyl-lib.sh ]; then
+  if [ -f /tmp/hydrodactyl-lib.sh ]; then
     # shellcheck source=/dev/null
-    if ! source /tmp/pyrodactyl-lib.sh 2>/dev/null; then
+    if ! source /tmp/hydrodactyl-lib.sh 2>/dev/null; then
       # Temp file exists but failed to load (corrupt/invalid) - remove it
-      rm -f /tmp/pyrodactyl-lib.sh
+      rm -f /tmp/hydrodactyl-lib.sh
     fi
   fi
   # Fall back to downloading if temp file didn't load or doesn't exist
   if ! fn_exists lib_loaded; then
     # shellcheck source=/dev/null
-    source <(curl -sSL "${GITHUB_BASE_URL:-"https://raw.githubusercontent.com/Muspelheim-Hosting/pyrodactyl-installer"}/${GITHUB_SOURCE:-"main"}/lib/lib.sh")
+    source <(curl -sSL "${GITHUB_BASE_URL:-"https://raw.githubusercontent.com/itzzjustmateo/hydro-install"}/${GITHUB_SOURCE:-"main"}/lib/lib.sh")
   fi
   ! fn_exists lib_loaded && echo "* ERROR: Could not load lib script" && exit 1
 fi
@@ -32,7 +32,7 @@ fi
 # ------------------ Variables ----------------- #
 
 # Panel configuration
-PANEL_REPO="${PANEL_REPO:-pyrodactyl-oss/pyrodactyl}"
+PANEL_REPO="${PANEL_REPO:-blueprintframework/hydrodactyl}"
 PANEL_INSTALL_METHOD="${PANEL_INSTALL_METHOD:-release}"
 PANEL_RELEASE_VERSION="${PANEL_RELEASE_VERSION:-latest}"
 PANEL_FQDN="${PANEL_FQDN:-}"
@@ -51,7 +51,7 @@ SSL_KEY_PATH="${SSL_KEY_PATH:-}"
 DB_HOST="${DB_HOST:-127.0.0.1}"
 DB_PORT="${DB_PORT:-3306}"
 DB_NAME="${DB_NAME:-panel}"
-DB_USER="${DB_USER:-pyrodactyl}"
+DB_USER="${DB_USER:-hydrodactyl}"
 
 # Load existing credentials or generate new ones
 if saved_pass=$(load_existing_db_credentials); then
@@ -61,8 +61,9 @@ else
   MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-$(gen_passwd 64)}"
 fi
 
-# Elytra configuration
-ELYTRA_REPO="${ELYTRA_REPO:-pyrohost/elytra}"
+# Wings configuration
+WINGS_VARIANT="${WINGS_VARIANT:-go}"
+WINGS_REPO="${WINGS_REPO:-pterodactyl/wings}"
 NODE_NAME="${NODE_NAME:-local}"
 NODE_DESCRIPTION="${NODE_DESCRIPTION:-Local Node}"
 NODE_TOKEN="${NODE_TOKEN:-$(gen_passwd 32)}"
@@ -77,13 +78,13 @@ INSTALL_AUTO_UPDATER_ELYTRA="${INSTALL_AUTO_UPDATER_ELYTRA:-false}"
 
 # GitHub
 PANEL_REPO_PRIVATE="${PANEL_REPO_PRIVATE:-false}"
-ELYTRA_REPO_PRIVATE="${ELYTRA_REPO_PRIVATE:-false}"
+WINGS_REPO_PRIVATE="${WINGS_REPO_PRIVATE:-false}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 
 # Paths
-INSTALL_DIR="${INSTALL_DIR:-/var/www/pyrodactyl}"
-ELYTRA_DIR="${ELYTRA_DIR:-/etc/elytra}"
-PANEL_CONFIG_DIR="${PANEL_CONFIG_DIR:-/etc/pyrodactyl}"
+INSTALL_DIR="${INSTALL_DIR:-/var/www/hydrodactyl}"
+ELYTRA_DIR="${ELYTRA_DIR:-/etc/pterodactyl}"
+PANEL_CONFIG_DIR="${PANEL_CONFIG_DIR:-/etc/hydrodactyl}"
 
 # Node ID (will be set during installation)
 NODE_ID=""
@@ -162,8 +163,8 @@ check_existing() {
     fi
 
     # Stop services if they exist
-    systemctl stop elytra 2>/dev/null || true
-    systemctl stop pyroq 2>/dev/null || true
+    systemctl stop wings 2>/dev/null || true
+    systemctl stop hydroq 2>/dev/null || true
   fi
 }
 
@@ -280,9 +281,9 @@ install_panel_release() {
 
   # Save version from GitHub release tag to persistent location
   output "Recording version from GitHub: $release_tag"
-  mkdir -p /etc/pyrodactyl
-  echo "$release_tag" > /etc/pyrodactyl/panel-version
-  chmod 644 /etc/pyrodactyl/panel-version
+  mkdir -p /etc/hydrodactyl
+  echo "$release_tag" > /etc/hydrodactyl/panel-version
+  chmod 644 /etc/hydrodactyl/panel-version
 
   output "Creating installation directory..."
   mkdir -p "$INSTALL_DIR"
@@ -398,9 +399,9 @@ install_panel_clone() {
   local commit_hash
   commit_hash=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
   output "Recording git commit hash: ${commit_hash:0:8}"
-  mkdir -p /etc/pyrodactyl
-  echo "git:${commit_hash}" > /etc/pyrodactyl/panel-version
-  chmod 644 /etc/pyrodactyl/panel-version
+  mkdir -p /etc/hydrodactyl
+  echo "git:${commit_hash}" > /etc/hydrodactyl/panel-version
+  chmod 644 /etc/hydrodactyl/panel-version
 
   success "Panel cloned to $INSTALL_DIR"
 }
@@ -441,14 +442,14 @@ else
     error "Please either:"
     error "  1. Set MYSQL_ROOT_PASSWORD environment variable to the correct password"
     error "  2. Reset MariaDB root password manually"
-    error "  3. Remove /root/.config/pyrodactyl/db-credentials if you want to start fresh"
+    error "  3. Remove /root/.config/hydrodactyl/db-credentials if you want to start fresh"
     exit 1
   fi
 
   # Save credentials
-  mkdir -p /root/.config/pyrodactyl
-  echo "root:${MYSQL_ROOT_PASSWORD}" > /root/.config/pyrodactyl/db-credentials
-  chmod 600 /root/.config/pyrodactyl/db-credentials
+  mkdir -p /root/.config/hydrodactyl
+  echo "root:${MYSQL_ROOT_PASSWORD}" > /root/.config/hydrodactyl/db-credentials
+  chmod 600 /root/.config/hydrodactyl/db-credentials
 
   # Create panel database and user
   output "Creating panel database..."
@@ -571,7 +572,7 @@ setup_panel_services() {
   insert_cronjob
 
   # Install queue worker
-  install_pyroq
+  install_hydroq
 
   success "Panel services configured"
 }
@@ -671,8 +672,8 @@ create_node_in_panel() {
 
 # ---------------- Elytra Installation ---------------- #
 
-install_elytra_daemon() {
-  print_flame "Installing Elytra Daemon"
+install_wings_daemon() {
+  print_flame "Installing Wings Daemon"
 
   # Install Docker using shared function from lib.sh
   install_docker
@@ -680,28 +681,28 @@ install_elytra_daemon() {
   # Create directories
   mkdir -p "$ELYTRA_DIR"
   mkdir -p "$PANEL_CONFIG_DIR"
-  mkdir -p /var/lib/elytra/volumes
-  mkdir -p /var/lib/elytra/archives
-  mkdir -p /var/lib/elytra/backups
+  mkdir -p /var/lib/pterodactyl/volumes
+  mkdir -p /var/lib/pterodactyl/archives
+  mkdir -p /var/lib/pterodactyl/backups
 
-  # Create pyrodactyl group first (required for user creation)
-  output "Creating pyrodactyl system group..."
-  if ! getent group pyrodactyl >/dev/null 2>&1; then
-    groupadd --gid 8888 pyrodactyl 2>/dev/null || true
+  # Create hydrodactyl group first (required for user creation)
+  output "Creating hydrodactyl system group..."
+  if ! getent group hydrodactyl >/dev/null 2>&1; then
+    groupadd --gid 8888 hydrodactyl 2>/dev/null || true
   fi
 
-  # Create pyrodactyl user for Elytra (UID/GID 8888) if it doesn't exist
-  output "Creating pyrodactyl system user..."
-  if ! id -u pyrodactyl >/dev/null 2>&1; then
-    useradd --system --no-create-home --shell /usr/sbin/nologin --uid 8888 --gid 8888 pyrodactyl 2>/dev/null || \
-    useradd --system --no-create-home --shell /sbin/nologin --uid 8888 pyrodactyl 2>/dev/null || \
-    useradd --system --no-create-home --shell /bin/false --uid 8888 pyrodactyl
+  # Create hydrodactyl user for Elytra (UID/GID 8888) if it doesn't exist
+  output "Creating hydrodactyl system user..."
+  if ! id -u hydrodactyl >/dev/null 2>&1; then
+    useradd --system --no-create-home --shell /usr/sbin/nologin --uid 8888 --gid 8888 hydrodactyl 2>/dev/null || \
+    useradd --system --no-create-home --shell /sbin/nologin --uid 8888 hydrodactyl 2>/dev/null || \
+    useradd --system --no-create-home --shell /bin/false --uid 8888 hydrodactyl
   fi
 
-  # Add pyrodactyl user to docker group for container management
+  # Add hydrodactyl user to docker group for container management
   if getent group docker >/dev/null 2>&1; then
-    output "Adding pyrodactyl user to docker group..."
-    usermod -aG docker pyrodactyl 2>/dev/null || true
+    output "Adding hydrodactyl user to docker group..."
+    usermod -aG docker hydrodactyl 2>/dev/null || true
   fi
 
   # Determine architecture
@@ -714,10 +715,10 @@ install_elytra_daemon() {
   # Get latest release
   output "Fetching latest Elytra release..."
   local latest_release
-  latest_release=$(get_latest_release "$ELYTRA_REPO" "$GITHUB_TOKEN")
+  latest_release=$(get_latest_release "$WINGS_REPO" "$GITHUB_TOKEN")
 
   if [ -z "$latest_release" ] || [ "$latest_release" == "null" ]; then
-    error "Could not fetch latest release from $ELYTRA_REPO"
+    error "Could not fetch latest release from $WINGS_REPO"
     exit 1
   fi
 
@@ -725,7 +726,7 @@ install_elytra_daemon() {
 
   # Download binary
   output "Downloading Elytra binary..."
-  if ! download_release_asset "$ELYTRA_REPO" "$asset_name" "/usr/local/bin/elytra" "$GITHUB_TOKEN"; then
+  if ! download_release_asset "$WINGS_REPO" "$asset_name" "/usr/local/bin/elytra" "$GITHUB_TOKEN"; then
     error "Failed to download Elytra binary"
     exit 1
   fi
@@ -733,9 +734,9 @@ install_elytra_daemon() {
   chmod +x /usr/local/bin/elytra
 
   # Save version from GitHub release tag for auto-updater tracking
-  mkdir -p /etc/pyrodactyl
-  echo "$latest_release" > /etc/pyrodactyl/elytra-version
-  chmod 644 /etc/pyrodactyl/elytra-version
+  mkdir -p /etc/hydrodactyl
+  echo "$latest_release" > /etc/hydrodactyl/elytra-version
+  chmod 644 /etc/hydrodactyl/elytra-version
 
   # Create Elytra config directory
   output "Creating Elytra config directory at ${ELYTRA_DIR}..."
@@ -796,43 +797,43 @@ install_elytra_daemon() {
   install_rustic
 
   # Get systemd service
-  output "Setting up Elytra service..."
-  if ! get_config "elytra.service" "/etc/systemd/system/elytra.service"; then
-    error "Failed to get Elytra service file"
+  output "Setting up Wings service..."
+  if ! get_config "wings.service" "/etc/systemd/system/wings.service"; then
+    error "Failed to get Wings service file"
     exit 1
   fi
 
   systemctl daemon-reload
-  systemctl enable elytra
-  systemctl restart elytra
+  systemctl enable wings
+  systemctl restart wings
 
   # Wait for service to start
   sleep 3
 
-  if systemctl is-active --quiet elytra; then
-    success "Elytra is running"
+  if systemctl is-active --quiet wings; then
+    success "Wings is running"
   else
-    warning "Elytra service may not have started properly"
+    warning "Wings service may not have started properly"
   fi
 
   # Set proper ownership and permissions on Elytra data directories (after service starts)
   output "Ensuring Elytra data directories exist..."
-  mkdir -p /var/lib/elytra/volumes /var/lib/elytra/archives /var/lib/elytra/backups
+  mkdir -p /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups
 
   output "Setting final permissions on Elytra data directories..."
-  chown -R 8888:8888 /var/lib/elytra/volumes /var/lib/elytra/archives /var/lib/elytra/backups "$ELYTRA_DIR" 2>/dev/null || true
+  chown -R 8888:8888 /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups "$ELYTRA_DIR" 2>/dev/null || true
 
   # Set full permissions so containers can read/write/execute
   # Note: 777 is required for containerized game servers to access these directories
-  # Ensure parent /var/lib/elytra is accessible
-  chmod 755 /var/lib/elytra 2>/dev/null || true
+  # Ensure parent /var/lib/pterodactyl is accessible
+  chmod 755 /var/lib/pterodactyl 2>/dev/null || true
   # Ensure the volumes directory itself and all contents have 777
-  chmod 777 /var/lib/elytra/volumes 2>/dev/null || true
-  chmod -R 777 /var/lib/elytra/volumes/* 2>/dev/null || true
-  chmod 777 /var/lib/elytra/archives 2>/dev/null || true
-  chmod -R 777 /var/lib/elytra/archives/* 2>/dev/null || true
-  chmod 777 /var/lib/elytra/backups 2>/dev/null || true
-  chmod -R 777 /var/lib/elytra/backups/* 2>/dev/null || true
+  chmod 777 /var/lib/pterodactyl/volumes 2>/dev/null || true
+  chmod -R 777 /var/lib/pterodactyl/volumes/* 2>/dev/null || true
+  chmod 777 /var/lib/pterodactyl/archives 2>/dev/null || true
+  chmod -R 777 /var/lib/pterodactyl/archives/* 2>/dev/null || true
+  chmod 777 /var/lib/pterodactyl/backups 2>/dev/null || true
+  chmod -R 777 /var/lib/pterodactyl/backups/* 2>/dev/null || true
   chmod -R 755 "$ELYTRA_DIR" 2>/dev/null || true
   [ -f "$ELYTRA_DIR/config.yml" ] && chmod 600 "$ELYTRA_DIR/config.yml" 2>/dev/null || true
 
@@ -902,8 +903,8 @@ install_auto_updaters() {
 
   if [ "$INSTALL_AUTO_UPDATER_ELYTRA" == true ]; then
     print_flame "Installing Elytra Auto-Updater"
-    export ELYTRA_REPO
-    export ELYTRA_REPO_PRIVATE
+    export WINGS_REPO
+    export WINGS_REPO_PRIVATE
     export GITHUB_TOKEN
     install_auto_updater_elytra
   fi
@@ -914,7 +915,7 @@ install_auto_updaters() {
 main() {
   print_header
   print_flame "Starting Combined Installation"
-  output "This will install Pyrodactyl Panel and Elytra on the same machine."
+  output "This will install Hydrodactyl Panel and Elytra on the same machine."
   echo ""
 
   validate_configuration
@@ -942,9 +943,9 @@ main() {
   if [ -n "$PANEL_API_KEY" ]; then
     success "API Key generated successfully"
     # Save API key to credentials file for later use
-    mkdir -p /root/.config/pyrodactyl
-    echo "api_key:${PANEL_API_KEY}" >> /root/.config/pyrodactyl/db-credentials
-    chmod 600 /root/.config/pyrodactyl/db-credentials
+    mkdir -p /root/.config/hydrodactyl
+    echo "api_key:${PANEL_API_KEY}" >> /root/.config/hydrodactyl/db-credentials
+    chmod 600 /root/.config/hydrodactyl/db-credentials
   else
     warning "Failed to generate API key - automated server creation will be skipped"
   fi
@@ -959,7 +960,7 @@ main() {
   setup_database_host "$PANEL_FQDN"
 
   # Elytra installation
-  install_elytra_daemon
+  install_wings_daemon
 
   # Create Minecraft server if requested and API key is available
   if [ "$CREATE_MINECRAFT_SERVER" == "true" ] && [ -n "$PANEL_API_KEY" ]; then
@@ -1000,7 +1001,7 @@ main() {
   print_flame "Installation Complete!"
 
   echo ""
-  output "🎉 Pyrodactyl Panel and Elytra have been successfully installed!"
+  output "🎉 Hydrodactyl Panel and Wings have been successfully installed!"
   echo ""
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   output "  Panel Information"
@@ -1060,23 +1061,20 @@ main() {
   fi
 
   output "Service Commands:"
-  output "  ${COLOR_ORANGE}systemctl status pyroq${COLOR_NC}    - Panel queue worker"
-  output "  ${COLOR_ORANGE}systemctl status elytra${COLOR_NC}    - Elytra daemon"
-  output "  ${COLOR_ORANGE}journalctl -u elytra -f${COLOR_NC}   - View Elytra logs"
+  output "  ${COLOR_ORANGE}systemctl status hydroq${COLOR_NC}    - Panel queue worker"
+  output "  ${COLOR_ORANGE}systemctl status wings${COLOR_NC}     - Wings daemon"
+  output "  ${COLOR_ORANGE}journalctl -u wings -f${COLOR_NC}    - View Wings logs"
   echo ""
 
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   output "  Manual Reconfiguration"
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  output "If you need to reconfigure Elytra manually, run:"
+  output "If you need to reconfigure Wings manually, run:"
   output ""
-  output "  ${COLOR_ORANGE}cd /etc/elytra && sudo elytra configure \\"
+  output "  ${COLOR_ORANGE}cd /etc/pterodactyl && sudo wings configure \\"
   output "    --panel-url 'https://${PANEL_FQDN}' \\"
   output "    --token '<your-api-key>' \\"
   output "    --node '${NODE_ID}'${COLOR_NC}"
-  output ""
-  output "Or use the installer function (if running the installer):"
-  output "  ${COLOR_ORANGE}configure_elytra 'https://${PANEL_FQDN}' '<api-key>' '${NODE_ID}'${COLOR_NC}"
   echo ""
 
   print_brake 70
@@ -1096,7 +1094,7 @@ main() {
   save_panel_install_info "install"
 
   # Save Elytra installation information
-  save_elytra_install_info "install"
+  save_wings_install_info "install"
 
   # Show completion screen
   show_both_completion
