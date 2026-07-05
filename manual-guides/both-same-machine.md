@@ -1,4 +1,6 @@
-# Hydrodactyl Panel + Elytra Daemon - Same Machine Installation Guide
+# Hydrodactyl Panel + Elytra Daemon - Same Machine Installation Guide (Deprecated)
+
+> ⚠️ **Elytra is no longer supported.** This guide is kept for reference only. Existing users should migrate to **Wings** or **Wings-RS** ([https://github.com/calagopus/wings](https://github.com/calagopus/wings)) as a replacement daemon.
 
 This guide covers installing both the Hydrodactyl Panel and Elytra Daemon on the same physical or virtual server. This setup is suitable for small deployments, development environments, or single-node installations.
 

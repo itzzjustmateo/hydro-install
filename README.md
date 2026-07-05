@@ -7,7 +7,9 @@
   <a href="https://github.com/itzzjustmateo/hydro-install/blob/main/LICENSE"><img src="https://img.shields.io/github/license/itzzjustmateo/hydro-install?style=for-the-badge&color=orange" alt="License"></a>
 </p>
 
-A beautiful, modern, and feature-rich installer for **Hydrodactyl Panel** and **Elytra Daemon**. Built with an elegant flame-inspired UI and designed for ease of use.
+A beautiful, modern, and feature-rich installer for **Hydrodactyl Panel**. Built with an elegant flame-inspired UI and designed for ease of use.
+
+> ⚠️ **Elytra is no longer supported.** Existing users should migrate to **Wings** or **Wings-RS** ([https://github.com/calagopus/wings](https://github.com/calagopus/wings)) as a replacement daemon.
 
 ## ✨ Features
 
@@ -61,6 +63,8 @@ bash install.sh
 > 💡 **Note:** The installer will display a warning if your system is below minimum requirements. Swap space is recommended for systems with limited RAM.
 
 > ⚠️ **Docker Compatibility:** Elytra requires Docker to run game servers. OpenVZ, LXC, or Virtuozzo virtualization are **not supported**. KVM, VMware, or dedicated servers work best. Run `systemd-detect-virt` to check your virtualization type.
+
+> ⚠️ **Elytra is no longer supported.** Migrate to **Wings** or **Wings-RS** ([https://github.com/calagopus/wings](https://github.com/calagopus/wings)).
 
 ## 🔧 Installation Options
 
@@ -192,7 +196,8 @@ systemctl status pyroq
 journalctl -u pyroq -f
 ```
 
-**Elytra not connecting**
+**Elytra not connecting (Deprecated)**
+> ⚠️ Elytra is no longer supported. Migrate to **Wings** or **Wings-RS** ([https://github.com/calagopus/wings](https://github.com/calagopus/wings)).
 ```bash
 # Check Elytra health via Health Check (Option 8)
 bash <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)
@@ -358,7 +363,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Credits
 
 - [Hydrodactyl](https://github.com/hydrodactyl-oss/hydrodactyl) - The panel software
-- [Elytra](https://github.com/pyrohost/elytra) - The daemon software
+- [Elytra](https://github.com/pyrohost/elytra) - The daemon software (deprecated — migrate to [Wings-RS](https://github.com/calagopus/wings))
 - [Pterodactyl Installer](https://github.com/pterodactyl-installer/pterodactyl-installer) - Inspiration
 
 ---
