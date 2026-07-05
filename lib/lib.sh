@@ -1963,6 +1963,94 @@ get_php_socket() {
 
 # ------------------ Nginx Functions ----------------- #
 
+check_port_conflicts() {
+  local has_conflict=false
+  local conflict_details=""
+
+  for port in 80 443; do
+    if ss -tlnp 2>/dev/null | grep -q ":$port "; then
+      local pid
+      local process_name
+      pid=$(ss -tlnp 2>/dev/null | grep ":$port " | head -1 | grep -oP 'pid=\K[0-9]+' || echo "")
+      if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        process_name=$(ps -p "$pid" -o comm= 2>/dev/null || echo "unknown")
+        local service_name
+        service_name=$(systemctl status "$pid" 2>/dev/null | grep -oP '● \K[^ ]+' || echo "$process_name")
+        conflict_details="$conflict_details  • Port $port: $service_name (PID $pid)\n"
+      else
+        conflict_details="$conflict_details  • Port $port: unknown process\n"
+      fi
+      has_conflict=true
+    fi
+  done
+
+  if [ "$has_conflict" == true ]; then
+    echo ""
+    output "${COLOR_RED}Port conflict detected!${COLOR_NC}"
+    output "The following services are already using required ports:"
+    echo -e "$conflict_details"
+    echo ""
+
+    local existing_configs
+    existing_configs=$(find /etc/nginx/sites-enabled/ -type l -o -type f 2>/dev/null | grep -v default | head -5)
+    if [ -n "$existing_configs" ]; then
+      output "Existing nginx site configs detected:"
+      while IFS= read -r config; do
+        [ -n "$config" ] && output "  • $(basename "$config")"
+      done <<< "$existing_configs"
+      echo ""
+    fi
+
+    output "${COLOR_YELLOW}What would you like to do?${COLOR_NC}"
+    output "[${COLOR_ORANGE}0${COLOR_NC}] Stop conflicting services and remove their nginx configs (recommended)"
+    output "[${COLOR_ORANGE}1${COLOR_NC}] Keep existing services - I will configure manually"
+    output "[${COLOR_ORANGE}2${COLOR_NC}] Keep existing services and install on different ports (not recommended)"
+    echo ""
+
+    local conflict_choice=""
+    while [[ "$conflict_choice" != "0" && "$conflict_choice" != "1" && "$conflict_choice" != "2" ]]; do
+      echo -n "* Select [0-2]: "
+      read -r conflict_choice
+    done
+
+    case "$conflict_choice" in
+      0)
+        output "Stopping conflicting services and removing their configs..."
+        local pids
+        pids=$(ss -tlnp 2>/dev/null | grep -oP 'pid=\K[0-9]+' | sort -u)
+        for pid in $pids; do
+          kill "$pid" 2>/dev/null || true
+        done
+        find /etc/nginx/sites-enabled/ -type l -o -type f | grep -v default | while IFS= read -r conf; do
+          rm -f "$conf"
+          local available_link
+          available_link=$(readlink -f "$conf" 2>/dev/null || echo "")
+          [ -n "$available_link" ] && rm -f "$available_link"
+        done
+        find /etc/nginx/sites-available/ -maxdepth 1 -type f | grep -v default | grep -v hydrodactyl | while IFS= read -r conf; do
+          rm -f "$conf"
+        done
+        sleep 1
+        output "Conflicting services stopped. Proceeding with installation..."
+        return 0
+        ;;
+      1)
+        output "Skipping nginx configuration. You will need to configure it manually."
+        output "Config templates are available at:"
+        output "  $(hyperlink "https://github.com/itzzjustmateo/hydro-install/tree/main/configs")"
+        return 1
+        ;;
+      2)
+        output "Using alternative ports is not recommended. The panel requires port 80/443."
+        output "Please configure your existing server to proxy requests to this panel."
+        return 1
+        ;;
+    esac
+  fi
+
+  return 0
+}
+
 install_nginx_config() {
   local fqdn="$1"
   local php_socket="$2"
@@ -2001,8 +2089,14 @@ install_nginx_config() {
   # Remove default site
   rm -f /etc/nginx/sites-enabled/default
 
-  # Test and reload
-  nginx -t && systemctl reload nginx
+  # Test and reload/start
+  if nginx -t; then
+    if systemctl is-active --quiet nginx 2>/dev/null; then
+      systemctl reload nginx
+    else
+      systemctl start nginx
+    fi
+  fi
 
   success "Nginx configured"
 }
