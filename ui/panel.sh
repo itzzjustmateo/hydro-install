@@ -1,6 +1,3 @@
- ```
-hydrodactyl\install-scripts\new\ui\panel.sh
-```
 #!/bin/bash
 
 set -e
