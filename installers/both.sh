@@ -117,9 +117,16 @@ validate_configuration() {
     exit 1
   fi
 
-  if ! check_fqdn "$PANEL_FQDN"; then
+  if ! check_fqdn "$PANEL_FQDN" && ! is_ip_address "$PANEL_FQDN"; then
     error "Invalid FQDN: $PANEL_FQDN"
     exit 1
+  fi
+
+  if is_ip_address "$PANEL_FQDN" && { [ "$CONFIGURE_LETSENCRYPT" == true ] || [ -n "$SSL_CERT_PATH" ]; }; then
+    warning "Let's Encrypt/custom SSL cannot be used with an IP address ($PANEL_FQDN). Disabling SSL."
+    CONFIGURE_LETSENCRYPT=false
+    SSL_CERT_PATH=""
+    SSL_KEY_PATH=""
   fi
 
   success "Configuration valid"
@@ -136,10 +143,17 @@ if (( ${#missing[@]} > 0 )); then
 fi
 
 # Validate FQDN
-if ! check_fqdn "$PANEL_FQDN"; then
+if ! check_fqdn "$PANEL_FQDN" && ! is_ip_address "$PANEL_FQDN"; then
   error "Invalid FQDN: $PANEL_FQDN"
-  error "FQDN must be a domain name, not an IP address"
+  error "FQDN must be a valid domain name or IP address"
   exit 1
+fi
+
+if is_ip_address "$PANEL_FQDN" && { [ "$CONFIGURE_LETSENCRYPT" == true ] || [ -n "$SSL_CERT_PATH" ]; }; then
+  warning "Let's Encrypt/custom SSL cannot be used with an IP address ($PANEL_FQDN). Disabling SSL."
+  CONFIGURE_LETSENCRYPT=false
+  SSL_CERT_PATH=""
+  SSL_KEY_PATH=""
 fi
 
 # ---------------- Installation Functions ---------------- #
@@ -176,23 +190,8 @@ install_panel_dependencies() {
   update_repos true
 
   case "$OS" in
-    ubuntu)
-      output "Setting up Ubuntu repositories..."
-      install_packages "software-properties-common apt-transport-https ca-certificates gnupg2"
-      add-apt-repository universe -y
-      LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
-      update_repos true
-      install_packages "php${PHP_VERSION}-fpm php${PHP_VERSION}-cli php${PHP_VERSION}-gd php${PHP_VERSION}-mysql php${PHP_VERSION}-pdo php${PHP_VERSION}-mbstring php${PHP_VERSION}-tokenizer php${PHP_VERSION}-bcmath php${PHP_VERSION}-xml php${PHP_VERSION}-curl php${PHP_VERSION}-zip php${PHP_VERSION}-intl php${PHP_VERSION}-redis php${PHP_VERSION}-sqlite3"
-
-      ensure_php_default
-      ;;
-
-    debian)
-      output "Setting up Debian repositories..."
-      install_packages "dirmngr ca-certificates apt-transport-https lsb-release"
-      curl -o /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
-      echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/php.list
-      update_repos true
+    ubuntu|debian)
+      configure_php_apt_repo
       install_packages "php${PHP_VERSION}-fpm php${PHP_VERSION}-cli php${PHP_VERSION}-gd php${PHP_VERSION}-mysql php${PHP_VERSION}-pdo php${PHP_VERSION}-mbstring php${PHP_VERSION}-tokenizer php${PHP_VERSION}-bcmath php${PHP_VERSION}-xml php${PHP_VERSION}-curl php${PHP_VERSION}-zip php${PHP_VERSION}-intl php${PHP_VERSION}-redis php${PHP_VERSION}-sqlite3"
 
       ensure_php_default
@@ -584,7 +583,7 @@ create_node_in_panel() {
 
   # Check if we have API key for API-based creation
   if [ -n "$PANEL_API_KEY" ] && [ -n "$PANEL_FQDN" ]; then
-    local panel_url="https://${PANEL_FQDN}"
+    local panel_url="$(panel_scheme)://${PANEL_FQDN}"
 
     # Step 1: Detect country and get/create location
     output "Detecting server location..."
@@ -705,15 +704,23 @@ install_wings_daemon() {
     usermod -aG docker hydrodactyl 2>/dev/null || true
   fi
 
-  # Determine architecture
+  # Determine architecture and asset name based on the selected Wings variant
   local arch
   arch=$(uname -m)
-  [[ $arch == x86_64 ]] && arch=amd64 || arch=arm64
 
-  local asset_name="elytra_linux_${arch}"
+  local asset_name
+  if [ "$WINGS_VARIANT" == "rs" ]; then
+    [[ $arch == x86_64 ]] && arch=x86_64 || arch=aarch64
+    asset_name="wings-rs-${arch}-linux"
+    WINGS_REPO="${WINGS_REPO:-calagopus/wings}"
+  else
+    [[ $arch == x86_64 ]] && arch=amd64 || arch=arm64
+    asset_name="wings_linux_${arch}"
+    WINGS_REPO="${WINGS_REPO:-pterodactyl/wings}"
+  fi
 
   # Get latest release
-  output "Fetching latest Elytra release..."
+  output "Fetching latest Wings release..."
   local latest_release
   latest_release=$(get_latest_release "$WINGS_REPO" "$GITHUB_TOKEN")
 
@@ -725,18 +732,18 @@ install_wings_daemon() {
   info "Latest release: $latest_release"
 
   # Download binary
-  output "Downloading Elytra binary..."
-  if ! download_release_asset "$WINGS_REPO" "$asset_name" "/usr/local/bin/elytra" "$GITHUB_TOKEN"; then
-    error "Failed to download Elytra binary"
+  output "Downloading Wings binary..."
+  if ! download_release_asset "$WINGS_REPO" "$asset_name" "/usr/local/bin/wings" "$GITHUB_TOKEN"; then
+    error "Failed to download Wings binary"
     exit 1
   fi
 
-  chmod +x /usr/local/bin/elytra
+  chmod +x /usr/local/bin/wings
 
   # Save version from GitHub release tag for auto-updater tracking
   mkdir -p /etc/hydrodactyl
-  echo "$latest_release" > /etc/hydrodactyl/elytra-version
-  chmod 644 /etc/hydrodactyl/elytra-version
+  echo "$latest_release" > /etc/hydrodactyl/wings-version
+  chmod 644 /etc/hydrodactyl/wings-version
 
   # Create Elytra config directory
   output "Creating Elytra config directory at ${ELYTRA_DIR}..."
@@ -746,8 +753,8 @@ install_wings_daemon() {
     exit 1
   fi
 
-  # Determine panel URL - always use HTTPS for API
-  local panel_url="https://${PANEL_FQDN}"
+  # Determine panel URL based on configured SSL/TLS
+  local panel_url="$(panel_scheme)://${PANEL_FQDN}"
 
   # Debug output
   output "DEBUG: Elytra configuration values:"
@@ -755,16 +762,16 @@ install_wings_daemon() {
   output "DEBUG: PANEL_FQDN=${PANEL_FQDN}"
   output "DEBUG: ELYTRA_DIR=${ELYTRA_DIR}"
 
-  # Configure Elytra using the official configure command
-  output "Configuring Elytra using 'elytra configure' command..."
-  cd "${ELYTRA_DIR}" && elytra configure --panel-url "${panel_url}" --token "${PANEL_API_KEY}" --node "${NODE_ID}"
+  # Configure Wings using the official configure command
+  output "Configuring Wings using 'wings configure' command..."
+  cd "${ELYTRA_DIR}" && wings configure --panel-url "${panel_url}" --token "${PANEL_API_KEY}" --node "${NODE_ID}"
 
   if [ $? -ne 0 ]; then
-    error "Failed to configure Elytra"
+    error "Failed to configure Wings"
     exit 1
   fi
 
-  output "DEBUG: Elytra configured successfully"
+  output "DEBUG: Wings configured successfully"
 
   # Disable permission checking to prevent Elytra from resetting permissions
   output "Disabling permission checks in Elytra config..."
@@ -970,8 +977,8 @@ main() {
     ALLOCATION_ID=$(mysql -u root -p"${MYSQL_ROOT_PASSWORD}" -D panel -N -B -e "SELECT id FROM allocations WHERE node_id=${NODE_ID} LIMIT 1;" 2>/dev/null || echo "")
 
     if [ -n "$ALLOCATION_ID" ]; then
-      # Determine panel URL - always use HTTPS for API
-      PANEL_URL="https://${PANEL_FQDN}"
+      # Determine panel URL based on configured SSL/TLS
+      PANEL_URL="$(panel_scheme)://${PANEL_FQDN}"
 
       # Create the server
       if create_minecraft_server "$PANEL_URL" "$PANEL_API_KEY" "$NODE_ID" "$LOCATION_ID" "$ALLOCATION_ID"; then
@@ -1006,7 +1013,7 @@ main() {
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   output "  Panel Information"
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  output "Panel URL:      ${COLOR_ORANGE}https://${PANEL_FQDN}${COLOR_NC}"
+  output "Panel URL:      ${COLOR_ORANGE}$(panel_scheme)://${PANEL_FQDN}${COLOR_NC}"
   output "Admin Email:    ${COLOR_ORANGE}${PANEL_ADMIN_EMAIL}${COLOR_NC}"
   output "Admin Username: ${COLOR_ORANGE}${PANEL_ADMIN_USERNAME}${COLOR_NC}"
   output "Admin Password: ${COLOR_ORANGE}${PANEL_ADMIN_PASSWORD}${COLOR_NC}"
@@ -1072,7 +1079,7 @@ main() {
   output "If you need to reconfigure Wings manually, run:"
   output ""
   output "  ${COLOR_ORANGE}cd /etc/pterodactyl && sudo wings configure \\"
-  output "    --panel-url 'https://${PANEL_FQDN}' \\"
+  output "    --panel-url '$(panel_scheme)://${PANEL_FQDN}' \\"
   output "    --token '<your-api-key>' \\"
   output "    --node '${NODE_ID}'${COLOR_NC}"
   echo ""

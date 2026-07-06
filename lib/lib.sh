@@ -292,6 +292,7 @@ detect_os() {
     ubuntu)
       [ "$OS_VER_MAJOR" == "22" ] && SUPPORTED=true
       [ "$OS_VER_MAJOR" == "24" ] && SUPPORTED=true
+      [ "$OS_VER_MAJOR" -ge "26" ] 2>/dev/null && SUPPORTED=true
       export DEBIAN_FRONTEND=noninteractive
       ;;
     debian)
@@ -644,8 +645,45 @@ check_fqdn() {
   return 0
 }
 
+# Check whether the given string is a literal IPv4 or IPv6 address.
+# Used to allow IP-based panel installs (no domain/DNS available) while
+# still rejecting them from check_fqdn.
+is_ip_address() {
+  local ip="$1"
+
+  [ -z "$ip" ] && return 1
+
+  # IPv4: four dot-separated octets, each 0-255
+  if [[ "$ip" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]]; then
+    local octet
+    for octet in "${BASH_REMATCH[@]:1}"; do
+      [ "$octet" -gt 255 ] && return 1
+    done
+    return 0
+  fi
+
+  # IPv6: hex groups separated by colons, optionally with "::" compression
+  if [[ "$ip" =~ ^[0-9a-fA-F:]+$ ]] && [[ "$ip" == *:* ]]; then
+    return 0
+  fi
+
+  return 1
+}
+
 cmd_exists() {
   command -v "$1" >/dev/null 2>&1
+}
+
+# Determine whether the panel should be addressed over https or http, based
+# on the same SSL/TLS variables used to build the Laravel APP_URL
+# (configure_panel/configure_panel_environment in installers/panel.sh and
+# installers/both.sh). Echoes "https" or "http".
+panel_scheme() {
+  if [ "${CONFIGURE_LETSENCRYPT:-false}" == true ] || [ "${ASSUME_SSL:-false}" == true ] || [ -n "${SSL_CERT_PATH:-}" ]; then
+    echo "https"
+  else
+    echo "http"
+  fi
 }
 
 # Load existing database credentials from previous run
@@ -1281,6 +1319,39 @@ install_packages() {
       }
       ;;
   esac
+}
+
+# Configure the PHP APT repository for Debian/Ubuntu.
+# Ubuntu 22.04/24.04 use the ppa:ondrej/php Launchpad PPA. Starting with
+# Ubuntu 26.04 (Resolute), that PPA is being merged into packages.sury.org
+# and is no longer published for new releases, so Resolute and later use
+# packages.sury.org directly, the same as Debian.
+configure_php_apt_repo() {
+  case "$OS" in
+    ubuntu)
+      if [ "$OS_VER_MAJOR" -ge 26 ] 2>/dev/null; then
+        output "Ubuntu ${OS_VER_MAJOR} detected - using packages.sury.org (ppa:ondrej/php is not published for this release)..."
+        install_packages "lsb-release ca-certificates curl"
+        curl -sSL -o /tmp/debsuryorg-archive-keyring.deb https://packages.sury.org/debsuryorg-archive-keyring.deb
+        dpkg -i /tmp/debsuryorg-archive-keyring.deb
+        rm -f /tmp/debsuryorg-archive-keyring.deb
+        echo "deb [signed-by=/usr/share/keyrings/debsuryorg-archive-keyring.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/php.list
+      else
+        output "Configuring Ubuntu repositories..."
+        install_packages "software-properties-common apt-transport-https ca-certificates gnupg2"
+        add-apt-repository universe -y
+        LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
+      fi
+      ;;
+    debian)
+      output "Configuring Debian repositories..."
+      install_packages "dirmngr ca-certificates apt-transport-https lsb-release"
+      curl -fsSL -o /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
+      echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/php.list
+      ;;
+  esac
+
+  update_repos true
 }
 
 # ------------------ MySQL/MariaDB Functions ----------------- #
@@ -3429,7 +3500,7 @@ show_panel_completion() {
   echo ""
   output "Your Hydrodactyl panel has been installed and configured."
   echo ""
-  [ -n "$FQDN" ] && output "Panel URL: https://$FQDN"
+  [ -n "$FQDN" ] && output "Panel URL: $(panel_scheme)://$FQDN"
   [ -n "$user_email" ] && output "Admin Email: $user_email"
   [ -n "$user_username" ] && output "Admin Username: $user_username"
   [ -n "$user_password" ] && output "Admin Password: (saved in install info)"
@@ -3486,7 +3557,7 @@ show_both_completion() {
   echo ""
   output "Both Hydrodactyl Panel and Elytra Daemon have been installed."
   echo ""
-  [ -n "$FQDN" ] && output "Panel URL: https://$FQDN"
+  [ -n "$FQDN" ] && output "Panel URL: $(panel_scheme)://$FQDN"
   [ -n "$user_email" ] && output "Admin Email: $user_email"
   [ -n "$user_username" ] && output "Admin Username: $user_username"
   [ -n "$NODE_NAME" ] && output "Node Name: $NODE_NAME"
@@ -3494,7 +3565,7 @@ show_both_completion() {
   output "Next Steps:"
   output "  1. Start Elytra: systemctl start elytra"
   output "  2. Check Elytra status: systemctl status elytra"
-  output "  3. Access your panel at: https://$FQDN"
+  output "  3. Access your panel at: $(panel_scheme)://$FQDN"
   output "  4. Log in with your admin credentials"
   echo ""
   output "To view installation information later, run:"

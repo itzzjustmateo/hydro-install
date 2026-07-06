@@ -37,6 +37,7 @@ GITHUB_TOKEN=""
 PANEL_INSTALL_METHOD="release"
 PANEL_RELEASE_VERSION="${PANEL_RELEASE_VERSION:-latest}"
 PANEL_FQDN=""
+PANEL_IS_IP=false
 PANEL_TIMEZONE="UTC"
 PANEL_ADMIN_EMAIL=""
 PANEL_ADMIN_USERNAME=""
@@ -186,13 +187,19 @@ configure_fqdn() {
 
   output "Please enter the domain or subdomain for your panel."
   output "Example: ${COLOR_ORANGE}panel.example.com${COLOR_NC}"
+  output "An IP address (e.g., ${COLOR_ORANGE}192.168.1.10${COLOR_NC}) is also accepted, but SSL will not be available."
   echo ""
 
   local valid_fqdn=false
+  PANEL_IS_IP=false
   while [ "$valid_fqdn" == false ]; do
-    required_input PANEL_FQDN "Domain/Subdomain: " "Domain is required"
+    required_input PANEL_FQDN "Domain/Subdomain/IP: " "Domain is required"
 
-    if check_fqdn "$PANEL_FQDN"; then
+    if is_ip_address "$PANEL_FQDN"; then
+      PANEL_IS_IP=true
+      warning "You entered an IP address. Let's Encrypt will not be available for IP addresses."
+      valid_fqdn=true
+    elif check_fqdn "$PANEL_FQDN"; then
       # Verify DNS resolution
       output "Verifying DNS for ${PANEL_FQDN}..."
       local verify_result=1
@@ -205,7 +212,7 @@ configure_fqdn() {
         error "Please fix your DNS configuration or enter a different domain."
       fi
     else
-      error "Invalid FQDN format. Must be a valid domain name (not IP address)."
+      error "Invalid format. Must be a valid domain name or IP address."
     fi
   done
 
@@ -217,6 +224,15 @@ configure_fqdn() {
 configure_ssl() {
   print_header
   print_flame "SSL/TLS Configuration"
+
+  if [ "$PANEL_IS_IP" == true ]; then
+    warning "Let's Encrypt will not be available for IP addresses (${PANEL_FQDN})."
+    output "SSL will not be configured. Use a domain name instead if you need HTTPS."
+    CONFIGURE_LETSENCRYPT=false
+    SSL_CERT_PATH=""
+    SSL_KEY_PATH=""
+    return
+  fi
 
   local use_ssl=""
   bool_input use_ssl "Would you like to use SSL/HTTPS?" "y"

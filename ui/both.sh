@@ -38,6 +38,7 @@ GITHUB_TOKEN_PANEL=""
 PANEL_INSTALL_METHOD="release"
 PANEL_RELEASE_VERSION="${PANEL_RELEASE_VERSION:-latest}"
 PANEL_FQDN=""
+PANEL_IS_IP=false
 PANEL_TIMEZONE="UTC"
 PANEL_ADMIN_EMAIL=""
 PANEL_ADMIN_USERNAME=""
@@ -57,6 +58,7 @@ DB_USER="hydrodactyl"
 DB_PASSWORD=""
 
 # Elytra Configuration
+WINGS_VARIANT=""
 ELYTRA_REPO=""
 ELYTRA_REPO_PRIVATE=false
 GITHUB_TOKEN_ELYTRA=""
@@ -188,14 +190,19 @@ configure_panel_settings() {
   echo ""
 
   local valid_fqdn=false
+  PANEL_IS_IP=false
   while [ "$valid_fqdn" == false ]; do
-    required_input PANEL_FQDN "Enter the domain for your panel (e.g., panel.example.com): " "Domain is required"
+    required_input PANEL_FQDN "Enter the domain or IP for your panel (e.g., panel.example.com): " "Domain is required"
 
-    if check_fqdn "$PANEL_FQDN"; then
+    if is_ip_address "$PANEL_FQDN"; then
+      PANEL_IS_IP=true
+      warning "You entered an IP address. Let's Encrypt will not be available for IP addresses."
+      valid_fqdn=true
+    elif check_fqdn "$PANEL_FQDN"; then
       # Verify DNS resolution
       local verify_result=1
       bash <(curl -sSL "$GITHUB_URL/lib/verify-fqdn.sh") "$PANEL_FQDN" && verify_result=0
-      
+
       if [ $verify_result -eq 0 ]; then
         valid_fqdn=true
       else
@@ -203,39 +210,47 @@ configure_panel_settings() {
         error "Please fix your DNS configuration or enter a different domain."
       fi
     else
-      error "Invalid FQDN format. Must be a valid domain name."
+      error "Invalid format. Must be a valid domain name or IP address."
     fi
   done
 
   echo ""
-  local use_ssl=""
-  bool_input use_ssl "Would you like to use SSL/HTTPS?" "y"
+  if [ "$PANEL_IS_IP" == true ]; then
+    warning "Let's Encrypt will not be available for IP addresses (${PANEL_FQDN})."
+    output "SSL will not be configured. Use a domain name instead if you need HTTPS."
+    CONFIGURE_LETSENCRYPT=false
+    SSL_CERT_PATH=""
+    SSL_KEY_PATH=""
+  else
+    local use_ssl=""
+    bool_input use_ssl "Would you like to use SSL/HTTPS?" "y"
 
-  if [ "$use_ssl" == "y" ]; then
-    echo ""
-    output "[${COLOR_ORANGE}0${COLOR_NC}] Let's Encrypt (auto-generated)"
-    output "[${COLOR_ORANGE}1${COLOR_NC}] Use existing SSL certificate"
-    output "[${COLOR_ORANGE}2${COLOR_NC}] No SSL (not recommended)"
-    echo ""
+    if [ "$use_ssl" == "y" ]; then
+      echo ""
+      output "[${COLOR_ORANGE}0${COLOR_NC}] Let's Encrypt (auto-generated)"
+      output "[${COLOR_ORANGE}1${COLOR_NC}] Use existing SSL certificate"
+      output "[${COLOR_ORANGE}2${COLOR_NC}] No SSL (not recommended)"
+      echo ""
 
-    local ssl_choice=""
-    while [[ "$ssl_choice" != "0" && "$ssl_choice" != "1" && "$ssl_choice" != "2" ]]; do
-      echo -n "* Select [0-2]: "
-      read -r ssl_choice
-    done
+      local ssl_choice=""
+      while [[ "$ssl_choice" != "0" && "$ssl_choice" != "1" && "$ssl_choice" != "2" ]]; do
+        echo -n "* Select [0-2]: "
+        read -r ssl_choice
+      done
 
-    case "$ssl_choice" in
-      0)
-        CONFIGURE_LETSENCRYPT=true
-        ;;
-      1)
-        required_input SSL_CERT_PATH "Path to SSL certificate: " "Path is required"
-        required_input SSL_KEY_PATH "Path to SSL key: " "Path is required"
-        ;;
-      2)
-        output "SSL will not be configured"
-        ;;
-    esac
+      case "$ssl_choice" in
+        0)
+          CONFIGURE_LETSENCRYPT=true
+          ;;
+        1)
+          required_input SSL_CERT_PATH "Path to SSL certificate: " "Path is required"
+          required_input SSL_KEY_PATH "Path to SSL key: " "Path is required"
+          ;;
+        2)
+          output "SSL will not be configured"
+          ;;
+      esac
+    fi
   fi
 
   echo ""
@@ -275,21 +290,61 @@ configure_panel_settings() {
 
 }
 
+# ------------------ Wings Variant Selection ----------------- #
+
+configure_wings_variant() {
+  print_header
+  print_flame "Wings Daemon Variant Selection"
+
+  output "Which daemon would you like to install to run game servers?"
+  output "(Elytra is no longer supported - migrate to Wings or Wings-RS instead.)"
+  echo ""
+  output "[${COLOR_ORANGE}0${COLOR_NC}] Wings (pterodactyl/wings)"
+  output "    The official Pterodactyl server daemon, written in Go."
+  output "    Most stable, widely used, and battle-tested in production."
+  echo ""
+  output "[${COLOR_ORANGE}1${COLOR_NC}] Wings-RS (calagopus/wings)"
+  output "    A lightweight Rust reimplementation of Wings."
+  output "    Lower memory usage, faster startup, additional features."
+  echo ""
+
+  local variant_choice=""
+  while [[ "$variant_choice" != "0" && "$variant_choice" != "1" ]]; do
+    echo -n "* Select [0-1]: "
+    read -r variant_choice
+    if [[ "$variant_choice" != "0" && "$variant_choice" != "1" ]]; then
+      error "Invalid selection. Please enter 0 or 1."
+    fi
+  done
+
+  if [ "$variant_choice" == "0" ]; then
+    WINGS_VARIANT="go"
+    ELYTRA_REPO="$DEFAULT_WINGS_REPO"
+    output "Selected: Wings (Go) - ${COLOR_ORANGE}${ELYTRA_REPO}${COLOR_NC}"
+  else
+    WINGS_VARIANT="rs"
+    ELYTRA_REPO="$DEFAULT_WINGS_RS_REPO"
+    output "Selected: Wings-RS (Rust) - ${COLOR_ORANGE}${ELYTRA_REPO}${COLOR_NC}"
+  fi
+}
+
 # ------------------ Elytra Configuration ----------------- #
 
 configure_elytra_settings() {
-  print_header
-  print_flame "Elytra Repository Configuration"
+  configure_wings_variant
 
-  output "The default Elytra repository is:"
-  output "  ${COLOR_ORANGE}${DEFAULT_ELYTRA_REPO}${COLOR_NC}"
+  print_header
+  print_flame "Wings Daemon Repository Configuration"
+
+  output "The default repository for this variant is:"
+  output "  ${COLOR_ORANGE}${ELYTRA_REPO}${COLOR_NC}"
   echo ""
 
   local use_default=""
   bool_input use_default "Use default repository?" "y"
 
   if [ "$use_default" == "y" ]; then
-    ELYTRA_REPO="$DEFAULT_ELYTRA_REPO"
+    : # Keep the repository selected by configure_wings_variant
   else
     required_input ELYTRA_REPO "Enter the GitHub repository (format: owner/repo): " "Repository cannot be empty"
 
@@ -371,7 +426,7 @@ configure_elytra_settings() {
   print_flame "Elytra Node Configuration"
   echo ""
 
-  output "Configuring Elytra to connect to the panel at: ${COLOR_ORANGE}https://${PANEL_FQDN}${COLOR_NC}"
+  output "Configuring Elytra to connect to the panel at: ${COLOR_ORANGE}$(panel_scheme)://${PANEL_FQDN}${COLOR_NC}"
   output "(This will be set automatically - no panel URL input needed)"
   echo ""
 
@@ -460,11 +515,12 @@ show_summary() {
   echo ""
 
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  output "  Elytra Configuration"
+  output "  Wings Daemon Configuration"
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo -e "  ${COLOR_ORANGE}Variant:${COLOR_NC}           $([ "$WINGS_VARIANT" == "go" ] && echo 'Wings (Go)' || echo 'Wings-RS (Rust)')"
   echo -e "  ${COLOR_ORANGE}Repository:${COLOR_NC}        ${ELYTRA_REPO} $([ "$ELYTRA_REPO_PRIVATE" == "true" ] && echo '(private)' || echo '(public)')"
   echo -e "  ${COLOR_ORANGE}Release Version:${COLOR_NC}   ${ELYTRA_RELEASE_VERSION}"
-  echo -e "  ${COLOR_ORANGE}Panel URL:${COLOR_NC}         https://${PANEL_FQDN} (auto-configured)"
+  echo -e "  ${COLOR_ORANGE}Panel URL:${COLOR_NC}         $(panel_scheme)://${PANEL_FQDN} (auto-configured)"
   echo -e "  ${COLOR_ORANGE}Node Name:${COLOR_NC}         ${NODE_NAME}"
   echo -e "  ${COLOR_ORANGE}Node Description:${COLOR_NC}  ${NODE_DESCRIPTION}"
   echo -e "  ${COLOR_ORANGE}Behind Proxy:${COLOR_NC}      $([ "$BEHIND_PROXY" == "true" ] && echo 'Yes' || echo 'No')"
@@ -529,6 +585,8 @@ export_variables() {
   export DB_PASSWORD
 
   # Elytra variables
+  export WINGS_VARIANT
+  export WINGS_REPO="$ELYTRA_REPO"
   export ELYTRA_REPO
   export ELYTRA_REPO_PRIVATE
   export GITHUB_TOKEN_ELYTRA

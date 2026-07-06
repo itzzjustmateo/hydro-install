@@ -84,9 +84,16 @@ validate_configuration() {
     exit 1
   fi
 
-  if ! check_fqdn "$PANEL_FQDN"; then
+  if ! check_fqdn "$PANEL_FQDN" && ! is_ip_address "$PANEL_FQDN"; then
     error "Invalid FQDN: $PANEL_FQDN"
     exit 1
+  fi
+
+  if is_ip_address "$PANEL_FQDN" && { [ "$CONFIGURE_LETSENCRYPT" == true ] || [ -n "$SSL_CERT_PATH" ]; }; then
+    warning "Let's Encrypt/custom SSL cannot be used with an IP address ($PANEL_FQDN). Disabling SSL."
+    CONFIGURE_LETSENCRYPT=false
+    SSL_CERT_PATH=""
+    SSL_KEY_PATH=""
   fi
 
   success "Configuration valid"
@@ -100,24 +107,8 @@ install_dependencies() {
   update_repos true
 
   case "$OS" in
-    ubuntu)
-      output "Configuring Ubuntu repositories..."
-      install_packages "software-properties-common apt-transport-https ca-certificates gnupg2"
-      add-apt-repository universe -y
-      LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
-      update_repos true
-
-      install_packages "php${PHP_VERSION}-fpm php${PHP_VERSION}-cli php${PHP_VERSION}-gd php${PHP_VERSION}-mysql php${PHP_VERSION}-pdo php${PHP_VERSION}-mbstring php${PHP_VERSION}-tokenizer php${PHP_VERSION}-bcmath php${PHP_VERSION}-xml php${PHP_VERSION}-curl php${PHP_VERSION}-zip php${PHP_VERSION}-intl php${PHP_VERSION}-redis"
-
-      ensure_php_default
-      ;;
-
-    debian)
-      output "Configuring Debian repositories..."
-      install_packages "dirmngr ca-certificates apt-transport-https lsb-release"
-      curl -fsSL -o /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
-      echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/php.list
-      update_repos true
+    ubuntu|debian)
+      configure_php_apt_repo
 
       install_packages "php${PHP_VERSION}-fpm php${PHP_VERSION}-cli php${PHP_VERSION}-gd php${PHP_VERSION}-mysql php${PHP_VERSION}-pdo php${PHP_VERSION}-mbstring php${PHP_VERSION}-tokenizer php${PHP_VERSION}-bcmath php${PHP_VERSION}-xml php${PHP_VERSION}-curl php${PHP_VERSION}-zip php${PHP_VERSION}-intl php${PHP_VERSION}-redis"
 
@@ -622,7 +613,7 @@ main() {
   echo ""
   output "🎉 Your Hydrodactyl Panel has been installed successfully!"
   echo ""
-  output "Panel URL: ${COLOR_ORANGE}https://${PANEL_FQDN}${COLOR_NC}"
+  output "Panel URL: ${COLOR_ORANGE}$(panel_scheme)://${PANEL_FQDN}${COLOR_NC}"
   output "Admin Email: ${COLOR_ORANGE}${PANEL_ADMIN_EMAIL}${COLOR_NC}"
   output "Admin Username: ${COLOR_ORANGE}${PANEL_ADMIN_USERNAME}${COLOR_NC}"
   output "Admin Password: ${COLOR_ORANGE}**hidden** (hope you remember it!)${COLOR_NC}"
