@@ -657,7 +657,9 @@ is_ip_address() {
   if [[ "$ip" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]]; then
     local octet
     for octet in "${BASH_REMATCH[@]:1}"; do
-      [ "$octet" -gt 255 ] && return 1
+      # Force base-10 interpretation so a leading zero (e.g. "08") isn't
+      # parsed as an (invalid) octal literal.
+      (( 10#$octet > 255 )) && return 1
     done
     return 0
   fi
@@ -1331,11 +1333,7 @@ configure_php_apt_repo() {
     ubuntu)
       if [ "$OS_VER_MAJOR" -ge 26 ] 2>/dev/null; then
         output "Ubuntu ${OS_VER_MAJOR} detected - using packages.sury.org (ppa:ondrej/php is not published for this release)..."
-        install_packages "lsb-release ca-certificates curl"
-        curl -sSL -o /tmp/debsuryorg-archive-keyring.deb https://packages.sury.org/debsuryorg-archive-keyring.deb
-        dpkg -i /tmp/debsuryorg-archive-keyring.deb
-        rm -f /tmp/debsuryorg-archive-keyring.deb
-        echo "deb [signed-by=/usr/share/keyrings/debsuryorg-archive-keyring.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/php.list
+        install_sury_php_repo
       else
         output "Configuring Ubuntu repositories..."
         install_packages "software-properties-common apt-transport-https ca-certificates gnupg2"
@@ -1345,13 +1343,28 @@ configure_php_apt_repo() {
       ;;
     debian)
       output "Configuring Debian repositories..."
-      install_packages "dirmngr ca-certificates apt-transport-https lsb-release"
-      curl -fsSL -o /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
-      echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/php.list
+      install_sury_php_repo
       ;;
   esac
 
   update_repos true
+}
+
+# Add the packages.sury.org PHP APT repository, following the official
+# instructions at https://packages.sury.org/php/README.txt: install the
+# keyring package (rather than dearmoring a key into the globally-trusted
+# /etc/apt/trusted.gpg.d/) and scope trust to this source via signed-by.
+# Shared by both the Debian branch and Ubuntu 26.04+ in configure_php_apt_repo().
+install_sury_php_repo() {
+  install_packages "lsb-release ca-certificates curl"
+
+  local sury_keyring_deb
+  sury_keyring_deb=$(mktemp --suffix=.deb)
+  curl -sSL -o "$sury_keyring_deb" https://packages.sury.org/debsuryorg-archive-keyring.deb
+  dpkg -i "$sury_keyring_deb"
+  rm -f "$sury_keyring_deb"
+
+  echo "deb [signed-by=/usr/share/keyrings/debsuryorg-archive-keyring.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/php.list
 }
 
 # ------------------ MySQL/MariaDB Functions ----------------- #
@@ -3555,7 +3568,7 @@ show_both_completion() {
   echo ""
   print_brake 70
   echo ""
-  output "Both Hydrodactyl Panel and Elytra Daemon have been installed."
+  output "Both Hydrodactyl Panel and the Wings daemon have been installed."
   echo ""
   [ -n "$FQDN" ] && output "Panel URL: $(panel_scheme)://$FQDN"
   [ -n "$user_email" ] && output "Admin Email: $user_email"
@@ -3563,8 +3576,8 @@ show_both_completion() {
   [ -n "$NODE_NAME" ] && output "Node Name: $NODE_NAME"
   echo ""
   output "Next Steps:"
-  output "  1. Start Elytra: systemctl start elytra"
-  output "  2. Check Elytra status: systemctl status elytra"
+  output "  1. Start Wings: systemctl start wings"
+  output "  2. Check Wings status: systemctl status wings"
   output "  3. Access your panel at: $(panel_scheme)://$FQDN"
   output "  4. Log in with your admin credentials"
   echo ""

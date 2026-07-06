@@ -63,7 +63,10 @@ fi
 
 # Wings configuration
 WINGS_VARIANT="${WINGS_VARIANT:-go}"
-WINGS_REPO="${WINGS_REPO:-pterodactyl/wings}"
+# Repo default depends on variant (pterodactyl/wings vs calagopus/wings) and
+# is resolved in install_wings_daemon() - do not default it here, or a
+# variant-specific default below would never apply once this is non-empty.
+WINGS_REPO="${WINGS_REPO:-}"
 NODE_NAME="${NODE_NAME:-local}"
 NODE_DESCRIPTION="${NODE_DESCRIPTION:-Local Node}"
 NODE_TOKEN="${NODE_TOKEN:-$(gen_passwd 32)}"
@@ -583,7 +586,8 @@ create_node_in_panel() {
 
   # Check if we have API key for API-based creation
   if [ -n "$PANEL_API_KEY" ] && [ -n "$PANEL_FQDN" ]; then
-    local panel_url="$(panel_scheme)://${PANEL_FQDN}"
+    local panel_url
+    panel_url="$(panel_scheme)://${PANEL_FQDN}"
 
     # Step 1: Detect country and get/create location
     output "Detecting server location..."
@@ -649,7 +653,7 @@ create_node_in_panel() {
     --locationId="$location_id" \
     --fqdn="$PANEL_FQDN" \
     --public=1 \
-    --scheme=https \
+    --scheme=$(panel_scheme) \
     --proxy=$([ "$BEHIND_PROXY" == "true" ] && echo "yes" || echo "no") \
     --maxMemory="$max_memory" \
     --overallocateMemory=0 \
@@ -754,7 +758,8 @@ install_wings_daemon() {
   fi
 
   # Determine panel URL based on configured SSL/TLS
-  local panel_url="$(panel_scheme)://${PANEL_FQDN}"
+  local panel_url
+  panel_url="$(panel_scheme)://${PANEL_FQDN}"
 
   # Debug output
   output "DEBUG: Elytra configuration values:"
@@ -764,9 +769,7 @@ install_wings_daemon() {
 
   # Configure Wings using the official configure command
   output "Configuring Wings using 'wings configure' command..."
-  cd "${ELYTRA_DIR}" && wings configure --panel-url "${panel_url}" --token "${PANEL_API_KEY}" --node "${NODE_ID}"
-
-  if [ $? -ne 0 ]; then
+  if ! (cd "${ELYTRA_DIR}" && wings configure --panel-url "${panel_url}" --token "${PANEL_API_KEY}" --node "${NODE_ID}"); then
     error "Failed to configure Wings"
     exit 1
   fi
