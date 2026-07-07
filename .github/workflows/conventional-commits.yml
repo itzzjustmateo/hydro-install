@@ -1,0 +1,61 @@
+name: Conventional Commits
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate:
+    name: Validate PR Title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR title
+        uses: amannn/action-semantic-pull-request@v5
+        id: check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            chore
+            refactor
+            perf
+            test
+            ci
+            build
+            revert
+          requireScope: false
+          subjectPattern: ^[a-z].*
+          subjectPatternError: |
+            The subject "{subject}" must start with a lowercase letter.
+          validateSingleCommit: true
+
+      - name: Comment on failure
+        if: failure() && steps.check.outputs.error_message != ''
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: conventional-commits
+          message: |
+            ### ❌ Invalid Pull Request Title
+
+            ${{ steps.check.outputs.error_message }}
+
+            Please update the PR title to follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
+
+            Valid types: `feat`, `fix`, `docs`, `chore`, `refactor`, `perf`, `test`, `ci`, `build`, `revert`
+
+            Example: `feat: add SSL renewal hook for Elytra`
+
+      - name: Clear comment on success
+        if: success()
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: conventional-commits
+          delete: true

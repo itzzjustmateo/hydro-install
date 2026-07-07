@@ -1,0 +1,40 @@
+name: Configuration Problem
+description: Report an issue with installation or service configuration
+labels: ["type: config"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a configuration issue. Please describe the problem.
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration details
+      description: Describe the configuration you are trying to use or that is failing
+    validations:
+      required: true
+
+  - type: textarea
+    id: error
+    attributes:
+      label: Error output
+      description: Paste any error messages or unexpected behavior
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: troubleshooting
+    attributes:
+      label: Troubleshooting attempted
+      description: What have you tried so far?
+      placeholder: "I've tried restarting services, checking logs..."
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Verification
+      options:
+        - label: I have searched existing issues for duplicates
+          required: true

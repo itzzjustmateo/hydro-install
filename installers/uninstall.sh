@@ -15,8 +15,8 @@ remove_panel() {
 
     # Stop services
     output "Stopping panel services..."
-    systemctl stop pyroq 2>/dev/null || true
-    systemctl disable pyroq 2>/dev/null || true
+    systemctl stop hydroq 2>/dev/null || true
+    systemctl disable hydroq 2>/dev/null || true
 
     # Remove nginx config
     output "Removing nginx configuration..."
@@ -35,7 +35,7 @@ remove_panel() {
     fi
 
     # Remove systemd service
-    rm -f /etc/systemd/system/pyroq.service
+    rm -f /etc/systemd/system/hydroq.service
     systemctl daemon-reload
 
     # Remove cron job

@@ -26,7 +26,7 @@ if [ -f /etc/hydrodactyl/auto-update-panel.env ]; then
 fi
 
 # Default config (can be overridden by /etc/hydrodactyl/auto-update-panel.env)
-PANEL_REPO="${PANEL_REPO:-hydrodactyl-oss/hydrodactyl}"
+PANEL_REPO="${PANEL_REPO:-BlueprintFramework/hydrodactyl}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 INSTALL_DIR="${INSTALL_DIR:-/var/www/hydrodactyl}"
 LOG_FILE="${LOG_FILE:-/var/log/hydrodactyl-panel-auto-update.log}"
@@ -679,8 +679,8 @@ EOF
         echo "- PHP-FPM is not running" >> "$PANEL_CONFIG_DIR/update-health-check-failure.log"
       fi
 
-      if ! systemctl is-active --quiet pyroq 2>/dev/null; then
-        echo "- Queue worker (pyroq) is not running" >> "$PANEL_CONFIG_DIR/update-health-check-failure.log"
+      if ! systemctl is-active --quiet hydroq 2>/dev/null; then
+        echo "- Queue worker (hydroq) is not running" >> "$PANEL_CONFIG_DIR/update-health-check-failure.log"
       fi
 
       echo "" >> "$PANEL_CONFIG_DIR/update-health-check-failure.log"
@@ -911,8 +911,8 @@ EOF
         echo "- PHP-FPM is not running" >> "$PANEL_CONFIG_DIR/update-health-check-failure.log"
       fi
 
-      if ! systemctl is-active --quiet pyroq 2>/dev/null; then
-        echo "- Queue worker (pyroq) is not running" >> "$PANEL_CONFIG_DIR/update-health-check-failure.log"
+      if ! systemctl is-active --quiet hydroq 2>/dev/null; then
+        echo "- Queue worker (hydroq) is not running" >> "$PANEL_CONFIG_DIR/update-health-check-failure.log"
       fi
 
       echo "" >> "$PANEL_CONFIG_DIR/update-health-check-failure.log"
@@ -990,8 +990,8 @@ post_update_health_check() {
   fi
 
   debug "Checking queue worker..."
-  if ! systemctl is-active --quiet pyroq 2>/dev/null; then
-    warning "Queue worker (pyroq) is not running"
+  if ! systemctl is-active --quiet hydroq 2>/dev/null; then
+    warning "Queue worker (hydroq) is not running"
     has_errors=true
   fi
 
@@ -1040,7 +1040,7 @@ auto_fix_panel_issues() {
   done
   systemctl restart php-fpm 2>/dev/null || true
 
-  systemctl restart pyroq 2>/dev/null || true
+  systemctl restart hydroq 2>/dev/null || true
 
   # Rebuild caches
   info "Rebuilding caches..."

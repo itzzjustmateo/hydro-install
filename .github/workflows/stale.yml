@@ -1,0 +1,38 @@
+name: Stale Issue Manager
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    name: Mark and Close Stale Issues
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          stale-issue-message: >
+            This issue has been marked as stale because it has had no activity
+            in the last 60 days. If there is no further activity within 14 days,
+            this issue will be automatically closed.
+          stale-pr-message: >
+            This pull request has been marked as stale because it has had no
+            activity in the last 60 days. If there is no further activity within
+            14 days, this PR will be automatically closed.
+          close-issue-message: >
+            This issue has been automatically closed due to inactivity.
+            Feel free to reopen if the issue persists.
+          close-pr-message: >
+            This pull request has been automatically closed due to inactivity.
+            Feel free to reopen if you'd like to continue working on it.
+          days-before-stale: 60
+          days-before-close: 14
+          stale-issue-label: status: stale
+          stale-pr-label: status: stale
+          exempt-issue-labels: 'type: security,priority: critical,priority: high'
+          exempt-pr-labels: 'type: security,priority: critical,priority: high'

@@ -6,7 +6,7 @@ set -e
 #                                                                                    #
 # Hydrodactyl Auto-Updater Management UI                                              #
 #                                                                                    #
-# Copyright (C) 2025, Muspelheim Hosting                                             #
+# Copyright (C) 2026, ItzzMateo Studios                                             #
 #                                                                                    #
 ######################################################################################
 
@@ -152,17 +152,17 @@ configure_panel_auto_updater() {
 
 configure_elytra_auto_updater() {
   print_header
-  print_flame "Elytra Auto-Updater Configuration"
+  print_flame "Wings Auto-Updater Configuration"
 
-  output "The default Elytra repository is:"
-  output "  ${COLOR_ORANGE}${DEFAULT_ELYTRA_REPO}${COLOR_NC}"
+  output "The default Wings repository is:"
+  output "  ${COLOR_ORANGE}${DEFAULT_WINGS_REPO}${COLOR_NC}"
   echo ""
 
   local use_default=""
   bool_input use_default "Use default repository?" "y"
 
   if [ "$use_default" == "y" ]; then
-    ELYTRA_REPO="$DEFAULT_ELYTRA_REPO"
+    ELYTRA_REPO="$DEFAULT_WINGS_REPO"
   else
     required_input ELYTRA_REPO "Enter the GitHub repository (format: owner/repo): " "Repository cannot be empty"
 
@@ -209,7 +209,7 @@ configure_elytra_auto_updater() {
     ELYTRA_REPO_PRIVATE="false"
   fi
 
-  # Elytra always uses release-based updates
+  # Wings always uses release-based updates
   output "Checking for releases in repository..."
   if ! check_releases_exist "$ELYTRA_REPO" "$GITHUB_TOKEN_ELYTRA"; then
     echo ""
@@ -238,7 +238,7 @@ configure_both_auto_updaters() {
   configure_panel_auto_updater
 
   echo ""
-  output "Now configuring Elytra auto-updater..."
+  output "Now configuring Wings auto-updater..."
   echo ""
 
   configure_elytra_auto_updater
@@ -260,7 +260,7 @@ show_remove_menu() {
     panel_updater_installed=true
   fi
 
-  if systemctl is-enabled --quiet hydrodactyl-elytra-auto-update.timer 2>/dev/null; then
+  if systemctl is-enabled --quiet hydrodactyl-wings-auto-update.timer 2>/dev/null; then
     elytra_updater_installed=true
   fi
 
@@ -280,7 +280,7 @@ show_remove_menu() {
   fi
 
   if [ "$elytra_updater_installed" == true ]; then
-    output "[${COLOR_ORANGE}1${COLOR_NC}] Elytra auto-updater only"
+    output "[${COLOR_ORANGE}1${COLOR_NC}] Wings auto-updater only"
   fi
 
   if [ "$panel_updater_installed" == true ] && [ "$elytra_updater_installed" == true ]; then
@@ -312,12 +312,12 @@ show_remove_menu() {
         ;;
       1)
         if [ "$elytra_updater_installed" == true ]; then
-          warning "This will remove the Elytra auto-updater"
+          warning "This will remove the Wings auto-updater"
           local confirm=""
           bool_input confirm "Are you sure?" "n"
           if [ "$confirm" == "y" ]; then
             remove_auto_updater_elytra
-            success "Elytra auto-updater removed"
+            success "Wings auto-updater removed"
           fi
           break
         else
@@ -376,7 +376,7 @@ trigger_panel_update() {
   fi
   
   # Get latest version from GitHub
-  local panel_repo="${PANEL_REPO:-hydrodactyl-oss/hydrodactyl}"
+  local panel_repo="${PANEL_REPO:-BlueprintFramework/hydrodactyl}"
   local github_token="${GITHUB_TOKEN_PANEL:-$GITHUB_TOKEN}"
   local curl_opts=(-sL --max-time 10)
   if [ -n "$github_token" ]; then
@@ -418,30 +418,30 @@ trigger_panel_update() {
 
 trigger_elytra_update() {
   print_header
-  print_flame "Trigger Elytra Update"
+  print_flame "Trigger Wings Update"
 
-  if ! systemctl is-enabled --quiet hydrodactyl-elytra-auto-update.timer 2>/dev/null; then
-    error "Elytra auto-updater is not installed."
+  if ! systemctl is-enabled --quiet hydrodactyl-wings-auto-update.timer 2>/dev/null; then
+    error "Wings auto-updater is not installed."
     echo ""
     output "Please install the auto-updater first."
     return
   fi
 
-  output "This will manually trigger the Elytra update check."
+  output "This will manually trigger the Wings update check."
   echo ""
 
   # Get current and latest versions for display
   local current_version="unknown"
   local latest_version="unknown"
-  
-  if [ -f "/etc/hydrodactyl/elytra-version" ]; then
-    current_version=$(cat "/etc/hydrodactyl/elytra-version" 2>/dev/null || echo "unknown")
-  elif [ -x "/usr/local/bin/elytra" ]; then
-    current_version=$(/usr/local/bin/elytra --version 2>/dev/null || echo "unknown")
+
+  if [ -f "/etc/hydrodactyl/wings-version" ]; then
+    current_version=$(cat "/etc/hydrodactyl/wings-version" 2>/dev/null || echo "unknown")
+  elif [ -x "/usr/local/bin/wings" ]; then
+    current_version=$(/usr/local/bin/wings --version 2>/dev/null || echo "unknown")
   fi
-  
+
   # Get latest version from GitHub
-  local elytra_repo="${ELYTRA_REPO:-pyrohost/elytra}"
+  local elytra_repo="${ELYTRA_REPO:-pterodactyl/wings}"
   local github_token="${GITHUB_TOKEN_ELYTRA:-$GITHUB_TOKEN}"
   local curl_args=(-sL --max-time 10)
   if [ -n "$github_token" ]; then
@@ -449,7 +449,7 @@ trigger_elytra_update() {
   fi
   latest_version=$(curl "${curl_args[@]}" "https://api.github.com/repos/$elytra_repo/releases/latest" 2>/dev/null | sed -nE 's/.*"tag_name":[[:space:]]*"([^"]+)".*/\1/p' | head -1)
   [ -z "$latest_version" ] && latest_version="unknown"
-  
+
   output "Current version: ${COLOR_ORANGE}${current_version}${COLOR_NC}"
   if [ "$latest_version" != "unknown" ] && [ "$latest_version" != "null" ]; then
     output "Latest version:  ${COLOR_ORANGE}${latest_version}${COLOR_NC}"
@@ -466,13 +466,13 @@ trigger_elytra_update() {
 
   if [ "$confirm" == "y" ]; then
     echo ""
-    output "Running Elytra auto-updater..."
+    output "Running Wings auto-updater..."
     echo ""
 
-    if /usr/local/bin/hydrodactyl-auto-update-elytra.sh --verbose; then
-      success "Elytra update check completed successfully"
+    if /usr/local/bin/hydrodactyl-auto-update-wings.sh --verbose; then
+      success "Wings update check completed successfully"
     else
-      warning "Elytra update check finished with issues (see output above)"
+      warning "Wings update check finished with issues (see output above)"
     fi
 
     echo ""
@@ -492,7 +492,7 @@ show_main_menu() {
     panel_updater_installed=true
   fi
 
-  if systemctl is-enabled --quiet hydrodactyl-elytra-auto-update.timer 2>/dev/null; then
+  if systemctl is-enabled --quiet hydrodactyl-wings-auto-update.timer 2>/dev/null; then
     elytra_updater_installed=true
   fi
 
@@ -503,7 +503,7 @@ show_main_menu() {
     output "What would you like to do?"
     echo ""
     output "[${COLOR_ORANGE}0${COLOR_NC}] Install Panel auto-updater"
-    output "[${COLOR_ORANGE}1${COLOR_NC}] Install Elytra auto-updater"
+    output "[${COLOR_ORANGE}1${COLOR_NC}] Install Wings auto-updater"
     output "[${COLOR_ORANGE}2${COLOR_NC}] Install both auto-updaters"
     echo ""
 
@@ -514,9 +514,9 @@ show_main_menu() {
     fi
 
     if [ "$elytra_updater_installed" == true ]; then
-      output "[${COLOR_ORANGE}4${COLOR_NC}] Trigger Elytra update check now"
+      output "[${COLOR_ORANGE}4${COLOR_NC}] Trigger Wings update check now"
     else
-      output "[${COLOR_GRAY}4${COLOR_NC}] Trigger Elytra update check now (not installed)"
+      output "[${COLOR_GRAY}4${COLOR_NC}] Trigger Wings update check now (not installed)"
     fi
 
     echo ""
@@ -564,7 +564,7 @@ show_main_menu() {
         if ! systemctl is-enabled --quiet hydrodactyl-panel-auto-update.timer 2>/dev/null; then
           panel_updater_installed=false
         fi
-        if ! systemctl is-enabled --quiet hydrodactyl-elytra-auto-update.timer 2>/dev/null; then
+        if ! systemctl is-enabled --quiet hydrodactyl-wings-auto-update.timer 2>/dev/null; then
           elytra_updater_installed=false
         fi
         ;;

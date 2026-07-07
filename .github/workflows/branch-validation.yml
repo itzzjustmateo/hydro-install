@@ -1,0 +1,52 @@
+name: Branch Validation
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate-branch:
+    name: Validate Branch Name
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch name
+        id: check
+        run: |
+          BRANCH_NAME="${{ github.head_ref }}"
+          echo "Branch: $BRANCH_NAME"
+
+          if echo "$BRANCH_NAME" | grep -qE '^(feature|fix|docs|chore|refactor|perf|test|ci|build|revert)/'; then
+            echo "valid=true" >> "$GITHUB_OUTPUT"
+            echo "Branch name '$BRANCH_NAME' is valid."
+          else
+            echo "valid=false" >> "$GITHUB_OUTPUT"
+            echo "::error::Invalid branch name: '$BRANCH_NAME'"
+            exit 1
+          fi
+
+      - name: Comment on failure
+        if: failure()
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: branch-name
+          message: |
+            ### ❌ Invalid Branch Name
+
+            The branch name `${{ github.head_ref }}` does not follow the required convention.
+
+            Branch names must start with one of these prefixes:
+            `feature/`, `fix/`, `docs/`, `chore/`, `refactor/`, `perf/`, `test/`, `ci/`, `build/`, `revert/`
+
+            Example: `feature/add-ssl-support`
+
+      - name: Clear comment on success
+        if: success()
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: branch-name
+          delete: true

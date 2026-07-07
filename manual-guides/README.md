@@ -7,10 +7,8 @@ This directory contains comprehensive manual installation guides for Hydrodactyl
 | Guide | Description | Use Case |
 |-------|-------------|----------|
 | [Hydrodactyl Panel Manual](./hydrodactyl-panel-manual.md) | Complete standalone Panel installation | Control panel only, separate from game servers |
-| [Elytra Daemon Manual](./elytra-manual.md) (Deprecated) | Complete standalone Daemon installation | Game server node only, connects to existing Panel |
-| [Both Same Machine](./both-same-machine.md) (Deprecated) | Combined Panel + Daemon installation | Single-server setup for small deployments |
-
-> ⚠️ **Elytra is no longer supported.** Migrate to **Wings** or **Wings-RS** ([https://github.com/calagopus/wings](https://github.com/calagopus/wings)).
+| [Elytra Daemon Manual](./elytra-manual.md) | Complete standalone Daemon installation | Game server node only, connects to existing Panel |
+| [Both Same Machine](./both-same-machine.md) | Combined Panel + Daemon installation | Single-server setup for small deployments |
 
 ## 🤔 Which Guide Should I Use?
 
@@ -85,7 +83,7 @@ If you encounter issues with manual installation:
 1. **Check the Troubleshooting section** in the specific guide
 2. **Review logs**: `journalctl -u <service>` for systemd services
 3. **Check our GitHub Issues**:
-   - [Hydrodactyl Issues](https://github.com/hydrodactyl-oss/hydrodactyl/issues)
+   - [Hydrodactyl Issues](https://github.com/BlueprintFramework/hydrodactyl/issues)
    - [Elytra Issues](https://github.com/pyrohost/elytra/issues)
 4. **Community Support**: Join our Discord community
 

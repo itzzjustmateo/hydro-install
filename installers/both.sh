@@ -4,7 +4,7 @@ set -e
 
 ######################################################################################
 #                                                                                    #
-# Hydrodactyl + Wings Combined Installer                                             #
+# Hydrodactyl + Elytra Combined Installer                                             #
 #                                                                                    #
 # Installs both Panel and Elytra on the same machine with automatic configuration    #
 #                                                                                    #
@@ -32,7 +32,7 @@ fi
 # ------------------ Variables ----------------- #
 
 # Panel configuration
-PANEL_REPO="${PANEL_REPO:-blueprintframework/hydrodactyl}"
+PANEL_REPO="${PANEL_REPO:-BlueprintFramework/hydrodactyl}"
 PANEL_INSTALL_METHOD="${PANEL_INSTALL_METHOD:-release}"
 PANEL_RELEASE_VERSION="${PANEL_RELEASE_VERSION:-latest}"
 PANEL_FQDN="${PANEL_FQDN:-}"
@@ -556,14 +556,19 @@ setup_panel_services() {
   # SELinux configuration for RHEL
   selinux_allow
 
-  # Install nginx config
-  local php_socket
-  php_socket=$(get_php_socket)
+  # Check for port conflicts before nginx setup
+  if ! check_port_conflicts; then
+    warning "Skipping nginx configuration due to port conflict"
+  else
+    # Install nginx config
+    local php_socket
+    php_socket=$(get_php_socket)
 
-  local use_ssl=false
-  [ -n "$SSL_CERT_PATH" ] && [ -n "$SSL_KEY_PATH" ] && use_ssl=true
+    local use_ssl=false
+    [ -n "$SSL_CERT_PATH" ] && [ -n "$SSL_KEY_PATH" ] && use_ssl=true
 
-  install_nginx_config "$PANEL_FQDN" "$php_socket" "$use_ssl" "$SSL_CERT_PATH" "$SSL_KEY_PATH"
+    install_nginx_config "$PANEL_FQDN" "$php_socket" "$use_ssl" "$SSL_CERT_PATH" "$SSL_KEY_PATH"
+  fi
 
   # Setup SSL if requested
   if [ "$CONFIGURE_LETSENCRYPT" == true ]; then
@@ -970,7 +975,7 @@ main() {
   # Setup database host for the panel
   setup_database_host "$PANEL_FQDN"
 
-  # Elytra installation
+  # Wings installation
   install_wings_daemon
 
   # Create Minecraft server if requested and API key is available
@@ -1012,7 +1017,7 @@ main() {
   print_flame "Installation Complete!"
 
   echo ""
-  output "🎉 Hydrodactyl Panel and Wings have been successfully installed!"
+  output "🎉 Hydrodactyl Panel and Elytra have been successfully installed!"
   echo ""
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   output "  Panel Information"
@@ -1105,7 +1110,7 @@ main() {
   save_panel_install_info "install"
 
   # Save Elytra installation information
-  save_wings_install_info "install"
+  save_elytra_install_info "install"
 
   # Show completion screen
   show_both_completion

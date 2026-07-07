@@ -6,7 +6,7 @@ set -e
 #                                                                                    #
 # Hydrodactyl Panel Installation UI                                                   #
 #                                                                                    #
-# Copyright (C) 2025, Muspelheim Hosting                                             #
+# Copyright (C) 2026, ItzzMateo Studios                                             #
 #                                                                                    #
 ######################################################################################
 
@@ -292,23 +292,96 @@ configure_timezone() {
   print_header
   print_flame "Timezone Configuration"
 
+  local sys_tz
+  sys_tz=$(detect_system_timezone)
   output "This timezone setting is used by PHP for all date/time functions."
-  output "Available timezones can be found at:"
-  output "$(hyperlink "https://www.php.net/manual/en/timezones.php")"
-  echo ""
-  output "Format: Continent/City (e.g., Europe/Berlin, America/New_York, Asia/Tokyo)"
-  output "Examples:"
-  output "  Europe/Berlin       - Central European Time"
-  output "  Europe/London       - Greenwich Mean Time / British Summer Time"
-  output "  America/New_York    - Eastern Time (US)"
-  output "  America/Los_Angeles - Pacific Time (US)"
-  output "  Asia/Tokyo          - Japan Standard Time"
-  output "  Australia/Sydney    - Australian Eastern Time"
-  output "  UTC                 - Coordinated Universal Time (default)"
   echo ""
 
-  required_input PANEL_TIMEZONE "Timezone [UTC]: " "" "UTC"
-  output "Timezone set to: ${PANEL_TIMEZONE}"
+  output "Detected system timezone: ${COLOR_ORANGE}${sys_tz}${COLOR_NC}"
+  local use_sys=""
+  bool_input use_sys "Use system timezone (${sys_tz})?" "y"
+
+  if [ "$use_sys" != "y" ]; then
+    echo ""
+    output "Pick a region to browse available timezones:"
+
+    local regions
+    regions=$(list_timezone_regions)
+    local region_list=()
+    while IFS= read -r region; do
+      region_list+=("$region")
+    done <<< "$regions"
+
+    for i in "${!region_list[@]}"; do
+      echo -e "  [${COLOR_ORANGE}$i${COLOR_NC}] ${region_list[$i]}"
+    done
+    echo ""
+    echo -n "* Select region [0-$((${#region_list[@]} - 1))]: "
+    read -r region_idx
+
+    local selected_region=""
+    if [[ "$region_idx" =~ ^[0-9]+$ ]] && [ "$region_idx" -ge 0 ] && [ "$region_idx" -lt "${#region_list[@]}" ]; then
+      selected_region="${region_list[$region_idx]}"
+    fi
+
+    if [ -n "$selected_region" ] && [ "$selected_region" != "UTC" ]; then
+      echo ""
+      output "Available cities in ${COLOR_ORANGE}${selected_region}${COLOR_NC}:"
+      echo ""
+
+      local cities
+      if [ -d "/usr/share/zoneinfo/$selected_region" ]; then
+        cities=$(ls /usr/share/zoneinfo/"$selected_region"/ 2>/dev/null | sort)
+      fi
+      if [ -z "$cities" ]; then
+        cities=$(grep "^$selected_region/" "$(dirname "$0")/../configs/valid_timezones.txt" 2>/dev/null | cut -d/ -f2 | sort -u)
+      fi
+      if [ -z "$cities" ]; then
+        cities=$(php -r "echo implode(PHP_EOL, timezone_identifiers_list(DateTimeZone::$selected_region));" 2>/dev/null | cut -d/ -f2- | sort)
+      fi
+
+      if [ -n "$cities" ]; then
+        echo "$cities" | head -30 | while IFS= read -r city; do
+          [ -n "$city" ] && echo "    - ${selected_region}/${city}"
+        done
+        echo "    ..."
+      fi
+    fi
+
+    echo ""
+    output "Format: Continent/City (e.g., Europe/Berlin, America/New_York)"
+    output "Full list: $(hyperlink "https://www.php.net/manual/en/timezones.php")"
+    echo ""
+
+    local tz_valid=false
+    while [ "$tz_valid" == false ]; do
+      if [ -n "$selected_region" ] && [ "$selected_region" != "UTC" ]; then
+        required_input PANEL_TIMEZONE "Timezone [${selected_region}/]: " "" "${selected_region}/"
+        if [ "$PANEL_TIMEZONE" = "${selected_region}/" ]; then
+          PANEL_TIMEZONE="${selected_region}/UTC"
+        fi
+      else
+        required_input PANEL_TIMEZONE "Timezone [UTC]: " "" "UTC"
+      fi
+
+      if validate_timezone "$PANEL_TIMEZONE"; then
+        tz_valid=true
+      else
+        warning "Timezone '${PANEL_TIMEZONE}' is not recognized"
+        output "Enter a valid timezone (e.g., Continent/City) or type 'list' to see options"
+        if [ "$PANEL_TIMEZONE" = "list" ]; then
+          php -r "
+            \$tzs = timezone_identifiers_list();
+            foreach (\$tzs as \$tz) echo \$tz . PHP_EOL;
+          " 2>/dev/null | head -50 || cat "$(dirname "$0")/../configs/valid_timezones.txt" 2>/dev/null | head -50
+        fi
+      fi
+    done
+  else
+    PANEL_TIMEZONE="$sys_tz"
+  fi
+
+  output "Timezone set to: ${COLOR_ORANGE}${PANEL_TIMEZONE}${COLOR_NC}"
 }
 
 # ------------------ Admin Account ----------------- #

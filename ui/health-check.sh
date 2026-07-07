@@ -8,7 +8,7 @@ set -e
 #                                                                                    #
 # Health check and diagnostics for Hydrodactyl Panel and Elytra                       #
 #                                                                                    #
-# Copyright (C) 2025, Muspelheim Hosting                                             #
+# Copyright (C) 2026, ItzzMateo Studios                                             #
 #                                                                                    #
 # https://github.com/itzzjustmateo/hydro-install                         #
 #                                                                                    #

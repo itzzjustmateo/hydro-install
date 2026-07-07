@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          severity: warning
+          ignore: manual-guides
+
+  syntax:
+    name: Bash Syntax Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check syntax of all shell scripts
+        run: |
+          failed=0
+          while IFS= read -r -d '' file; do
+            if ! bash -n "$file"; then
+              echo "::error file=$file::Syntax error in $file"
+              failed=1
+            else
+              echo "✓ $file"
+            fi
+          done < <(find . -name '*.sh' -not -path './manual-guides/*' -print0)
+          exit $failed
+
+  permissions:
+    name: Executable Permissions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify all shell scripts are executable
+        run: |
+          failed=0
+          while IFS= read -r -d '' file; do
+            if ! test -x "$file"; then
+              echo "::error file=$file::$file is not executable"
+              failed=1
+            fi
+          done < <(find . -name '*.sh' -not -path './manual-guides/*' -not -path './lib/lib.sh' -print0)
+          exit $failed

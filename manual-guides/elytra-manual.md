@@ -1,6 +1,4 @@
-# Elytra Daemon - Manual Installation Guide (Deprecated)
-
-> ⚠️ **Elytra is no longer supported.** This guide is kept for reference only. Existing users should migrate to **Wings** or **Wings-RS** ([https://github.com/calagopus/wings](https://github.com/calagopus/wings)) as a replacement daemon.
+# Elytra Daemon - Manual Installation Guide
 
 This guide provides step-by-step instructions for manually installing the Elytra Daemon on your game server nodes. Elytra is the game server management daemon that communicates with the Hydrodactyl Panel and manages Docker containers for game servers.
 
@@ -788,7 +786,7 @@ For help creating servers and managing them, refer to the Hydrodactyl Panel docu
 ## Support
 
 - GitHub Issues: https://github.com/pyrohost/elytra/issues
-- Hydrodactyl Documentation: https://github.com/hydrodactyl-oss/hydrodactyl/tree/main/docs
+- Hydrodactyl Documentation: https://github.com/BlueprintFramework/hydrodactyl/tree/main/docs
 - Docker Documentation: https://docs.docker.com/
 
 ---

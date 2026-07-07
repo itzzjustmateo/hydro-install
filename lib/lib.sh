@@ -6,7 +6,7 @@ set -e
 #                                                                                    #
 # Hydrodactyl Installer Library                                                       #
 #                                                                                    #
-# Copyright (C) 2025, ItzzMateo Studios                                             #
+# Copyright (C) 2026, ItzzMateo Studios                                             #
 #                                                                                    #
 # https://github.com/itzzjustmateo/hydro-install                         #
 #                                                                                    #
@@ -23,8 +23,8 @@ export GITHUB_URL="$GITHUB_BASE_URL/$GITHUB_SOURCE"
 
 # ------------------ Default Repositories ----------------- #
 
-export DEFAULT_PANEL_REPO="blueprintframework/hydrodactyl"
-export DEFAULT_ELYTRA_REPO="pterodactyl/wings"
+export DEFAULT_PANEL_REPO="BlueprintFramework/hydrodactyl"
+export DEFAULT_ELYTRA_REPO="pyrohost/elytra"
 export DEFAULT_WINGS_REPO="pterodactyl/wings"
 export DEFAULT_WINGS_RS_REPO="calagopus/wings"
 
@@ -142,14 +142,14 @@ print_header() {
   # Flame gradient header - smooth color transition from top to bottom
   echo -e "${GRADIENT_1}    ╔══════════════════════════════════════════════════════════════════════════════════════╗"
   echo -e "${GRADIENT_2}    ║                                                                                      ║"
-  echo -e "${GRADIENT_3}    ║  ___ ___            .___                 .___              __          .__           ║"
-  echo -e "${GRADIENT_4}    ║ /   |   \ ___.__ __| _/______  ____   __| _/____    _____/  |_ ___.__.|  |          ║"
-  echo -e "${GRADIENT_5}    ║/    ~    <   |  |/ __ |\_  __ \/  _ \ / __ |\__  \ _/ ___\   __<   |  ||  |         ║"
-  echo -e "${GRADIENT_6}    ║\    Y    /\___  / /_/ | |  | \(  <_> ) /_/ | / __ \\  \___|  |  \___  ||  |__       ║"
-  echo -e "${GRADIENT_7}    ║ \___|_  / / ____\____ | |__|   \____/\____ |(____  /\___  >__|  / ____||____/       ║"
-  echo -e "${GRADIENT_8}    ║       \/  \/         \/                   \/     \/     \/      \/                   ║"
+  echo -e "${GRADIENT_3}    ║     ___ ___            .___                 .___              __          .__                ║"
+  echo -e "${GRADIENT_4}    ║   /   |   \\ ___.__. __| _/______  ____   __| _/____    _____/  |_ ___.__.|  |               ║"
+  echo -e "${GRADIENT_5}    ║  /    ~    <   |  |/ __ |\\_  __ \\/  _ \\ / __ |\\__  \\ _/ ___\\   __<   |  ||  |              ║"
+  echo -e "${GRADIENT_6}    ║  \\    Y    /\\___  / /_/ | |  | \\(  <_> ) /_/ | / __ \\\\  \\___|  |  \\___  / |  |__             ║"
+  echo -e "${GRADIENT_7}    ║   \\___|_  / / ____\\____ | |__|   \\____/\\____ |(____  /\\___  >__|  / ____||____/             ║"
+  echo -e "${GRADIENT_8}    ║         \\/  \\/         \\/                   \\/     \\/     \\/      \\/                        ║"
   echo -e "${GRADIENT_9}    ║                                                                                      ║"
-  echo -e "${GRADIENT_10}    ║                           Hydrodactyl Installation Manager                           ║"
+  echo -e "${GRADIENT_10}    ║                            Hydrodactyl Installation Manager                           ║"
   echo -e "${GRADIENT_11}    ╚══════════════════════════════════════════════════════════════════════════════════════╝"
   echo -e "${COLOR_NC}"
   echo -e "    ${COLOR_ORANGE}Version:${COLOR_NC} ${SCRIPT_RELEASE}  ${COLOR_ORANGE}|${COLOR_NC}  ${COLOR_ORANGE}By:${COLOR_NC} ItzzMateo Studios"
@@ -1153,6 +1153,64 @@ download_release_asset() {
   return 0
 }
 
+# ------------------ Timezone Functions ----------------- #
+
+detect_system_timezone() {
+  local tz=""
+  if command -v timedatectl >/dev/null 2>&1; then
+    tz=$(timedatectl show --property=Timezone --value 2>/dev/null || echo "")
+  fi
+  if [ -z "$tz" ] && [ -f /etc/timezone ]; then
+    tz=$(cat /etc/timezone 2>/dev/null || echo "")
+  fi
+  if [ -z "$tz" ] && [ -L /etc/localtime ]; then
+    tz=$(readlink /etc/localtime 2>/dev/null | sed 's|.*/zoneinfo/||' || echo "")
+  fi
+  echo "${tz:-UTC}"
+}
+
+validate_timezone() {
+  local tz="$1"
+  if [ -z "$tz" ]; then
+    return 1
+  fi
+  if [ -f /usr/share/zoneinfo/"$tz" ] 2>/dev/null; then
+    return 0
+  fi
+  if php -r "echo timezone_open('$tz') ? 'valid' : 'invalid';" 2>/dev/null | grep -q "valid"; then
+    return 0
+  fi
+  local known_timezones
+  known_timezones=$(cat "$(dirname "$(readlink -f "$0")")/configs/valid_timezones.txt" 2>/dev/null || echo "")
+  if [ -n "$known_timezones" ]; then
+    echo "$known_timezones" | grep -qi "^$tz$" && return 0
+  fi
+  local iana_count
+  iana_count=$(ls /usr/share/zoneinfo/*/* 2>/dev/null | head -5 | wc -l)
+  if [ "$iana_count" -gt 0 ] && [ -f "/usr/share/zoneinfo/$tz" ]; then
+    return 0
+  fi
+  return 1
+}
+
+list_timezone_regions() {
+  if [ -f /usr/share/zoneinfo/zone.tab ]; then
+    cut -f3 /usr/share/zoneinfo/zone.tab 2>/dev/null | cut -d/ -f1 | sort -u | grep -v '^$' || true
+  else
+    echo "Africa"
+    echo "America"
+    echo "Antarctica"
+    echo "Arctic"
+    echo "Asia"
+    echo "Atlantic"
+    echo "Australia"
+    echo "Europe"
+    echo "Indian"
+    echo "Pacific"
+    echo "UTC"
+  fi
+}
+
 # ------------------ Input Functions ----------------- #
 
 required_input() {
@@ -1989,6 +2047,321 @@ get_php_socket() {
 
 # ------------------ Nginx Functions ----------------- #
 
+# ------------------ Panel Detection & Removal ----------------- #
+
+detect_installed_panels() {
+  local found=()
+
+  # Struxa
+  if [ -f "/etc/nginx/sites-available/struxa-panel.conf" ] || [ -d "/var/www/struxa" ]; then
+    found+=("Struxa")
+  fi
+
+  # Pterodactyl
+  if ls /etc/nginx/sites-available/pterodactyl* 2>/dev/null | grep -q . || \
+     [ -d "/var/www/pterodactyl" ] || [ -f "/usr/local/bin/wings" ] || \
+     systemctl is-enabled --quiet pteroq 2>/dev/null; then
+    found+=("Pterodactyl")
+  fi
+
+  # Dokploy
+  if [ -d "/etc/dokploy" ] || docker ps -a 2>/dev/null | grep -qi "dokploy" || \
+     systemctl is-enabled --quiet dokploy 2>/dev/null; then
+    found+=("Dokploy")
+  fi
+
+  # Coolify
+  if [ -d "/etc/coolify" ] || docker ps -a 2>/dev/null | grep -qi "coolify" || \
+     systemctl is-enabled --quiet coolify 2>/dev/null; then
+    found+=("Coolify")
+  fi
+
+  echo "${found[@]}"
+}
+
+remove_struxa() {
+  output "Removing Struxa panel..."
+  rm -f /etc/nginx/sites-available/struxa-panel.conf
+  rm -f /etc/nginx/sites-enabled/struxa-panel.conf
+  rm -rf /var/www/struxa
+  systemctl disable --now nginx 2>/dev/null || true
+  systemctl disable --now php*-fpm 2>/dev/null || true
+  systemctl disable --now mariadb 2>/dev/null || true
+  output "Struxa panel removed."
+}
+
+remove_pterodactyl() {
+  output "Removing Pterodactyl panel..."
+  systemctl disable --now pteroq 2>/dev/null || true
+  systemctl disable --now wings 2>/dev/null || true
+  rm -rf /var/www/pterodactyl
+  rm -f /etc/nginx/sites-available/pterodactyl*
+  rm -f /etc/nginx/sites-enabled/pterodactyl*
+  rm -f /etc/systemd/system/pteroq*
+  rm -f /etc/systemd/system/wings*
+  rm -f /usr/local/bin/wings
+  rm -f /usr/local/bin/elytra
+  systemctl daemon-reload
+  output "Pterodactyl panel removed."
+}
+
+remove_dokploy() {
+  output "Removing Dokploy..."
+  systemctl disable --now dokploy 2>/dev/null || true
+  docker ps -a 2>/dev/null | grep -i "dokploy" | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
+  rm -rf /etc/dokploy
+  rm -f /etc/systemd/system/dokploy*
+  rm -f /etc/nginx/sites-available/dokploy*
+  rm -f /etc/nginx/sites-enabled/dokploy*
+  systemctl daemon-reload
+  output "Dokploy removed."
+}
+
+remove_coolify() {
+  output "Removing Coolify..."
+  systemctl disable --now coolify 2>/dev/null || true
+  docker ps -a 2>/dev/null | grep -i "coolify" | awk '{print $1}' | xargs -r docker rm -f 2>/dev/null || true
+  rm -rf /etc/coolify
+  rm -f /etc/systemd/system/coolify*
+  rm -f /etc/nginx/sites-available/coolify*
+  rm -f /etc/nginx/sites-enabled/coolify*
+  systemctl daemon-reload
+  output "Coolify removed."
+}
+
+remove_all_other_panels() {
+  for panel in Struxa Pterodactyl Dokploy Coolify; do
+    case "$panel" in
+      Struxa) remove_struxa ;;
+      Pterodactyl) remove_pterodactyl ;;
+      Dokploy) remove_dokploy ;;
+      Coolify) remove_coolify ;;
+    esac
+  done
+}
+
+check_port_conflicts() {
+  local has_conflict=false
+  local conflict_details=""
+
+  for port in 80 443; do
+    if ss -tlnp 2>/dev/null | grep -q ":$port "; then
+      local pid
+      local process_name
+      pid=$(ss -tlnp 2>/dev/null | grep ":$port " | head -1 | grep -oP 'pid=\K[0-9]+' || echo "")
+      if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        process_name=$(ps -p "$pid" -o comm= 2>/dev/null || echo "unknown")
+        local service_name
+        service_name=$(systemctl status "$pid" 2>/dev/null | grep -oP '● \K[^ ]+' || echo "$process_name")
+        conflict_details="$conflict_details  • Port $port: $service_name (PID $pid)\n"
+      else
+        conflict_details="$conflict_details  • Port $port: unknown process\n"
+      fi
+      has_conflict=true
+    fi
+  done
+
+  if [ "$has_conflict" == true ]; then
+    echo ""
+    output "${COLOR_RED}Port conflict detected!${COLOR_NC}"
+    output "The following services are already using required ports:"
+    echo -e "$conflict_details"
+    echo ""
+
+    local existing_configs
+    existing_configs=$(find /etc/nginx/sites-enabled/ -type l -o -type f 2>/dev/null | grep -v default | head -5)
+    if [ -n "$existing_configs" ]; then
+      output "Existing nginx site configs detected:"
+      while IFS= read -r config; do
+        [ -n "$config" ] && output "  • $(basename "$config")"
+      done <<< "$existing_configs"
+      echo ""
+    fi
+
+    local detected_panels
+    detected_panels=($(detect_installed_panels))
+    local has_known_panels=false
+    if [ ${#detected_panels[@]} -gt 0 ]; then
+      has_known_panels=true
+      output "${COLOR_YELLOW}Detected known panels on this server:${COLOR_NC}"
+      for panel in "${detected_panels[@]}"; do
+        output "  ${COLOR_RED}✗${COLOR_NC} $panel"
+      done
+      echo ""
+    fi
+
+    output "${COLOR_YELLOW}What would you like to do?${COLOR_NC}"
+    output "[${COLOR_ORANGE}0${COLOR_NC}] Stop conflicting services and remove their nginx configs (recommended)"
+    if [ "$has_known_panels" == true ]; then
+      output "[${COLOR_ORANGE}1${COLOR_NC}] Remove a detected panel completely"
+    fi
+    output "[${COLOR_ORANGE}2${COLOR_NC}] Keep existing services - I will configure manually"
+    output "[${COLOR_ORANGE}3${COLOR_NC}] Use a different port for the Hydrodactyl panel"
+    echo ""
+
+    local max_option=3
+    [ "$has_known_panels" == true ] && max_option=4
+
+    local conflict_choice=""
+    while true; do
+      echo -n "* Select [0-$((max_option - 1))]: "
+      read -r conflict_choice
+      case "$conflict_choice" in
+        0|2) break ;;
+        1)
+          if [ "$has_known_panels" == true ]; then
+            # Show panel removal submenu
+            echo ""
+            output "${COLOR_YELLOW}Select a panel to remove:${COLOR_NC}"
+            local idx=0
+            local panel_indices=()
+            for panel in "${detected_panels[@]}"; do
+              echo -e "  [${COLOR_ORANGE}$idx${COLOR_NC}] Remove $panel"
+              panel_indices+=("$panel")
+              idx=$((idx + 1))
+            done
+            echo -e "  [${COLOR_ORANGE}$idx${COLOR_NC}] Remove all detected panels"
+            echo ""
+
+            local panel_choice=""
+            echo -n "* Select [0-$idx]: "
+            read -r panel_choice
+
+            if [[ "$panel_choice" =~ ^[0-9]+$ ]] && [ "$panel_choice" -ge 0 ] && [ "$panel_choice" -lt "$idx" ]; then
+              local selected="${panel_indices[$panel_choice]}"
+              output "You selected: ${COLOR_RED}$selected${COLOR_NC}"
+              local confirm=""
+              bool_input confirm "Remove $selected? This cannot be undone" "n"
+              if [ "$confirm" == "y" ]; then
+                case "$selected" in
+                  Struxa) remove_struxa ;;
+                  Pterodactyl) remove_pterodactyl ;;
+                  Dokploy) remove_dokploy ;;
+                  Coolify) remove_coolify ;;
+                esac
+                output "Proceeding after $selected removal..."
+                break
+              fi
+            elif [ "$panel_choice" == "$idx" ]; then
+              output "You selected: ${COLOR_RED}All panels${COLOR_NC}"
+              local confirm=""
+              bool_input confirm "Remove all detected panels? This cannot be undone" "n"
+              if [ "$confirm" == "y" ]; then
+                for panel in "${detected_panels[@]}"; do
+                  case "$panel" in
+                    Struxa) remove_struxa ;;
+                    Pterodactyl) remove_pterodactyl ;;
+                    Dokploy) remove_dokploy ;;
+                    Coolify) remove_coolify ;;
+                  esac
+                done
+                output "All panels removed. Proceeding..."
+                break
+              fi
+            fi
+          else
+            error "Invalid option"
+          fi
+          ;;
+        3)
+          echo ""
+          output "${COLOR_YELLOW}Custom Port Configuration${COLOR_NC}"
+          output "Enter a custom HTTP port for the panel (default: 80)."
+          local http_port=""
+          while true; do
+            echo -n "* HTTP port [1-65535]: "
+            read -r http_port
+            [ -z "$http_port" ] && http_port=80
+            if ! [[ "$http_port" =~ ^[0-9]+$ ]] || [ "$http_port" -lt 1 ] || [ "$http_port" -gt 65535 ]; then
+              error "Invalid port. Enter a number between 1 and 65535."
+              continue
+            fi
+            if [ "$http_port" != "80" ] && [ "$http_port" != "443" ] && ss -tlnp 2>/dev/null | grep -q ":$http_port "; then
+              warning "Port $http_port is already in use by another service."
+              local retry=""
+              bool_input retry "Use it anyway?" "n"
+              [ "$retry" != "y" ] && continue
+            fi
+            break
+          done
+
+          local https_port=""
+          output ""
+          output "Enter a custom HTTPS port for the panel (default: 443)."
+          while true; do
+            echo -n "* HTTPS port [1-65535]: "
+            read -r https_port
+            [ -z "$https_port" ] && https_port=443
+            if ! [[ "$https_port" =~ ^[0-9]+$ ]] || [ "$https_port" -lt 1 ] || [ "$https_port" -gt 65535 ]; then
+              error "Invalid port. Enter a number between 1 and 65535."
+              continue
+            fi
+            if [ "$https_port" != "80" ] && [ "$https_port" != "443" ] && ss -tlnp 2>/dev/null | grep -q ":$https_port "; then
+              warning "Port $https_port is already in use by another service."
+              local retry_https=""
+              bool_input retry_https "Use it anyway?" "n"
+              [ "$retry_https" != "y" ] && continue
+            fi
+            break
+          done
+
+          PANEL_CUSTOM_HTTP_PORT="$http_port"
+          PANEL_CUSTOM_SSL_PORT="$https_port"
+          output "Using custom ports — HTTP: ${COLOR_ORANGE}$http_port${COLOR_NC}, HTTPS: ${COLOR_ORANGE}$https_port${COLOR_NC}"
+          if [ "$http_port" != "80" ] || [ "$https_port" != "443" ]; then
+            warning "Let's Encrypt automatic SSL may not work with custom ports."
+            output "Certbot typically requires ports 80 and 443 for HTTP-01 validation."
+            output "Consider using DNS-01 challenge or obtaining certificates manually."
+            echo ""
+          fi
+          break
+          ;;
+        *) error "Invalid option" ;;
+      esac
+    done
+
+    case "$conflict_choice" in
+      0)
+        if [ "$has_known_panels" == false ]; then
+          output "Stopping conflicting services and removing their configs..."
+          local pids
+          pids=$(ss -tlnp 2>/dev/null | grep -oP 'pid=\K[0-9]+' | sort -u)
+          for pid in $pids; do
+            kill "$pid" 2>/dev/null || true
+          done
+          find /etc/nginx/sites-enabled/ -type l -o -type f | grep -v default | while IFS= read -r conf; do
+            rm -f "$conf"
+            local available_link
+            available_link=$(readlink -f "$conf" 2>/dev/null || echo "")
+            [ -n "$available_link" ] && rm -f "$available_link"
+          done
+          find /etc/nginx/sites-available/ -maxdepth 1 -type f | grep -v default | grep -v hydrodactyl | while IFS= read -r conf; do
+            rm -f "$conf"
+          done
+          sleep 1
+          output "Conflicting services stopped. Proceeding with installation..."
+          return 0
+        fi
+        ;;
+      1)
+        # Panel was already removed in the submenu flow above
+        return 0
+        ;;
+      2)
+        output "Skipping nginx configuration. You will need to configure it manually."
+        output "Config templates are available at:"
+        output "  $(hyperlink "https://github.com/itzzjustmateo/hydro-install/tree/main/configs")"
+        return 1
+        ;;
+      3)
+        return 0
+        ;;
+    esac
+  fi
+
+  return 0
+}
+
 install_nginx_config() {
   local fqdn="$1"
   local php_socket="$2"
@@ -2020,6 +2393,16 @@ install_nginx_config() {
     sed -i "s|<php_socket>|$php_socket|g" "$config_file"
   fi
 
+  # Apply custom port substitutions if set
+  if [ -n "$PANEL_CUSTOM_HTTP_PORT" ] && [ "$PANEL_CUSTOM_HTTP_PORT" != "80" ]; then
+    sed -i "s|listen 80;|listen $PANEL_CUSTOM_HTTP_PORT;|g" "$config_file"
+    sed -i "s|listen \[::\]:80;|listen [::]:$PANEL_CUSTOM_HTTP_PORT;|g" "$config_file"
+  fi
+  if [ -n "$PANEL_CUSTOM_SSL_PORT" ] && [ "$PANEL_CUSTOM_SSL_PORT" != "443" ]; then
+    sed -i "s|listen 443 ssl http2;|listen $PANEL_CUSTOM_SSL_PORT ssl http2;|g" "$config_file"
+    sed -i "s|listen \[::\]:443 ssl http2;|listen [::]:$PANEL_CUSTOM_SSL_PORT ssl http2;|g" "$config_file"
+  fi
+
   # Enable site
   mkdir -p /etc/nginx/sites-enabled
   ln -sf "$config_file" /etc/nginx/sites-enabled/hydrodactyl.conf
@@ -2027,8 +2410,14 @@ install_nginx_config() {
   # Remove default site
   rm -f /etc/nginx/sites-enabled/default
 
-  # Test and reload
-  nginx -t && systemctl reload nginx
+  # Test and reload/start
+  if nginx -t; then
+    if systemctl is-active --quiet nginx 2>/dev/null; then
+      systemctl reload nginx
+    else
+      systemctl start nginx
+    fi
+  fi
 
   success "Nginx configured"
 }
@@ -2247,7 +2636,7 @@ install_hydroq() {
   output "Installing queue worker service..."
 
   # Get service file
-  if ! get_config "pyroq.service" "/etc/systemd/system/hydroq.service"; then
+  if ! get_config "hydroq.service" "/etc/systemd/system/hydroq.service"; then
     exit 1
   fi
 
@@ -2381,7 +2770,7 @@ install_auto_updater_panel() {
   fi
 
   # Create config
-  echo "PANEL_REPO=\"${PANEL_REPO:-blueprintframework/hydrodactyl}\"" > /etc/hydrodactyl/auto-update-panel.env
+  echo "PANEL_REPO=\"${PANEL_REPO:-BlueprintFramework/hydrodactyl}\"" > /etc/hydrodactyl/auto-update-panel.env
   echo "GITHUB_TOKEN=\"${GITHUB_TOKEN:-}\"" >> /etc/hydrodactyl/auto-update-panel.env
   echo "UPDATE_METHOD=\"${update_method}\"" >> /etc/hydrodactyl/auto-update-panel.env
   echo "PANEL_REPO_PRIVATE=\"${PANEL_REPO_PRIVATE:-false}\"" >> /etc/hydrodactyl/auto-update-panel.env

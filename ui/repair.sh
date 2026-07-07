@@ -8,7 +8,7 @@ set -e
 #                                                                                    #
 # Repair and fix common issues with Hydrodactyl Panel and Elytra                      #
 #                                                                                    #
-# Copyright (C) 2025, Muspelheim Hosting                                             #
+# Copyright (C) 2026, ItzzMateo Studios                                             #
 #                                                                                    #
 # https://github.com/itzzjustmateo/hydro-install                         #
 #                                                                                    #
@@ -233,8 +233,8 @@ restart_services() {
     warning "PHP-FPM not found or not running"
   fi
 
-  output "Restarting queue worker (pyroq)..."
-  systemctl restart pyroq 2>/dev/null || warning "Failed to restart pyroq (may not be installed)"
+  output "Restarting queue worker (hydroq)..."
+  systemctl restart hydroq 2>/dev/null || warning "Failed to restart hydroq (may not be installed)"
 
   output "Restarting Redis..."
   systemctl restart redis-server 2>/dev/null || \

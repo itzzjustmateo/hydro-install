@@ -6,7 +6,7 @@ set -e
 #                                                                                    #
 # Hydrodactyl Uninstallation UI                                                       #
 #                                                                                    #
-# Copyright (C) 2025, Muspelheim Hosting                                             #
+# Copyright (C) 2026, ItzzMateo Studios                                             #
 #                                                                                    #
 ######################################################################################
 
@@ -191,7 +191,7 @@ confirm_uninstall() {
     output "Panel removal includes:"
     output "  - Panel files (/var/www/hydrodactyl)"
     output "  - Nginx configuration"
-    output "  - Systemd services (pyroq)"
+    output "  - Systemd services (hydroq)"
     output "  - Cron jobs"
     echo ""
 

@@ -8,7 +8,7 @@ set -e
 #                                                                                    #
 # Supports both Pterodactyl Wings (Go) and wings-rs (Rust)                           #
 #                                                                                    #
-# Copyright (C) 2025, Muspelheim Hosting                                             #
+# Copyright (C) 2026, ItzzMateo Studios                                             #
 #                                                                                    #
 ######################################################################################
 

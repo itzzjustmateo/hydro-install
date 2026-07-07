@@ -38,7 +38,7 @@ done
 #                                                                                    #
 # One-command installer for Hydrodactyl Panel and Elytra Daemon                       #
 #                                                                                    #
-# Copyright (C) 2025, ItzzMateo Studios                                             #
+# Copyright (C) 2026, ItzzMateo Studios                                             #
 #                                                                                    #
 # https://github.com/itzzjustmateo/hydro-install                         #
 #                                                                                    #
@@ -144,14 +144,14 @@ print_header() {
   # Flame gradient header - smooth color transition from top to bottom
   echo -e "${GRADIENT_1}    ╔══════════════════════════════════════════════════════════════════════════════════════╗"
   echo -e "${GRADIENT_2}    ║                                                                                      ║"
-  echo -e "${GRADIENT_3}    ║  ___ ___            .___                 .___              __          .__           ║"
-  echo -e "${GRADIENT_4}    ║ /   |   \ ___.__ __| _/______  ____   __| _/____    _____/  |_ ___.__.|  |          ║"
-  echo -e "${GRADIENT_5}    ║/    ~    <   |  |/ __ |\_  __ \/  _ \ / __ |\__  \ _/ ___\   __<   |  ||  |         ║"
-  echo -e "${GRADIENT_6}    ║\    Y    /\___  / /_/ | |  | \(  <_> ) /_/ | / __ \\  \___|  |  \___  ||  |__       ║"
-  echo -e "${GRADIENT_7}    ║ \___|_  / / ____\____ | |__|   \____/\____ |(____  /\___  >__|  / ____||____/       ║"
-  echo -e "${GRADIENT_8}    ║       \/  \/         \/                   \/     \/     \/      \/                   ║"
+  echo -e "${GRADIENT_3}    ║     ___ ___            .___                 .___              __          .__                ║"
+  echo -e "${GRADIENT_4}    ║   /   |   \\ ___.__. __| _/______  ____   __| _/____    _____/  |_ ___.__.|  |               ║"
+  echo -e "${GRADIENT_5}    ║  /    ~    <   |  |/ __ |\\_  __ \\/  _ \\ / __ |\\__  \\ _/ ___\\   __<   |  ||  |              ║"
+  echo -e "${GRADIENT_6}    ║  \\    Y    /\\___  / /_/ | |  | \\(  <_> ) /_/ | / __ \\\\  \\___|  |  \\___  / |  |__             ║"
+  echo -e "${GRADIENT_7}    ║   \\___|_  / / ____\\____ | |__|   \\____/\\____ |(____  /\\___  >__|  / ____||____/             ║"
+  echo -e "${GRADIENT_8}    ║         \\/  \\/         \\/                   \\/     \\/     \\/      \\/                        ║"
   echo -e "${GRADIENT_9}    ║                                                                                      ║"
-  echo -e "${GRADIENT_10}    ║                           Hydrodactyl Installation Manager                           ║"
+  echo -e "${GRADIENT_10}    ║                            Hydrodactyl Installation Manager                           ║"
   echo -e "${GRADIENT_11}    ╚══════════════════════════════════════════════════════════════════════════════════════╝"
   echo -e "${COLOR_NC}"
   echo -e "    ${COLOR_ORANGE}Version:${COLOR_NC} ${SCRIPT_RELEASE}  ${COLOR_ORANGE}|${COLOR_NC}  ${COLOR_ORANGE}By:${COLOR_NC} ItzzMateo Studios"
@@ -358,7 +358,7 @@ run_panel_update() {
   else
     # Create temporary env file with defaults
     mkdir -p /etc/hydrodactyl
-    echo "PANEL_REPO=\"blueprintframework/hydrodactyl\"" > /etc/hydrodactyl/auto-update-panel.env
+    echo "PANEL_REPO=\"BlueprintFramework/hydrodactyl\"" > /etc/hydrodactyl/auto-update-panel.env
     echo "GITHUB_TOKEN=\"\"" >> /etc/hydrodactyl/auto-update-panel.env
     chmod 600 /etc/hydrodactyl/auto-update-panel.env
   fi
@@ -466,10 +466,12 @@ show_menu() {
     echo ""
     output "[${COLOR_ORANGE}10${COLOR_NC}] View Installation Information"
     echo ""
-    output "[${COLOR_ORANGE}11${COLOR_NC}] Exit"
+    output "[${COLOR_ORANGE}11${COLOR_NC}] Remove Other Panels (Struxa, Pterodactyl, Dokploy, Coolify)"
+    echo ""
+    output "[${COLOR_ORANGE}12${COLOR_NC}] Exit"
     echo ""
 
-    echo -n "* Select an option [0-11]: "
+    echo -n "* Select an option [0-12]: "
     read -r choice
 
     case "$choice" in
@@ -477,7 +479,7 @@ show_menu() {
         execute_ui "panel"
         continue
         ;;
-       1)
+      1)
         execute_ui "wings"
         continue
         ;;
@@ -494,7 +496,7 @@ show_menu() {
         run_panel_update
         continue
         ;;
-       4)
+      4)
         if [ "$ELYTRA_INSTALLED" == false ]; then
           error "Wings Daemon is not installed"
           sleep 2
@@ -503,7 +505,7 @@ show_menu() {
         run_elytra_update
         continue
         ;;
-       5)
+      5)
         if [ "$PANEL_INSTALLED" == false ] || [ "$ELYTRA_INSTALLED" == false ]; then
           error "Both Panel and Wings must be installed to use this option"
           sleep 2
@@ -527,7 +529,7 @@ show_menu() {
         elif [ "$PANEL_INSTALLED" == true ]; then
           check_panel_health
         elif [ "$ELYTRA_INSTALLED" == true ]; then
-          check_wings_health
+          check_elytra_health
         else
           error "Nothing installed to check. Install Hydrodactyl or Wings first."
           sleep 2
@@ -546,11 +548,64 @@ show_menu() {
         continue
         ;;
       11)
+        # Remove other panels
+        local detected_panels
+        detected_panels=($(detect_installed_panels))
+        if [ ${#detected_panels[@]} -eq 0 ]; then
+          output "No other panels detected on this server."
+        else
+          output "${COLOR_YELLOW}Detected panels:${COLOR_NC}"
+          local idx=0
+          local panel_names=()
+          for panel in "${detected_panels[@]}"; do
+            echo -e "  [${COLOR_ORANGE}$idx${COLOR_NC}] Remove $panel"
+            panel_names+=("$panel")
+            idx=$((idx + 1))
+          done
+          echo -e "  [${COLOR_ORANGE}$idx${COLOR_NC}] Remove all detected panels"
+          echo ""
+          echo -n "* Select [0-$idx]: "
+          read -r panel_choice
+
+          if [[ "$panel_choice" =~ ^[0-9]+$ ]] && [ "$panel_choice" -ge 0 ] && [ "$panel_choice" -lt "$idx" ]; then
+            local selected="${panel_names[$panel_choice]}"
+            local confirm=""
+            bool_input confirm "Remove $selected? This cannot be undone" "n"
+            if [ "$confirm" == "y" ]; then
+              case "$selected" in
+                Struxa) remove_struxa ;;
+                Pterodactyl) remove_pterodactyl ;;
+                Dokploy) remove_dokploy ;;
+                Coolify) remove_coolify ;;
+              esac
+              success "$selected removed"
+            fi
+          elif [ "$panel_choice" == "$idx" ]; then
+            local confirm=""
+            bool_input confirm "Remove all detected panels? This cannot be undone" "n"
+            if [ "$confirm" == "y" ]; then
+              for panel in "${panel_names[@]}"; do
+                case "$panel" in
+                  Struxa) remove_struxa ;;
+                  Pterodactyl) remove_pterodactyl ;;
+                  Dokploy) remove_dokploy ;;
+                  Coolify) remove_coolify ;;
+                esac
+              done
+              success "All panels removed"
+            fi
+          fi
+        fi
+        output "Press Enter to continue..."
+        read -r
+        continue
+        ;;
+      12)
         output "Exiting..."
         exit 0
         ;;
       *)
-        error "Invalid option. Please select 0-11."
+        error "Invalid option. Please select 0-12."
         ;;
     esac
   done
