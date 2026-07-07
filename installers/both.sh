@@ -659,7 +659,7 @@ create_node_in_panel() {
     --fqdn="$PANEL_FQDN" \
     --public=1 \
     --scheme="$(panel_scheme)" \
-    --proxy=$([ "$BEHIND_PROXY" == "true" ] && echo "yes" || echo "no") \
+    --proxy="$([ "$BEHIND_PROXY" == "true" ] && echo "yes" || echo "no")" \
     --maxMemory="$max_memory" \
     --overallocateMemory=0 \
     --maxDisk="$max_disk" \
