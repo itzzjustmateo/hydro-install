@@ -495,14 +495,19 @@ setup_services() {
   # SELinux configuration for RHEL
   selinux_allow
 
-  # Setup nginx
-  local php_socket
-  php_socket=$(get_php_socket)
+  # Check for port conflicts before nginx setup
+  if ! check_port_conflicts; then
+    warning "Skipping nginx configuration due to port conflict"
+  else
+    # Setup nginx
+    local php_socket
+    php_socket=$(get_php_socket)
 
-  local use_ssl=false
-  [ -n "$SSL_CERT_PATH" ] && [ -n "$SSL_KEY_PATH" ] && use_ssl=true
+    local use_ssl=false
+    [ -n "$SSL_CERT_PATH" ] && [ -n "$SSL_KEY_PATH" ] && use_ssl=true
 
-  install_nginx_config "$PANEL_FQDN" "$php_socket" "$use_ssl" "$SSL_CERT_PATH" "$SSL_KEY_PATH"
+    install_nginx_config "$PANEL_FQDN" "$php_socket" "$use_ssl" "$SSL_CERT_PATH" "$SSL_KEY_PATH"
+  fi
 
   # Setup SSL if requested
   if [ "$CONFIGURE_LETSENCRYPT" == true ]; then

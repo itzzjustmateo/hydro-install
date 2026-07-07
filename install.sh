@@ -466,10 +466,12 @@ show_menu() {
     echo ""
     output "[${COLOR_ORANGE}10${COLOR_NC}] View Installation Information"
     echo ""
-    output "[${COLOR_ORANGE}11${COLOR_NC}] Exit"
+    output "[${COLOR_ORANGE}11${COLOR_NC}] Remove Other Panels (Struxa, Pterodactyl, Dokploy, Coolify)"
+    echo ""
+    output "[${COLOR_ORANGE}12${COLOR_NC}] Exit"
     echo ""
 
-    echo -n "* Select an option [0-11]: "
+    echo -n "* Select an option [0-12]: "
     read -r choice
 
     case "$choice" in
@@ -546,11 +548,64 @@ show_menu() {
         continue
         ;;
       11)
+        # Remove other panels
+        local detected_panels
+        detected_panels=($(detect_installed_panels))
+        if [ ${#detected_panels[@]} -eq 0 ]; then
+          output "No other panels detected on this server."
+        else
+          output "${COLOR_YELLOW}Detected panels:${COLOR_NC}"
+          local idx=0
+          local panel_names=()
+          for panel in "${detected_panels[@]}"; do
+            echo -e "  [${COLOR_ORANGE}$idx${COLOR_NC}] Remove $panel"
+            panel_names+=("$panel")
+            idx=$((idx + 1))
+          done
+          echo -e "  [${COLOR_ORANGE}$idx${COLOR_NC}] Remove all detected panels"
+          echo ""
+          echo -n "* Select [0-$idx]: "
+          read -r panel_choice
+
+          if [[ "$panel_choice" =~ ^[0-9]+$ ]] && [ "$panel_choice" -ge 0 ] && [ "$panel_choice" -lt "$idx" ]; then
+            local selected="${panel_names[$panel_choice]}"
+            local confirm=""
+            bool_input confirm "Remove $selected? This cannot be undone" "n"
+            if [ "$confirm" == "y" ]; then
+              case "$selected" in
+                Struxa) remove_struxa ;;
+                Pterodactyl) remove_pterodactyl ;;
+                Dokploy) remove_dokploy ;;
+                Coolify) remove_coolify ;;
+              esac
+              success "$selected removed"
+            fi
+          elif [ "$panel_choice" == "$idx" ]; then
+            local confirm=""
+            bool_input confirm "Remove all detected panels? This cannot be undone" "n"
+            if [ "$confirm" == "y" ]; then
+              for panel in "${panel_names[@]}"; do
+                case "$panel" in
+                  Struxa) remove_struxa ;;
+                  Pterodactyl) remove_pterodactyl ;;
+                  Dokploy) remove_dokploy ;;
+                  Coolify) remove_coolify ;;
+                esac
+              done
+              success "All panels removed"
+            fi
+          fi
+        fi
+        output "Press Enter to continue..."
+        read -r
+        continue
+        ;;
+      12)
         output "Exiting..."
         exit 0
         ;;
       *)
-        error "Invalid option. Please select 0-11."
+        error "Invalid option. Please select 0-12."
         ;;
     esac
   done

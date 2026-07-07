@@ -110,10 +110,41 @@ hostnamectl set-hostname panel-node
 ```
 
 ### Configure Timezone
+
+Setting the correct timezone ensures log timestamps, scheduled tasks, and PHP date functions display the correct time.
+
+**Detect current timezone:**
 ```bash
-timedatectl set-timezone UTC
+timedatectl show --property=Timezone --value
+```
+
+**List available timezones:**
+```bash
+timedatectl list-timezones
+# Alternatively, browse by region:
+ls /usr/share/zoneinfo/Europe/
+```
+
+**Set your timezone** (e.g., Europe/Berlin, America/New_York, UTC):
+```bash
+timedatectl set-timezone Europe/Berlin
+```
+
+**Install and enable NTP for accurate time sync:**
+```bash
+# Ubuntu/Debian:
 apt install -y chrony
+systemctl enable --now chrony
+
+# Rocky/AlmaLinux:
+dnf install -y chrony
 systemctl enable --now chronyd
+```
+
+**Verify configuration:**
+```bash
+timedatectl
+chronyc tracking
 ```
 
 ---

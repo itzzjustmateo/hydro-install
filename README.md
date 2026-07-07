@@ -33,6 +33,11 @@ This installer is a fork of the [Pyrodactyl Installer](https://github.com/Muspel
 bash <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)
 ```
 
+**Zsh:**
+```zsh
+zsh <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)
+```
+
 Or download and run:
 
 ```bash
