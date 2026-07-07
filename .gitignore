@@ -1,0 +1,38 @@
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Editor/IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.iml
+.zed/
+
+# Project-specific
+/tmp/
+/var/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.bak
+
+# Secrets
+.env
+.env.*
+*.key
+*.pem
+*.cert
+credentials
+*.creds
