@@ -931,7 +931,7 @@ install_auto_updaters() {
 main() {
   print_header
   print_flame "Starting Combined Installation"
-  output "This will install Hydrodactyl Panel and Elytra on the same machine."
+  output "This will install Hydrodactyl Panel and Wings on the same machine."
   echo ""
 
   validate_configuration
@@ -1017,7 +1017,7 @@ main() {
   print_flame "Installation Complete!"
 
   echo ""
-  output "🎉 Hydrodactyl Panel and Elytra have been successfully installed!"
+  output "🎉 Hydrodactyl Panel and Wings have been successfully installed!"
   echo ""
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   output "  Panel Information"

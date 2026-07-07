@@ -575,7 +575,7 @@ show_summary() {
   echo ""
 
   local confirm=""
-  bool_input confirm "Proceed with installation of both Panel and Elytra?" "y"
+  bool_input confirm "Proceed with installation of both Panel and Wings?" "y"
 
   if [ "$confirm" != "y" ]; then
     error "Installation aborted"
