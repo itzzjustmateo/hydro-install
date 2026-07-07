@@ -2070,10 +2070,11 @@ check_port_conflicts() {
       output "[${COLOR_ORANGE}1${COLOR_NC}] Remove a detected panel completely"
     fi
     output "[${COLOR_ORANGE}2${COLOR_NC}] Keep existing services - I will configure manually"
+    output "[${COLOR_ORANGE}3${COLOR_NC}] Use a different port for the Hydrodactyl panel"
     echo ""
 
-    local max_option=2
-    [ "$has_known_panels" == true ] && max_option=3
+    local max_option=3
+    [ "$has_known_panels" == true ] && max_option=4
 
     local conflict_choice=""
     while true; do
@@ -2136,6 +2137,59 @@ check_port_conflicts() {
             error "Invalid option"
           fi
           ;;
+        3)
+          echo ""
+          output "${COLOR_YELLOW}Custom Port Configuration${COLOR_NC}"
+          output "Enter a custom HTTP port for the panel (default: 80)."
+          local http_port=""
+          while true; do
+            echo -n "* HTTP port [1-65535]: "
+            read -r http_port
+            [ -z "$http_port" ] && http_port=80
+            if ! [[ "$http_port" =~ ^[0-9]+$ ]] || [ "$http_port" -lt 1 ] || [ "$http_port" -gt 65535 ]; then
+              error "Invalid port. Enter a number between 1 and 65535."
+              continue
+            fi
+            if [ "$http_port" != "80" ] && [ "$http_port" != "443" ] && ss -tlnp 2>/dev/null | grep -q ":$http_port "; then
+              warning "Port $http_port is already in use by another service."
+              local retry=""
+              bool_input retry "Use it anyway?" "n"
+              [ "$retry" != "y" ] && continue
+            fi
+            break
+          done
+
+          local https_port=""
+          output ""
+          output "Enter a custom HTTPS port for the panel (default: 443)."
+          while true; do
+            echo -n "* HTTPS port [1-65535]: "
+            read -r https_port
+            [ -z "$https_port" ] && https_port=443
+            if ! [[ "$https_port" =~ ^[0-9]+$ ]] || [ "$https_port" -lt 1 ] || [ "$https_port" -gt 65535 ]; then
+              error "Invalid port. Enter a number between 1 and 65535."
+              continue
+            fi
+            if [ "$https_port" != "80" ] && [ "$https_port" != "443" ] && ss -tlnp 2>/dev/null | grep -q ":$https_port "; then
+              warning "Port $https_port is already in use by another service."
+              local retry_https=""
+              bool_input retry_https "Use it anyway?" "n"
+              [ "$retry_https" != "y" ] && continue
+            fi
+            break
+          done
+
+          PANEL_CUSTOM_HTTP_PORT="$http_port"
+          PANEL_CUSTOM_SSL_PORT="$https_port"
+          output "Using custom ports — HTTP: ${COLOR_ORANGE}$http_port${COLOR_NC}, HTTPS: ${COLOR_ORANGE}$https_port${COLOR_NC}"
+          if [ "$http_port" != "80" ] || [ "$https_port" != "443" ]; then
+            warning "Let's Encrypt automatic SSL may not work with custom ports."
+            output "Certbot typically requires ports 80 and 443 for HTTP-01 validation."
+            output "Consider using DNS-01 challenge or obtaining certificates manually."
+            echo ""
+          fi
+          break
+          ;;
         *) error "Invalid option" ;;
       esac
     done
@@ -2173,6 +2227,9 @@ check_port_conflicts() {
         output "  $(hyperlink "https://github.com/itzzjustmateo/hydro-install/tree/main/configs")"
         return 1
         ;;
+      3)
+        return 0
+        ;;
     esac
   fi
 
@@ -2208,6 +2265,16 @@ install_nginx_config() {
     # Replace placeholders
     sed -i "s|<domain>|$fqdn|g" "$config_file"
     sed -i "s|<php_socket>|$php_socket|g" "$config_file"
+  fi
+
+  # Apply custom port substitutions if set
+  if [ -n "$PANEL_CUSTOM_HTTP_PORT" ] && [ "$PANEL_CUSTOM_HTTP_PORT" != "80" ]; then
+    sed -i "s|listen 80;|listen $PANEL_CUSTOM_HTTP_PORT;|g" "$config_file"
+    sed -i "s|listen \[::\]:80;|listen [::]:$PANEL_CUSTOM_HTTP_PORT;|g" "$config_file"
+  fi
+  if [ -n "$PANEL_CUSTOM_SSL_PORT" ] && [ "$PANEL_CUSTOM_SSL_PORT" != "443" ]; then
+    sed -i "s|listen 443 ssl http2;|listen $PANEL_CUSTOM_SSL_PORT ssl http2;|g" "$config_file"
+    sed -i "s|listen \[::\]:443 ssl http2;|listen [::]:$PANEL_CUSTOM_SSL_PORT ssl http2;|g" "$config_file"
   fi
 
   # Enable site
