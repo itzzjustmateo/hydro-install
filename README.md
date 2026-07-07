@@ -75,7 +75,7 @@ sudo bash install.sh
 
 ## Installation Options
 
-<img width="848" height="504" alt="Installation menu" src="https://github.com/user-attachments/assets/9974e217-f667-4488-8a13-8745a9d2498f" />
+<img width="1920" height="1440" alt="image" src="https://github.com/user-attachments/assets/89cd8c4c-8cb1-4ce0-9625-58f42393ac41" />
 
 ```bash
 bash <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)
