@@ -12,6 +12,8 @@ A beautiful, modern, and feature-rich installer for the **Hydrodactyl** game ser
 
 This installer is a fork of the [Pyrodactyl Installer](https://github.com/Muspelheim-Hosting/pyrodactyl-installer), adapted for use with the [Hydrodactyl Panel](https://github.com/BlueprintFramework/hydrodactyl).
 
+> **Elytra Support Notice:** Elytra is no longer maintained upstream and is considered deprecated. While existing Elytra installations will continue to function, we recommend migrating to [Wings](https://github.com/pterodactyl/wings) or an alternative daemon. New installations should use the Hydrodactyl panel with Wings. The installer still includes Elytra support for legacy installations but it will not receive future updates.
+
 ## Features
 
 - **Beautiful Flame UI** — Orange gradient interface inspired by Muspelheim Hosting
