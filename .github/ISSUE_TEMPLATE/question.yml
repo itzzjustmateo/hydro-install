@@ -1,0 +1,30 @@
+name: Question
+description: Ask a question about the installer
+labels: ["type: question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ask your question here. Please search existing issues first to see if it's already been answered.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What would you like to know?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What are you trying to achieve? OS, installation type, etc.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Verification
+      options:
+        - label: I have searched existing issues for answers
+          required: true

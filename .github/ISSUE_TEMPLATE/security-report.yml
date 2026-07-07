@@ -1,0 +1,23 @@
+name: Security Report
+description: Report a security vulnerability
+labels: ["type: security"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ⚠️ **Do not disclose security vulnerabilities publicly in this issue.**
+
+        If you have found a security vulnerability, please report it privately via one of these methods:
+
+        1. **GitHub Security Advisories** — Navigate to the repository's Security tab and click "Report a vulnerability"
+        2. **Email** — [INSERT EMAIL ADDRESS]
+
+        Please **do not** include any vulnerability details in this form. Close this issue and use one of the private methods above.
+
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Confirmation
+      options:
+        - label: I understand that I should not include vulnerability details here and will report privately
+          required: true
