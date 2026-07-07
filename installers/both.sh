@@ -4,7 +4,7 @@ set -e
 
 ######################################################################################
 #                                                                                    #
-# Hydrodactyl + Wings Combined Installer                                             #
+# Hydrodactyl + Elytra Combined Installer                                             #
 #                                                                                    #
 # Installs both Panel and Elytra on the same machine with automatic configuration    #
 #                                                                                    #
@@ -32,7 +32,7 @@ fi
 # ------------------ Variables ----------------- #
 
 # Panel configuration
-PANEL_REPO="${PANEL_REPO:-blueprintframework/hydrodactyl}"
+PANEL_REPO="${PANEL_REPO:-BlueprintFramework/hydrodactyl}"
 PANEL_INSTALL_METHOD="${PANEL_INSTALL_METHOD:-release}"
 PANEL_RELEASE_VERSION="${PANEL_RELEASE_VERSION:-latest}"
 PANEL_FQDN="${PANEL_FQDN:-}"
@@ -61,9 +61,8 @@ else
   MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-$(gen_passwd 64)}"
 fi
 
-# Wings configuration
-WINGS_VARIANT="${WINGS_VARIANT:-go}"
-WINGS_REPO="${WINGS_REPO:-pterodactyl/wings}"
+# Elytra configuration
+ELYTRA_REPO="${ELYTRA_REPO:-pyrohost/elytra}"
 NODE_NAME="${NODE_NAME:-local}"
 NODE_DESCRIPTION="${NODE_DESCRIPTION:-Local Node}"
 NODE_TOKEN="${NODE_TOKEN:-$(gen_passwd 32)}"
@@ -78,12 +77,12 @@ INSTALL_AUTO_UPDATER_ELYTRA="${INSTALL_AUTO_UPDATER_ELYTRA:-false}"
 
 # GitHub
 PANEL_REPO_PRIVATE="${PANEL_REPO_PRIVATE:-false}"
-WINGS_REPO_PRIVATE="${WINGS_REPO_PRIVATE:-false}"
+ELYTRA_REPO_PRIVATE="${ELYTRA_REPO_PRIVATE:-false}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 
 # Paths
 INSTALL_DIR="${INSTALL_DIR:-/var/www/hydrodactyl}"
-ELYTRA_DIR="${ELYTRA_DIR:-/etc/pterodactyl}"
+ELYTRA_DIR="${ELYTRA_DIR:-/etc/elytra}"
 PANEL_CONFIG_DIR="${PANEL_CONFIG_DIR:-/etc/hydrodactyl}"
 
 # Node ID (will be set during installation)
@@ -163,7 +162,7 @@ check_existing() {
     fi
 
     # Stop services if they exist
-    systemctl stop wings 2>/dev/null || true
+    systemctl stop elytra 2>/dev/null || true
     systemctl stop hydroq 2>/dev/null || true
   fi
 }
@@ -672,8 +671,8 @@ create_node_in_panel() {
 
 # ---------------- Elytra Installation ---------------- #
 
-install_wings_daemon() {
-  print_flame "Installing Wings Daemon"
+install_elytra_daemon() {
+  print_flame "Installing Elytra Daemon"
 
   # Install Docker using shared function from lib.sh
   install_docker
@@ -681,9 +680,9 @@ install_wings_daemon() {
   # Create directories
   mkdir -p "$ELYTRA_DIR"
   mkdir -p "$PANEL_CONFIG_DIR"
-  mkdir -p /var/lib/pterodactyl/volumes
-  mkdir -p /var/lib/pterodactyl/archives
-  mkdir -p /var/lib/pterodactyl/backups
+  mkdir -p /var/lib/elytra/volumes
+  mkdir -p /var/lib/elytra/archives
+  mkdir -p /var/lib/elytra/backups
 
   # Create hydrodactyl group first (required for user creation)
   output "Creating hydrodactyl system group..."
@@ -715,10 +714,10 @@ install_wings_daemon() {
   # Get latest release
   output "Fetching latest Elytra release..."
   local latest_release
-  latest_release=$(get_latest_release "$WINGS_REPO" "$GITHUB_TOKEN")
+  latest_release=$(get_latest_release "$ELYTRA_REPO" "$GITHUB_TOKEN")
 
   if [ -z "$latest_release" ] || [ "$latest_release" == "null" ]; then
-    error "Could not fetch latest release from $WINGS_REPO"
+    error "Could not fetch latest release from $ELYTRA_REPO"
     exit 1
   fi
 
@@ -726,7 +725,7 @@ install_wings_daemon() {
 
   # Download binary
   output "Downloading Elytra binary..."
-  if ! download_release_asset "$WINGS_REPO" "$asset_name" "/usr/local/bin/elytra" "$GITHUB_TOKEN"; then
+  if ! download_release_asset "$ELYTRA_REPO" "$asset_name" "/usr/local/bin/elytra" "$GITHUB_TOKEN"; then
     error "Failed to download Elytra binary"
     exit 1
   fi
@@ -797,43 +796,43 @@ install_wings_daemon() {
   install_rustic
 
   # Get systemd service
-  output "Setting up Wings service..."
-  if ! get_config "wings.service" "/etc/systemd/system/wings.service"; then
-    error "Failed to get Wings service file"
+  output "Setting up Elytra service..."
+  if ! get_config "elytra.service" "/etc/systemd/system/elytra.service"; then
+    error "Failed to get Elytra service file"
     exit 1
   fi
 
   systemctl daemon-reload
-  systemctl enable wings
-  systemctl restart wings
+  systemctl enable elytra
+  systemctl restart elytra
 
   # Wait for service to start
   sleep 3
 
-  if systemctl is-active --quiet wings; then
-    success "Wings is running"
+  if systemctl is-active --quiet elytra; then
+    success "Elytra is running"
   else
-    warning "Wings service may not have started properly"
+    warning "Elytra service may not have started properly"
   fi
 
   # Set proper ownership and permissions on Elytra data directories (after service starts)
   output "Ensuring Elytra data directories exist..."
-  mkdir -p /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups
+  mkdir -p /var/lib/elytra/volumes /var/lib/elytra/archives /var/lib/elytra/backups
 
   output "Setting final permissions on Elytra data directories..."
-  chown -R 8888:8888 /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups "$ELYTRA_DIR" 2>/dev/null || true
+  chown -R 8888:8888 /var/lib/elytra/volumes /var/lib/elytra/archives /var/lib/elytra/backups "$ELYTRA_DIR" 2>/dev/null || true
 
   # Set full permissions so containers can read/write/execute
   # Note: 777 is required for containerized game servers to access these directories
-  # Ensure parent /var/lib/pterodactyl is accessible
-  chmod 755 /var/lib/pterodactyl 2>/dev/null || true
+  # Ensure parent /var/lib/elytra is accessible
+  chmod 755 /var/lib/elytra 2>/dev/null || true
   # Ensure the volumes directory itself and all contents have 777
-  chmod 777 /var/lib/pterodactyl/volumes 2>/dev/null || true
-  chmod -R 777 /var/lib/pterodactyl/volumes/* 2>/dev/null || true
-  chmod 777 /var/lib/pterodactyl/archives 2>/dev/null || true
-  chmod -R 777 /var/lib/pterodactyl/archives/* 2>/dev/null || true
-  chmod 777 /var/lib/pterodactyl/backups 2>/dev/null || true
-  chmod -R 777 /var/lib/pterodactyl/backups/* 2>/dev/null || true
+  chmod 777 /var/lib/elytra/volumes 2>/dev/null || true
+  chmod -R 777 /var/lib/elytra/volumes/* 2>/dev/null || true
+  chmod 777 /var/lib/elytra/archives 2>/dev/null || true
+  chmod -R 777 /var/lib/elytra/archives/* 2>/dev/null || true
+  chmod 777 /var/lib/elytra/backups 2>/dev/null || true
+  chmod -R 777 /var/lib/elytra/backups/* 2>/dev/null || true
   chmod -R 755 "$ELYTRA_DIR" 2>/dev/null || true
   [ -f "$ELYTRA_DIR/config.yml" ] && chmod 600 "$ELYTRA_DIR/config.yml" 2>/dev/null || true
 
@@ -903,8 +902,8 @@ install_auto_updaters() {
 
   if [ "$INSTALL_AUTO_UPDATER_ELYTRA" == true ]; then
     print_flame "Installing Elytra Auto-Updater"
-    export WINGS_REPO
-    export WINGS_REPO_PRIVATE
+    export ELYTRA_REPO
+    export ELYTRA_REPO_PRIVATE
     export GITHUB_TOKEN
     install_auto_updater_elytra
   fi
@@ -960,7 +959,7 @@ main() {
   setup_database_host "$PANEL_FQDN"
 
   # Elytra installation
-  install_wings_daemon
+  install_elytra_daemon
 
   # Create Minecraft server if requested and API key is available
   if [ "$CREATE_MINECRAFT_SERVER" == "true" ] && [ -n "$PANEL_API_KEY" ]; then
@@ -1001,7 +1000,7 @@ main() {
   print_flame "Installation Complete!"
 
   echo ""
-  output "🎉 Hydrodactyl Panel and Wings have been successfully installed!"
+  output "🎉 Hydrodactyl Panel and Elytra have been successfully installed!"
   echo ""
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   output "  Panel Information"
@@ -1062,19 +1061,22 @@ main() {
 
   output "Service Commands:"
   output "  ${COLOR_ORANGE}systemctl status hydroq${COLOR_NC}    - Panel queue worker"
-  output "  ${COLOR_ORANGE}systemctl status wings${COLOR_NC}     - Wings daemon"
-  output "  ${COLOR_ORANGE}journalctl -u wings -f${COLOR_NC}    - View Wings logs"
+  output "  ${COLOR_ORANGE}systemctl status elytra${COLOR_NC}    - Elytra daemon"
+  output "  ${COLOR_ORANGE}journalctl -u elytra -f${COLOR_NC}   - View Elytra logs"
   echo ""
 
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   output "  Manual Reconfiguration"
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  output "If you need to reconfigure Wings manually, run:"
+  output "If you need to reconfigure Elytra manually, run:"
   output ""
-  output "  ${COLOR_ORANGE}cd /etc/pterodactyl && sudo wings configure \\"
+  output "  ${COLOR_ORANGE}cd /etc/elytra && sudo elytra configure \\"
   output "    --panel-url 'https://${PANEL_FQDN}' \\"
   output "    --token '<your-api-key>' \\"
   output "    --node '${NODE_ID}'${COLOR_NC}"
+  output ""
+  output "Or use the installer function (if running the installer):"
+  output "  ${COLOR_ORANGE}configure_elytra 'https://${PANEL_FQDN}' '<api-key>' '${NODE_ID}'${COLOR_NC}"
   echo ""
 
   print_brake 70
@@ -1094,7 +1096,7 @@ main() {
   save_panel_install_info "install"
 
   # Save Elytra installation information
-  save_wings_install_info "install"
+  save_elytra_install_info "install"
 
   # Show completion screen
   show_both_completion

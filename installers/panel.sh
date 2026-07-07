@@ -31,7 +31,7 @@ fi
 
 # ------------------ Variables ----------------- #
 
-PANEL_REPO="${PANEL_REPO:-blueprintframework/hydrodactyl}"
+PANEL_REPO="${PANEL_REPO:-BlueprintFramework/hydrodactyl}"
 PANEL_INSTALL_METHOD="${PANEL_INSTALL_METHOD:-release}"
 PANEL_FQDN="${PANEL_FQDN:-}"
 PANEL_TIMEZONE="${PANEL_TIMEZONE:-UTC}"

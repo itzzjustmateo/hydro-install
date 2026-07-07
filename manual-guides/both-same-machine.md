@@ -1,6 +1,4 @@
-# Hydrodactyl Panel + Elytra Daemon - Same Machine Installation Guide (Deprecated)
-
-> ⚠️ **Elytra is no longer supported.** This guide is kept for reference only. Existing users should migrate to **Wings** or **Wings-RS** ([https://github.com/calagopus/wings](https://github.com/calagopus/wings)) as a replacement daemon.
+# Hydrodactyl Panel + Elytra Daemon - Same Machine Installation Guide
 
 This guide covers installing both the Hydrodactyl Panel and Elytra Daemon on the same physical or virtual server. This setup is suitable for small deployments, development environments, or single-node installations.
 
@@ -224,7 +222,7 @@ cd /var/www/hydrodactyl
 
 ### Download Panel
 ```bash
-curl -Lo panel.tar.gz $(curl -s https://api.github.com/repos/hydrodactyl-oss/hydrodactyl/releases/latest | grep "tarball_url" | cut -d'"' -f4)
+curl -Lo panel.tar.gz $(curl -s https://api.github.com/repos/BlueprintFramework/hydrodactyl/releases/latest | grep "tarball_url" | cut -d'"' -f4)
 tar -xzf panel.tar.gz --strip-components=1
 rm panel.tar.gz
 ```
@@ -814,7 +812,7 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 
 ## Support
 
-- Hydrodactyl Issues: https://github.com/hydrodactyl-oss/hydrodactyl/issues
+- Hydrodactyl Issues: https://github.com/BlueprintFramework/hydrodactyl/issues
 - Elytra Issues: https://github.com/pyrohost/elytra/issues
 - Docker Docs: https://docs.docker.com/
 - Community Discord: [Hydrodactyl Community]

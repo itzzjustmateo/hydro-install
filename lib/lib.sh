@@ -6,7 +6,7 @@ set -e
 #                                                                                    #
 # Hydrodactyl Installer Library                                                       #
 #                                                                                    #
-# Copyright (C) 2025, ItzzMateo Studios                                             #
+# Copyright (C) 2025, Muspelheim Hosting                                             #
 #                                                                                    #
 # https://github.com/itzzjustmateo/hydro-install                         #
 #                                                                                    #
@@ -23,10 +23,8 @@ export GITHUB_URL="$GITHUB_BASE_URL/$GITHUB_SOURCE"
 
 # ------------------ Default Repositories ----------------- #
 
-export DEFAULT_PANEL_REPO="blueprintframework/hydrodactyl"
-export DEFAULT_ELYTRA_REPO="pterodactyl/wings"
-export DEFAULT_WINGS_REPO="pterodactyl/wings"
-export DEFAULT_WINGS_RS_REPO="calagopus/wings"
+export DEFAULT_PANEL_REPO="BlueprintFramework/hydrodactyl"
+export DEFAULT_ELYTRA_REPO="pyrohost/elytra"
 
 # ------------------ Path Configuration ----------------- #
 
@@ -142,17 +140,17 @@ print_header() {
   # Flame gradient header - smooth color transition from top to bottom
   echo -e "${GRADIENT_1}    ╔══════════════════════════════════════════════════════════════════════════════════════╗"
   echo -e "${GRADIENT_2}    ║                                                                                      ║"
-  echo -e "${GRADIENT_3}    ║  ___ ___            .___                 .___              __          .__           ║"
-  echo -e "${GRADIENT_4}    ║ /   |   \ ___.__ __| _/______  ____   __| _/____    _____/  |_ ___.__.|  |          ║"
-  echo -e "${GRADIENT_5}    ║/    ~    <   |  |/ __ |\_  __ \/  _ \ / __ |\__  \ _/ ___\   __<   |  ||  |         ║"
-  echo -e "${GRADIENT_6}    ║\    Y    /\___  / /_/ | |  | \(  <_> ) /_/ | / __ \\  \___|  |  \___  ||  |__       ║"
-  echo -e "${GRADIENT_7}    ║ \___|_  / / ____\____ | |__|   \____/\____ |(____  /\___  >__|  / ____||____/       ║"
-  echo -e "${GRADIENT_8}    ║       \/  \/         \/                   \/     \/     \/      \/                   ║"
+  echo -e "${GRADIENT_3}    ║  ███╗   ███╗██╗   ██╗███████╗██████╗ ███████╗██╗     ██╗  ██╗███████╗██╗███╗   ███╗  ║"
+  echo -e "${GRADIENT_4}    ║  ████╗ ████║██║   ██║██╔════╝██╔══██╗██╔════╝██║     ██║  ██║██╔════╝██║████╗ ████║  ║"
+  echo -e "${GRADIENT_5}    ║  ██╔████╔██║██║   ██║███████╗██████╔╝█████╗  ██║     ███████║█████╗  ██║██╔████╔██║  ║"
+  echo -e "${GRADIENT_6}    ║  ██║╚██╔╝██║██║   ██║╚════██║██╔═══╝ ██╔══╝  ██║     ██╔══██║██╔══╝  ██║██║╚██╔╝██║  ║"
+  echo -e "${GRADIENT_7}    ║  ██║ ╚═╝ ██║╚██████╔╝███████║██║     ███████╗███████╗██║  ██║███████╗██║██║ ╚═╝ ██║  ║"
+  echo -e "${GRADIENT_8}    ║  ╚═╝     ╚═╝ ╚═════╝ ╚══════╝╚═╝     ╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝╚═╝╚═╝     ╚═╝  ║"
   echo -e "${GRADIENT_9}    ║                                                                                      ║"
-  echo -e "${GRADIENT_10}    ║                           Hydrodactyl Installation Manager                           ║"
+  echo -e "${GRADIENT_10}    ║                            Hydrodactyl Installation Manager                           ║"
   echo -e "${GRADIENT_11}    ╚══════════════════════════════════════════════════════════════════════════════════════╝"
   echo -e "${COLOR_NC}"
-  echo -e "    ${COLOR_ORANGE}Version:${COLOR_NC} ${SCRIPT_RELEASE}  ${COLOR_ORANGE}|${COLOR_NC}  ${COLOR_ORANGE}By:${COLOR_NC} ItzzMateo Studios"
+  echo -e "    ${COLOR_ORANGE}Version:${COLOR_NC} ${SCRIPT_RELEASE}  ${COLOR_ORANGE}|${COLOR_NC}  ${COLOR_ORANGE}By:${COLOR_NC} Muspelheim Hosting"
   echo ""
 }
 
@@ -204,10 +202,10 @@ welcome() {
     echo -e "  ${COLOR_RED}✗${COLOR_NC} Panel not installed"
   fi
 
-  if [ -f "/usr/local/bin/wings" ]; then
-    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Wings installed"
+  if [ -f "/usr/local/bin/elytra" ]; then
+    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Elytra installed"
   else
-    echo -e "  ${COLOR_RED}✗${COLOR_NC} Wings not installed"
+    echo -e "  ${COLOR_RED}✗${COLOR_NC} Elytra not installed"
   fi
 
   if systemctl is-enabled --quiet hydrodactyl-panel-auto-update.timer 2>/dev/null; then
@@ -216,10 +214,10 @@ welcome() {
     echo -e "  ${COLOR_RED}✗${COLOR_NC} Panel auto-updater not installed"
   fi
 
-  if systemctl is-enabled --quiet hydrodactyl-wings-auto-update.timer 2>/dev/null; then
-    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Wings auto-updater enabled"
+  if systemctl is-enabled --quiet hydrodactyl-elytra-auto-update.timer 2>/dev/null; then
+    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Elytra auto-updater enabled"
   else
-    echo -e "  ${COLOR_RED}✗${COLOR_NC} Wings auto-updater not installed"
+    echo -e "  ${COLOR_RED}✗${COLOR_NC} Elytra auto-updater not installed"
   fi
 
   echo ""
@@ -578,46 +576,6 @@ check_docker_compatibility() {
   return 0
 }
 
-# Ask which Wings variant to install
-select_wings_variant() {
-  echo ""
-  output "Which Wings variant would you like to install?"
-  echo ""
-  output "[${COLOR_ORANGE}0${COLOR_NC}] Pterodactyl Wings (Go)"
-  output "    The official Pterodactyl server daemon, written in Go."
-  output "    Most stable, widely used, and battle-tested in production."
-  output "    Best for: production environments, maximum compatibility."
-  echo ""
-  output "[${COLOR_ORANGE}1${COLOR_NC}] wings-rs (Rust)"
-  output "    A lightweight Rust reimplementation of Wings."
-  output "    Lower memory usage, faster startup, additional features."
-  output "    Best for: resource-constrained servers, advanced users."
-  echo ""
-
-  local variant_choice=""
-  while [[ "$variant_choice" != "0" && "$variant_choice" != "1" ]]; do
-    echo -n "* Select [0-1]: "
-    read -r variant_choice
-    if [[ "$variant_choice" != "0" && "$variant_choice" != "1" ]]; then
-      error "Invalid selection. Please enter 0 or 1."
-    fi
-  done
-
-  if [ "$variant_choice" == "0" ]; then
-    WINGS_VARIANT="go"
-    WINGS_REPO="${WINGS_REPO:-$DEFAULT_WINGS_REPO}"
-    export WINGS_VARIANT="go"
-    export WINGS_REPO
-    output "Selected: Pterodactyl Wings (Go)"
-  else
-    WINGS_VARIANT="rs"
-    WINGS_REPO="${WINGS_REPO:-$DEFAULT_WINGS_RS_REPO}"
-    export WINGS_VARIANT="rs"
-    export WINGS_REPO
-    output "Selected: wings-rs (Rust)"
-  fi
-}
-
 # ------------------ Validation Functions ----------------- #
 
 check_fqdn() {
@@ -681,8 +639,8 @@ check_existing_installation() {
   if [ "$component" == "panel" ] && [ -d "/var/www/hydrodactyl" ]; then
     warning "Existing panel installation detected at /var/www/hydrodactyl"
     has_existing=true
-  elif [ "$component" == "elytra" ] && [ -f "/usr/local/bin/wings" ]; then
-    warning "Existing Wings installation detected at /usr/local/bin/wings"
+  elif [ "$component" == "elytra" ] && [ -f "/usr/local/bin/elytra" ]; then
+    warning "Existing Elytra installation detected at /usr/local/bin/elytra"
     has_existing=true
   fi
 
@@ -2163,7 +2121,7 @@ install_hydroq() {
   output "Installing queue worker service..."
 
   # Get service file
-  if ! get_config "pyroq.service" "/etc/systemd/system/hydroq.service"; then
+  if ! get_config "hydroq.service" "/etc/systemd/system/hydroq.service"; then
     exit 1
   fi
 
@@ -2297,7 +2255,7 @@ install_auto_updater_panel() {
   fi
 
   # Create config
-  echo "PANEL_REPO=\"${PANEL_REPO:-blueprintframework/hydrodactyl}\"" > /etc/hydrodactyl/auto-update-panel.env
+  echo "PANEL_REPO=\"${PANEL_REPO:-BlueprintFramework/hydrodactyl}\"" > /etc/hydrodactyl/auto-update-panel.env
   echo "GITHUB_TOKEN=\"${GITHUB_TOKEN:-}\"" >> /etc/hydrodactyl/auto-update-panel.env
   echo "UPDATE_METHOD=\"${update_method}\"" >> /etc/hydrodactyl/auto-update-panel.env
   echo "PANEL_REPO_PRIVATE=\"${PANEL_REPO_PRIVATE:-false}\"" >> /etc/hydrodactyl/auto-update-panel.env
@@ -2320,44 +2278,40 @@ install_auto_updater_panel() {
 }
 
 install_auto_updater_elytra() {
-  output "Installing Wings auto-updater..."
+  output "Installing Elytra auto-updater..."
 
   mkdir -p /etc/hydrodactyl
 
   # Get auto-update script
-  if ! get_script "installers" "auto-update-wings" "/usr/local/bin/hydrodactyl-auto-update-wings.sh"; then
+  if ! get_script "installers" "auto-update-elytra" "/usr/local/bin/hydrodactyl-auto-update-elytra.sh"; then
     error "Failed to get auto-update script"
     exit 1
   fi
 
-  # Wings always uses release-based updates (distributed as binary)
-  output "Wings uses release-based updates"
+  # Elytra always uses release-based updates (distributed as binary)
+  output "Elytra uses release-based updates"
 
   # Create config
-  echo "WINGS_REPO=\"${WINGS_REPO:-pterodactyl/wings}\"" > /etc/hydrodactyl/auto-update-wings.env
-  echo "GITHUB_TOKEN=\"${GITHUB_TOKEN:-}\"" >> /etc/hydrodactyl/auto-update-wings.env
-  echo "UPDATE_METHOD=\"releases\"" >> /etc/hydrodactyl/auto-update-wings.env
-  echo "WINGS_REPO_PRIVATE=\"${WINGS_REPO_PRIVATE:-false}\"" >> /etc/hydrodactyl/auto-update-wings.env
-  chmod 600 /etc/hydrodactyl/auto-update-wings.env
+  echo "ELYTRA_REPO=\"${ELYTRA_REPO:-pyrohost/elytra}\"" > /etc/hydrodactyl/auto-update-elytra.env
+  echo "GITHUB_TOKEN=\"${GITHUB_TOKEN:-}\"" >> /etc/hydrodactyl/auto-update-elytra.env
+  echo "UPDATE_METHOD=\"releases\"" >> /etc/hydrodactyl/auto-update-elytra.env
+  echo "ELYTRA_REPO_PRIVATE=\"${ELYTRA_REPO_PRIVATE:-false}\"" >> /etc/hydrodactyl/auto-update-elytra.env
+  chmod 600 /etc/hydrodactyl/auto-update-elytra.env
 
   # Get systemd service
-  if ! get_config "auto-update-wings.service" "/etc/systemd/system/hydrodactyl-wings-auto-update.service"; then
+  if ! get_config "auto-update-elytra.service" "/etc/systemd/system/hydrodactyl-elytra-auto-update.service"; then
     exit 1
   fi
 
   # Get systemd timer
-  if ! get_config "auto-update-wings.timer" "/etc/systemd/system/hydrodactyl-wings-auto-update.timer"; then
+  if ! get_config "auto-update-elytra.timer" "/etc/systemd/system/hydrodactyl-elytra-auto-update.timer"; then
     exit 1
   fi
 
   systemctl daemon-reload
-  systemctl enable --now hydrodactyl-wings-auto-update.timer
+  systemctl enable --now hydrodactyl-elytra-auto-update.timer
 
-  success "Wings auto-updater installed"
-}
-
-install_auto_updater_wings() {
-  install_auto_updater_elytra
+  success "Elytra auto-updater installed"
 }
 
 remove_auto_updater_panel() {
@@ -2378,20 +2332,20 @@ remove_auto_updater_panel() {
 }
 
 remove_auto_updater_elytra() {
-  output "Removing Wings auto-updater..."
+  output "Removing Elytra auto-updater..."
 
-  systemctl stop hydrodactyl-wings-auto-update.timer 2>/dev/null || true
-  systemctl disable hydrodactyl-wings-auto-update.timer 2>/dev/null || true
+  systemctl stop hydrodactyl-elytra-auto-update.timer 2>/dev/null || true
+  systemctl disable hydrodactyl-elytra-auto-update.timer 2>/dev/null || true
 
-  rm -f /etc/systemd/system/hydrodactyl-wings-auto-update.service
-  rm -f /etc/systemd/system/hydrodactyl-wings-auto-update.timer
-  rm -f /usr/local/bin/hydrodactyl-auto-update-wings.sh
-  rm -f /etc/hydrodactyl/auto-update-wings.conf
-  rm -f /etc/hydrodactyl/auto-update-wings.env
+  rm -f /etc/systemd/system/hydrodactyl-elytra-auto-update.service
+  rm -f /etc/systemd/system/hydrodactyl-elytra-auto-update.timer
+  rm -f /usr/local/bin/hydrodactyl-auto-update-elytra.sh
+  rm -f /etc/hydrodactyl/auto-update-elytra.conf
+  rm -f /etc/hydrodactyl/auto-update-elytra.env
 
   systemctl daemon-reload
 
-  success "Wings auto-updater removed"
+  success "Elytra auto-updater removed"
 }
 
 # ------------------ Script Execution Functions ----------------- #

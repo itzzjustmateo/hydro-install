@@ -191,7 +191,7 @@ confirm_uninstall() {
     output "Panel removal includes:"
     output "  - Panel files (/var/www/hydrodactyl)"
     output "  - Nginx configuration"
-    output "  - Systemd services (pyroq)"
+    output "  - Systemd services (hydroq)"
     output "  - Cron jobs"
     echo ""
 

@@ -376,7 +376,7 @@ trigger_panel_update() {
   fi
   
   # Get latest version from GitHub
-  local panel_repo="${PANEL_REPO:-hydrodactyl-oss/hydrodactyl}"
+  local panel_repo="${PANEL_REPO:-BlueprintFramework/hydrodactyl}"
   local github_token="${GITHUB_TOKEN_PANEL:-$GITHUB_TOKEN}"
   local curl_opts=(-sL --max-time 10)
   if [ -n "$github_token" ]; then
