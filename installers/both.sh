@@ -653,7 +653,7 @@ create_node_in_panel() {
     --locationId="$location_id" \
     --fqdn="$PANEL_FQDN" \
     --public=1 \
-    --scheme=$(panel_scheme) \
+    --scheme="$(panel_scheme)" \
     --proxy=$([ "$BEHIND_PROXY" == "true" ] && echo "yes" || echo "no") \
     --maxMemory="$max_memory" \
     --overallocateMemory=0 \
@@ -912,7 +912,8 @@ install_auto_updaters() {
   fi
 
   if [ "$INSTALL_AUTO_UPDATER_ELYTRA" == true ]; then
-    print_flame "Installing Elytra Auto-Updater"
+    print_flame "Installing Wings Auto-Updater"
+    export WINGS_VARIANT
     export WINGS_REPO
     export WINGS_REPO_PRIVATE
     export GITHUB_TOKEN

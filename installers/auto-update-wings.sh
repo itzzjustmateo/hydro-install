@@ -26,7 +26,8 @@ if [ -f /etc/hydrodactyl/auto-update-wings.env ]; then
 fi
 
 # Default config (can be overridden by /etc/hydrodactyl/auto-update-wings.env)
-WINGS_REPO="${WINGS_REPO:-pyrohost/wings}"
+WINGS_VARIANT="${WINGS_VARIANT:-go}"
+WINGS_REPO="${WINGS_REPO:-pterodactyl/wings}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 INSTALL_DIR="${INSTALL_DIR:-/etc/wings}"
 LOG_FILE="${LOG_FILE:-/var/log/hydrodactyl-wings-auto-update.log}"
@@ -334,12 +335,18 @@ restart_wings() {
 get_download_url() {
   local version="$1"
 
-  # Determine architecture
+  # Determine architecture and asset name based on the installed Wings variant
   local arch
   arch=$(uname -m)
-  [[ $arch == x86_64 ]] && arch=amd64 || arch=arm64
 
-  local asset_name="wings_linux_${arch}"
+  local asset_name
+  if [ "$WINGS_VARIANT" == "rs" ]; then
+    [[ $arch == x86_64 ]] && arch=x86_64 || arch=aarch64
+    asset_name="wings-rs-${arch}-linux"
+  else
+    [[ $arch == x86_64 ]] && arch=amd64 || arch=arm64
+    asset_name="wings_linux_${arch}"
+  fi
 
   # Get asset download URL from GitHub API
   local release_info

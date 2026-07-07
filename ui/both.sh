@@ -479,8 +479,11 @@ configure_auto_updaters() {
     INSTALL_AUTO_UPDATER_PANEL=true
   fi
 
+  local elytra_au_label="Wings"
+  [ "$WINGS_VARIANT" == "rs" ] && elytra_au_label="Wings-RS"
+
   local install_elytra_au=""
-  bool_input install_elytra_au "Install auto-updater for Elytra?" "n" || true
+  bool_input install_elytra_au "Install auto-updater for ${elytra_au_label}?" "n" || true
   if [ "$install_elytra_au" == "y" ]; then
     INSTALL_AUTO_UPDATER_ELYTRA=true
   fi

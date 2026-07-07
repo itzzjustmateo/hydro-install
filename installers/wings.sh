@@ -691,6 +691,7 @@ install_auto_updater_if_requested() {
   if [ "$INSTALL_AUTO_UPDATER" == true ]; then
     print_flame "Installing Auto-Updater"
 
+    export WINGS_VARIANT
     export WINGS_REPO
     export WINGS_REPO_PRIVATE
     export GITHUB_TOKEN
