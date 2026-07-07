@@ -93,14 +93,6 @@ parse_arguments() {
         CONFIGURE_FIREWALL="false"
         shift
         ;;
-      --install-auto-updater)
-        INSTALL_AUTO_UPDATER="true"
-        shift
-        ;;
-      --no-auto-updater)
-        INSTALL_AUTO_UPDATER="false"
-        shift
-        ;;
       --behind-proxy)
         BEHIND_PROXY="true"
         shift
@@ -165,8 +157,6 @@ Resources (optional, auto-detected if not provided):
 Options:
   --configure-firewall           Enable firewall configuration
   --no-firewall                  Disable firewall configuration
-  --install-auto-updater         Install auto-updater
-  --no-auto-updater              Don't install auto-updater
   --behind-proxy                 Node is behind a proxy
   --assume-ssl                   Assume SSL is already configured
   --configure-letsencrypt        Obtain SSL certificate via Let's Encrypt
@@ -182,7 +172,7 @@ Examples:
 
   # With all options specified (completely unattended)
   elytra.sh --fqdn node.example.com --panel-url https://panel.example.com --api-key pyro_xxx \
-    --node-name "My Node" --memory 8192 --disk 100000 --configure-firewall --install-auto-updater
+    --node-name "My Node" --memory 8192 --disk 100000 --configure-firewall
 
   # Manual setup (will prompt for missing values)
   elytra.sh
@@ -217,9 +207,6 @@ FQDN="${FQDN:-}"
 CONFIGURE_FIREWALL="${CONFIGURE_FIREWALL:-false}"
 GAME_PORT_START="${GAME_PORT_START:-27015}"
 GAME_PORT_END="${GAME_PORT_END:-28025}"
-
-# Auto-updater
-INSTALL_AUTO_UPDATER="${INSTALL_AUTO_UPDATER:-false}"
 
 # GitHub
 ELYTRA_REPO_PRIVATE="${ELYTRA_REPO_PRIVATE:-false}"
@@ -783,20 +770,6 @@ configure_firewall() {
   fi
 }
 
-install_auto_updater_if_requested() {
-  if [ "$INSTALL_AUTO_UPDATER" == true ]; then
-    print_flame "Installing Auto-Updater"
-
-    export ELYTRA_REPO
-    export ELYTRA_REPO_PRIVATE
-    export GITHUB_TOKEN
-
-    install_auto_updater_elytra
-
-    success "Auto-updater installed"
-  fi
-}
-
 # ---------------- Main ---------------- #
 
 main() {
@@ -905,7 +878,6 @@ main() {
     auto_fix_elytra_issues || true
 
     configure_firewall
-    install_auto_updater_if_requested
     verify_connection
   fi
 
@@ -991,10 +963,6 @@ main() {
     echo ""
   fi
 
-  if [ "$INSTALL_AUTO_UPDATER" == true ]; then
-    output "Auto-updater is enabled and will check for updates hourly."
-    echo ""
-  fi
 
   print_brake 70
 

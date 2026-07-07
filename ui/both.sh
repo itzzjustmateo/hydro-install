@@ -47,8 +47,6 @@ PANEL_ADMIN_LASTNAME=""
 PANEL_ADMIN_PASSWORD=""
 CONFIGURE_LETSENCRYPT=false
 CONFIGURE_FIREWALL=false
-INSTALL_AUTO_UPDATER_PANEL=false
-INSTALL_AUTO_UPDATER_ELYTRA=false
 SSL_CERT_PATH=""
 SSL_KEY_PATH=""
 DB_HOST="127.0.0.1"
@@ -492,28 +490,6 @@ configure_minecraft_server() {
   fi
 }
 
-# ------------------ Auto-Updaters ----------------- #
-
-configure_auto_updaters() {
-  print_header
-  print_flame "Auto-Updater Configuration"
-
-  local install_panel_au=""
-  bool_input install_panel_au "Install auto-updater for the panel?" "n" || true
-  if [ "$install_panel_au" == "y" ]; then
-    INSTALL_AUTO_UPDATER_PANEL=true
-  fi
-
-  local elytra_au_label="Wings"
-  [ "$WINGS_VARIANT" == "rs" ] && elytra_au_label="Wings-RS"
-
-  local install_elytra_au=""
-  bool_input install_elytra_au "Install auto-updater for ${elytra_au_label}?" "n" || true
-  if [ "$install_elytra_au" == "y" ]; then
-    INSTALL_AUTO_UPDATER_ELYTRA=true
-  fi
-}
-
 # ------------------ Firewall ----------------- #
 
 configure_firewall_settings() {
@@ -539,7 +515,6 @@ show_summary() {
   echo -e "  ${COLOR_ORANGE}SSL:${COLOR_NC}               $([ "$CONFIGURE_LETSENCRYPT" == "true" ] && echo 'Let'\''s Encrypt' || ([ -n "$SSL_CERT_PATH" ] && echo 'Custom' || echo 'None'))"
   echo -e "  ${COLOR_ORANGE}Timezone:${COLOR_NC}          ${PANEL_TIMEZONE}"
   echo -e "  ${COLOR_ORANGE}Admin:${COLOR_NC}             ${PANEL_ADMIN_USERNAME} (${PANEL_ADMIN_EMAIL})"
-  echo -e "  ${COLOR_ORANGE}Auto-Updater:${COLOR_NC}      $([ "$INSTALL_AUTO_UPDATER_PANEL" == "true" ] && echo 'Yes' || echo 'No')"
   echo ""
 
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -552,7 +527,6 @@ show_summary() {
   echo -e "  ${COLOR_ORANGE}Node Name:${COLOR_NC}         ${NODE_NAME}"
   echo -e "  ${COLOR_ORANGE}Node Description:${COLOR_NC}  ${NODE_DESCRIPTION}"
   echo -e "  ${COLOR_ORANGE}Behind Proxy:${COLOR_NC}      $([ "$BEHIND_PROXY" == "true" ] && echo 'Yes' || echo 'No')"
-  echo -e "  ${COLOR_ORANGE}Auto-Updater:${COLOR_NC}      $([ "$INSTALL_AUTO_UPDATER_ELYTRA" == "true" ] && echo 'Yes' || echo 'No')"
   echo ""
 
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -601,9 +575,6 @@ export_variables() {
   export PANEL_ADMIN_PASSWORD
   export CONFIGURE_LETSENCRYPT
   export CONFIGURE_FIREWALL
-  export INSTALL_AUTO_UPDATER="$INSTALL_AUTO_UPDATER_PANEL"
-  export INSTALL_AUTO_UPDATER_PANEL
-  export INSTALL_AUTO_UPDATER_ELYTRA
   export SSL_CERT_PATH
   export SSL_KEY_PATH
   export DB_HOST
@@ -638,7 +609,6 @@ main() {
   configure_panel_repository
   configure_panel_settings
   configure_elytra_settings
-  configure_auto_updaters
   configure_minecraft_server
   configure_firewall_settings
   show_summary

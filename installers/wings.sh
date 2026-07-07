@@ -90,14 +90,6 @@ parse_arguments() {
         CONFIGURE_FIREWALL="false"
         shift
         ;;
-      --install-auto-updater)
-        INSTALL_AUTO_UPDATER="true"
-        shift
-        ;;
-      --no-auto-updater)
-        INSTALL_AUTO_UPDATER="false"
-        shift
-        ;;
       --behind-proxy)
         BEHIND_PROXY="true"
         shift
@@ -163,8 +155,6 @@ Options:
   --variant <go|rs>              Wings variant: go (Pterodactyl) or rs (wings-rs)
   --configure-firewall           Enable firewall configuration
   --no-firewall                  Disable firewall configuration
-  --install-auto-updater         Install auto-updater
-  --no-auto-updater              Don't install auto-updater
   --behind-proxy                 Node is behind a proxy
   --assume-ssl                   Assume SSL is already configured
   --configure-letsencrypt        Obtain SSL certificate via Let's Encrypt
@@ -202,8 +192,6 @@ FQDN="${FQDN:-}"
 CONFIGURE_FIREWALL="${CONFIGURE_FIREWALL:-false}"
 GAME_PORT_START="${GAME_PORT_START:-27015}"
 GAME_PORT_END="${GAME_PORT_END:-28025}"
-
-INSTALL_AUTO_UPDATER="${INSTALL_AUTO_UPDATER:-false}"
 
 WINGS_REPO_PRIVATE="${WINGS_REPO_PRIVATE:-false}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
@@ -687,21 +675,6 @@ configure_firewall() {
   fi
 }
 
-install_auto_updater_if_requested() {
-  if [ "$INSTALL_AUTO_UPDATER" == true ]; then
-    print_flame "Installing Auto-Updater"
-
-    export WINGS_VARIANT
-    export WINGS_REPO
-    export WINGS_REPO_PRIVATE
-    export GITHUB_TOKEN
-
-    install_auto_updater_wings
-
-    success "Auto-updater installed"
-  fi
-}
-
 # ---------------- Main ---------------- #
 
 main() {
@@ -790,7 +763,6 @@ main() {
     start_wings
 
     configure_firewall
-    install_auto_updater_if_requested
     verify_connection
   fi
 
@@ -861,10 +833,6 @@ main() {
     echo ""
   fi
 
-  if [ "$INSTALL_AUTO_UPDATER" == true ]; then
-    output "Auto-updater is enabled and will check for updates hourly."
-    echo ""
-  fi
 
   print_brake 70
 

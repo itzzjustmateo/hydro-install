@@ -76,8 +76,6 @@ BEHIND_PROXY="${BEHIND_PROXY:-false}"
 CONFIGURE_FIREWALL="${CONFIGURE_FIREWALL:-false}"
 GAME_PORT_START="${GAME_PORT_START:-27015}"
 GAME_PORT_END="${GAME_PORT_END:-28025}"
-INSTALL_AUTO_UPDATER_PANEL="${INSTALL_AUTO_UPDATER_PANEL:-false}"
-INSTALL_AUTO_UPDATER_ELYTRA="${INSTALL_AUTO_UPDATER_ELYTRA:-false}"
 
 # GitHub
 PANEL_REPO_PRIVATE="${PANEL_REPO_PRIVATE:-false}"
@@ -907,25 +905,6 @@ configure_firewall() {
   fi
 }
 
-install_auto_updaters() {
-  if [ "$INSTALL_AUTO_UPDATER_PANEL" == true ]; then
-    print_flame "Installing Panel Auto-Updater"
-    export PANEL_REPO
-    export PANEL_REPO_PRIVATE
-    export GITHUB_TOKEN
-    install_auto_updater_panel
-  fi
-
-  if [ "$INSTALL_AUTO_UPDATER_ELYTRA" == true ]; then
-    print_flame "Installing Wings Auto-Updater"
-    export WINGS_VARIANT
-    export WINGS_REPO
-    export WINGS_REPO_PRIVATE
-    export GITHUB_TOKEN
-    install_auto_updater_elytra
-  fi
-}
-
 # ---------------- Main ---------------- #
 
 main() {
@@ -1005,9 +984,6 @@ main() {
   # Firewall
   configure_firewall
 
-  # Auto-updaters
-  install_auto_updaters
-
   # Pause to let user review logs before showing completion screen
   echo ""
   output "Installation finished, press Enter to view details..."
@@ -1070,11 +1046,6 @@ main() {
   echo ""
   output "Both components are configured to work together on this machine!"
   echo ""
-
-  if [ "$INSTALL_AUTO_UPDATER_PANEL" == true ] || [ "$INSTALL_AUTO_UPDATER_ELYTRA" == true ]; then
-    output "✅ Auto-updaters are enabled and will check for updates hourly."
-    echo ""
-  fi
 
   output "Service Commands:"
   output "  ${COLOR_ORANGE}systemctl status hydroq${COLOR_NC}    - Panel queue worker"

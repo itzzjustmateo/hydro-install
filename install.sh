@@ -267,8 +267,6 @@ check_installations() {
   ELYTRA_INSTALLED=false
   PANEL_VERSION=""
   ELYTRA_VERSION=""
-  PANEL_UPDATER_INSTALLED=false
-  ELYTRA_UPDATER_INSTALLED=false
 
   # Check for Hydrodactyl
   if [ -d "/var/www/hydrodactyl" ]; then
@@ -284,14 +282,6 @@ check_installations() {
     if [ -f "/etc/hydrodactyl/wings-version" ]; then
       ELYTRA_VERSION=$(cat "/etc/hydrodactyl/wings-version" 2>/dev/null || echo "")
     fi
-  fi
-
-  if systemctl is-enabled --quiet hydrodactyl-panel-auto-update.timer 2>/dev/null; then
-    PANEL_UPDATER_INSTALLED=true
-  fi
-
-  if systemctl is-enabled --quiet hydrodactyl-wings-auto-update.timer 2>/dev/null; then
-    ELYTRA_UPDATER_INSTALLED=true
   fi
 }
 
@@ -322,18 +312,6 @@ show_welcome() {
     echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Wings installed${ELYTRA_VERSION:+ ($ELYTRA_VERSION)}"
   else
     echo -e "  ${COLOR_RED}✗${COLOR_NC} Wings not installed"
-  fi
-
-  if [ "$PANEL_UPDATER_INSTALLED" == true ]; then
-    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Panel auto-updater enabled"
-  else
-    echo -e "  ${COLOR_RED}✗${COLOR_NC} Panel auto-updater not installed"
-  fi
-
-  if [ "$ELYTRA_UPDATER_INSTALLED" == true ]; then
-    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Wings auto-updater enabled"
-  else
-    echo -e "  ${COLOR_RED}✗${COLOR_NC} Wings auto-updater not installed"
   fi
 
   echo ""
@@ -456,22 +434,20 @@ show_menu() {
     fi
 
     echo ""
-    output "[${COLOR_ORANGE}6${COLOR_NC}] Auto Updater Management"
+    output "[${COLOR_ORANGE}6${COLOR_NC}] Repair / Fix Common Issues"
     echo ""
-    output "[${COLOR_ORANGE}7${COLOR_NC}] Repair / Fix Common Issues"
+    output "[${COLOR_ORANGE}7${COLOR_NC}] Health Check"
     echo ""
-    output "[${COLOR_ORANGE}8${COLOR_NC}] Health Check"
+    output "[${COLOR_ORANGE}8${COLOR_NC}] Uninstall Hydrodactyl / Wings"
     echo ""
-    output "[${COLOR_ORANGE}9${COLOR_NC}] Uninstall Hydrodactyl / Wings"
+    output "[${COLOR_ORANGE}9${COLOR_NC}] View Installation Information"
     echo ""
-    output "[${COLOR_ORANGE}10${COLOR_NC}] View Installation Information"
+    output "[${COLOR_ORANGE}10${COLOR_NC}] Remove Other Panels (Struxa, Pterodactyl, Dokploy, Coolify)"
     echo ""
-    output "[${COLOR_ORANGE}11${COLOR_NC}] Remove Other Panels (Struxa, Pterodactyl, Dokploy, Coolify)"
-    echo ""
-    output "[${COLOR_ORANGE}12${COLOR_NC}] Exit"
+    output "[${COLOR_ORANGE}11${COLOR_NC}] Exit"
     echo ""
 
-    echo -n "* Select an option [0-12]: "
+    echo -n "* Select an option [0-11]: "
     read -r choice
 
     case "$choice" in
@@ -515,14 +491,10 @@ show_menu() {
         continue
         ;;
       6)
-        execute_ui "auto-updater-menu"
-        continue
-        ;;
-      7)
         execute_ui "repair"
         continue
         ;;
-      8)
+      7)
         # Health Check - runs based on what's installed
         if [ "$PANEL_INSTALLED" == true ] && [ "$ELYTRA_INSTALLED" == true ]; then
           check_both_health
@@ -539,15 +511,15 @@ show_menu() {
         read -r
         continue
         ;;
-      9)
+      8)
         execute_ui "uninstall"
         continue
         ;;
-      10)
+      9)
         execute_ui "view-info"
         continue
         ;;
-      11)
+      10)
         # Remove other panels
         local detected_panels
         detected_panels=($(detect_installed_panels))
@@ -600,12 +572,12 @@ show_menu() {
         read -r
         continue
         ;;
-      12)
+      11)
         output "Exiting..."
         exit 0
         ;;
       *)
-        error "Invalid option. Please select 0-12."
+        error "Invalid option. Please select 0-11."
         ;;
     esac
   done

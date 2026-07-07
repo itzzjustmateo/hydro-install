@@ -2747,92 +2747,14 @@ restart_hydroq() {
   fi
 }
 
-# ------------------ Auto-Updater Functions ----------------- #
-
-install_auto_updater_panel() {
-  output "Installing Panel auto-updater..."
-
-  mkdir -p /etc/hydrodactyl
-
-  # Get auto-update script
-  if ! get_script "installers" "auto-update-panel" "/usr/local/bin/hydrodactyl-auto-update-panel.sh"; then
-    error "Failed to get auto-update script"
-    exit 1
-  fi
-
-  # Auto-detect update method based on installation type
-  local update_method="releases"
-  if [ -d "/var/www/hydrodactyl/.git" ]; then
-    update_method="git"
-    output "Detected git-based installation - will use git for updates"
-  else
-    output "Detected release-based installation - will check GitHub releases"
-  fi
-
-  # Create config
-  echo "PANEL_REPO=\"${PANEL_REPO:-BlueprintFramework/hydrodactyl}\"" > /etc/hydrodactyl/auto-update-panel.env
-  echo "GITHUB_TOKEN=\"${GITHUB_TOKEN:-}\"" >> /etc/hydrodactyl/auto-update-panel.env
-  echo "UPDATE_METHOD=\"${update_method}\"" >> /etc/hydrodactyl/auto-update-panel.env
-  echo "PANEL_REPO_PRIVATE=\"${PANEL_REPO_PRIVATE:-false}\"" >> /etc/hydrodactyl/auto-update-panel.env
-  chmod 600 /etc/hydrodactyl/auto-update-panel.env
-
-  # Get systemd service
-  if ! get_config "auto-update-panel.service" "/etc/systemd/system/hydrodactyl-panel-auto-update.service"; then
-    exit 1
-  fi
-
-  # Get systemd timer
-  if ! get_config "auto-update-panel.timer" "/etc/systemd/system/hydrodactyl-panel-auto-update.timer"; then
-    exit 1
-  fi
-
-  systemctl daemon-reload
-  systemctl enable --now hydrodactyl-panel-auto-update.timer
-
-  success "Panel auto-updater installed"
-}
-
-install_auto_updater_elytra() {
-  output "Installing Wings auto-updater..."
-
-  mkdir -p /etc/hydrodactyl
-
-  # Get auto-update script
-  if ! get_script "installers" "auto-update-wings" "/usr/local/bin/hydrodactyl-auto-update-wings.sh"; then
-    error "Failed to get auto-update script"
-    exit 1
-  fi
-
-  # Wings always uses release-based updates (distributed as binary)
-  output "Wings uses release-based updates"
-
-  # Create config
-  echo "WINGS_REPO=\"${WINGS_REPO:-pterodactyl/wings}\"" > /etc/hydrodactyl/auto-update-wings.env
-  echo "WINGS_VARIANT=\"${WINGS_VARIANT:-go}\"" >> /etc/hydrodactyl/auto-update-wings.env
-  echo "GITHUB_TOKEN=\"${GITHUB_TOKEN:-}\"" >> /etc/hydrodactyl/auto-update-wings.env
-  echo "UPDATE_METHOD=\"releases\"" >> /etc/hydrodactyl/auto-update-wings.env
-  echo "WINGS_REPO_PRIVATE=\"${WINGS_REPO_PRIVATE:-false}\"" >> /etc/hydrodactyl/auto-update-wings.env
-  chmod 600 /etc/hydrodactyl/auto-update-wings.env
-
-  # Get systemd service
-  if ! get_config "auto-update-wings.service" "/etc/systemd/system/hydrodactyl-wings-auto-update.service"; then
-    exit 1
-  fi
-
-  # Get systemd timer
-  if ! get_config "auto-update-wings.timer" "/etc/systemd/system/hydrodactyl-wings-auto-update.timer"; then
-    exit 1
-  fi
-
-  systemctl daemon-reload
-  systemctl enable --now hydrodactyl-wings-auto-update.timer
-
-  success "Wings auto-updater installed"
-}
-
-install_auto_updater_wings() {
-  install_auto_updater_elytra
-}
+# ------------------ Auto-Updater Removal Functions ----------------- #
+#
+# Scheduled (systemd timer based) auto-updates have been removed - they were
+# a recurring source of unattended-breakage reports. Updating is still fully
+# supported as an on-demand action via install.sh's "Update Panel/Wings/Both"
+# menu options, which invoke installers/auto-update-{panel,wings}.sh directly.
+# These remove_* functions are kept so installers/uninstall.sh can still clean
+# up a scheduled auto-updater left over from an older install.
 
 remove_auto_updater_panel() {
   output "Removing Panel auto-updater..."

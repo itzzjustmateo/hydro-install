@@ -46,7 +46,6 @@ PANEL_ADMIN_LASTNAME=""
 PANEL_ADMIN_PASSWORD=""
 CONFIGURE_LETSENCRYPT=false
 CONFIGURE_FIREWALL=false
-INSTALL_AUTO_UPDATER=false
 SSL_CERT_PATH=""
 SSL_KEY_PATH=""
 DB_HOST="127.0.0.1"
@@ -412,25 +411,6 @@ configure_admin_account() {
 
 # ------------------ Auto-Updater ----------------- #
 
-configure_auto_updater() {
-  print_header
-  print_flame "Auto-Updater Configuration"
-
-  output "Auto-updaters allow automatic updates but may cause unexpected downtime."
-  output "You can always install them later from the installer menu."
-  echo ""
-
-  local install_auto_update=""
-  bool_input install_auto_update "Install auto-updater for the panel?" "n"
-
-  if [ "$install_auto_update" == "y" ]; then
-    INSTALL_AUTO_UPDATER=true
-    output "Auto-updater will be installed"
-  else
-    output "Auto-updater will not be installed"
-  fi
-}
-
 # ------------------ Firewall ----------------- #
 
 configure_firewall() {
@@ -455,7 +435,6 @@ show_summary() {
   echo -e "  ${COLOR_ORANGE}Database:${COLOR_NC}          ${DB_NAME}@${DB_HOST}:${DB_PORT}"
   echo -e "  ${COLOR_ORANGE}Timezone:${COLOR_NC}          ${PANEL_TIMEZONE}"
   echo -e "  ${COLOR_ORANGE}Admin Email:${COLOR_NC}       ${PANEL_ADMIN_EMAIL}"
-  echo -e "  ${COLOR_ORANGE}Auto-Updater:${COLOR_NC}      $([ "$INSTALL_AUTO_UPDATER" == "true" ] && echo 'Yes' || echo 'No')"
   echo -e "  ${COLOR_ORANGE}Firewall:${COLOR_NC}          $([ "$CONFIGURE_FIREWALL" == "true" ] && echo 'Yes' || echo 'No')"
   echo ""
 
@@ -485,7 +464,6 @@ export_variables() {
   export PANEL_ADMIN_PASSWORD
   export CONFIGURE_LETSENCRYPT
   export CONFIGURE_FIREWALL
-  export INSTALL_AUTO_UPDATER
   export SSL_CERT_PATH
   export SSL_KEY_PATH
   export DB_HOST
@@ -508,7 +486,6 @@ main() {
   configure_database
   configure_timezone
   configure_admin_account
-  configure_auto_updater
   configure_firewall
   show_summary
 

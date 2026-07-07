@@ -46,7 +46,6 @@ CONFIGURE_LETSENCRYPT="${CONFIGURE_LETSENCRYPT:-false}"
 SSL_CERT_PATH="${SSL_CERT_PATH:-}"
 SSL_KEY_PATH="${SSL_KEY_PATH:-}"
 CONFIGURE_FIREWALL="${CONFIGURE_FIREWALL:-false}"
-INSTALL_AUTO_UPDATER="${INSTALL_AUTO_UPDATER:-false}"
 PANEL_REPO_PRIVATE="${PANEL_REPO_PRIVATE:-false}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 
@@ -541,24 +540,6 @@ configure_firewall() {
   success "Firewall configured"
 }
 
-# ------------------ Auto-Updater ----------------- #
-
-setup_auto_updater() {
-  if [ "$INSTALL_AUTO_UPDATER" != true ]; then
-    return 0
-  fi
-
-  print_flame "Installing Auto-Updater"
-
-  export PANEL_REPO
-  export PANEL_REPO_PRIVATE
-  export GITHUB_TOKEN
-
-  install_auto_updater_panel
-
-  success "Auto-updater installed"
-}
-
 # ------------------ Main ----------------- #
 
 main() {
@@ -609,7 +590,6 @@ main() {
   fi
 
   configure_firewall
-  setup_auto_updater
 
   # Final output
   print_header
@@ -639,11 +619,6 @@ main() {
     output "Save this API key! You can use it to automatically configure"
     output "Elytra without manually entering node ID and token."
     output "When running elytra.sh, enter this API key when prompted."
-    echo ""
-  fi
-
-  if [ "$INSTALL_AUTO_UPDATER" == true ]; then
-    output "✅ Auto-updater is enabled and will check for updates hourly."
     echo ""
   fi
 
