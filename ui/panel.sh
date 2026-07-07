@@ -9,7 +9,7 @@ set -e
 #                                                                                    #
 # Hydrodactyl Panel Installation UI                                                   #
 #                                                                                    #
-# Copyright (C) 2025, Muspelheim Hosting                                             #
+# Copyright (C) 2026, ItzzMateo Studios                                             #
 #                                                                                    #
 ######################################################################################
 

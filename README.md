@@ -16,7 +16,7 @@ This installer is a fork of the [Pyrodactyl Installer](https://github.com/Muspel
 
 ## Features
 
-- **Beautiful Flame UI** — Orange gradient interface inspired by Muspelheim Hosting
+- **Beautiful Flame UI** — Orange gradient interface
 - **Flexible Installation** — Install panel, Elytra, or both on the same machine
 - **Private Repository Support** — Full support for private GitHub repositories with token validation
 - **Auto-Updaters** — Optional automatic updates for both panel and Elytra
@@ -397,8 +397,4 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 - [Pyrodactyl Installer](https://github.com/Muspelheim-Hosting/pyrodactyl-installer) — The upstream installer that this project is forked from
 - [Pterodactyl Installer](https://github.com/pterodactyl-installer/pterodactyl-installer) — Original inspiration
 
----
 
-<p align="center">
-  <b>Brought to you by <a href="https://muspelheim.host">Muspelheim Hosting</a></b>
-</p>

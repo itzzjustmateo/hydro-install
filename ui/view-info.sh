@@ -8,7 +8,7 @@ set -e
 #                                                                                    #
 # Displays saved installation information for Panel and/or Elytra                    #
 #                                                                                    #
-# Copyright (C) 2025, Muspelheim Hosting                                             #
+# Copyright (C) 2026, ItzzMateo Studios                                             #
 #                                                                                    #
 # https://github.com/itzzjustmateo/hydro-install                         #
 #                                                                                    #
