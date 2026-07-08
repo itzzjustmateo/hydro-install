@@ -363,15 +363,24 @@ run_elytra_update() {
     return 1
   fi
 
-  # Check if auto-updater env file exists
-  if [ -f "/etc/hydrodactyl/auto-update-wings.env" ]; then
+  # Check if a complete auto-updater env file exists (installs from before
+  # variant tracking was added may have no file, or one missing WINGS_VARIANT)
+  if [ -f "/etc/hydrodactyl/auto-update-wings.env" ] && grep -q '^WINGS_VARIANT=' "/etc/hydrodactyl/auto-update-wings.env"; then
     output "Using existing auto-updater configuration..."
   else
-    # Create temporary env file with defaults
-    mkdir -p /etc/hydrodactyl
-    echo "WINGS_REPO=\"pterodactyl/wings\"" > /etc/hydrodactyl/auto-update-wings.env
-    echo "GITHUB_TOKEN=\"\"" >> /etc/hydrodactyl/auto-update-wings.env
-    chmod 600 /etc/hydrodactyl/auto-update-wings.env
+    warning "No saved Wings variant found for this install (it may predate variant tracking)."
+    local is_rs_variant="n"
+    bool_input is_rs_variant "Is the currently installed Wings a Wings-RS (Rust) build, rather than the standard Go Wings?" "n"
+
+    WINGS_VARIANT="go"
+    WINGS_REPO="pterodactyl/wings"
+    if [ "$is_rs_variant" == "y" ]; then
+      WINGS_VARIANT="rs"
+      WINGS_REPO="calagopus/wings"
+    fi
+    GITHUB_TOKEN=""
+    WINGS_REPO_PRIVATE="false"
+    save_wings_update_config
   fi
 
   output "Getting and running Wings auto-updater..."

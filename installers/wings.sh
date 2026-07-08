@@ -320,6 +320,9 @@ install_wings() {
   echo "$target_release" > /etc/hydrodactyl/wings-version
   chmod 644 /etc/hydrodactyl/wings-version
 
+  # Persist the installed variant/repo for the manual update menu
+  save_wings_update_config
+
   if /usr/local/bin/wings --version >/dev/null 2>&1; then
     info "Wings binary verified: $(/usr/local/bin/wings --version 2>/dev/null || echo 'unknown')"
   fi

@@ -752,6 +752,9 @@ install_wings_daemon() {
   echo "$latest_release" > /etc/hydrodactyl/wings-version
   chmod 644 /etc/hydrodactyl/wings-version
 
+  # Persist the installed variant/repo for the manual update menu
+  save_wings_update_config
+
   # Create Elytra config directory
   output "Creating Elytra config directory at ${ELYTRA_DIR}..."
   mkdir -p "${ELYTRA_DIR}"

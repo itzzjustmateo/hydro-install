@@ -619,6 +619,20 @@ select_wings_variant() {
   fi
 }
 
+# Persist the Wings variant/repo actually installed, so the manual update
+# menu (installers/auto-update-wings.sh) updates the same daemon instead of
+# silently falling back to Go Wings defaults.
+save_wings_update_config() {
+  mkdir -p /etc/hydrodactyl
+  {
+    echo "WINGS_VARIANT=\"${WINGS_VARIANT}\""
+    echo "WINGS_REPO=\"${WINGS_REPO}\""
+    echo "WINGS_REPO_PRIVATE=\"${WINGS_REPO_PRIVATE:-false}\""
+    echo "GITHUB_TOKEN=\"${GITHUB_TOKEN:-}\""
+  } >/etc/hydrodactyl/auto-update-wings.env
+  chmod 600 /etc/hydrodactyl/auto-update-wings.env
+}
+
 # ------------------ Validation Functions ----------------- #
 
 check_fqdn() {
