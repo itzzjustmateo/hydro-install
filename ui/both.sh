@@ -449,7 +449,7 @@ configure_elytra_settings() {
   print_flame "Elytra Node Configuration"
   echo ""
 
-  output "Configuring Elytra to connect to the panel at: ${COLOR_ORANGE}$(panel_scheme)://${PANEL_FQDN}${COLOR_NC}"
+  output "Configuring Elytra to connect to the panel at: ${COLOR_ORANGE}$(panel_scheme)://$(panel_url_host "$PANEL_FQDN")${COLOR_NC}"
   output "(This will be set automatically - no panel URL input needed)"
   echo ""
 
@@ -523,7 +523,7 @@ show_summary() {
   echo -e "  ${COLOR_ORANGE}Variant:${COLOR_NC}           $([ "$WINGS_VARIANT" == "go" ] && echo 'Wings (Go)' || echo 'Wings-RS (Rust)')"
   echo -e "  ${COLOR_ORANGE}Repository:${COLOR_NC}        ${ELYTRA_REPO} $([ "$ELYTRA_REPO_PRIVATE" == "true" ] && echo '(private)' || echo '(public)')"
   echo -e "  ${COLOR_ORANGE}Release Version:${COLOR_NC}   ${ELYTRA_RELEASE_VERSION}"
-  echo -e "  ${COLOR_ORANGE}Panel URL:${COLOR_NC}         $(panel_scheme)://${PANEL_FQDN} (auto-configured)"
+  echo -e "  ${COLOR_ORANGE}Panel URL:${COLOR_NC}         $(panel_scheme)://$(panel_url_host "$PANEL_FQDN") (auto-configured)"
   echo -e "  ${COLOR_ORANGE}Node Name:${COLOR_NC}         ${NODE_NAME}"
   echo -e "  ${COLOR_ORANGE}Node Description:${COLOR_NC}  ${NODE_DESCRIPTION}"
   echo -e "  ${COLOR_ORANGE}Behind Proxy:${COLOR_NC}      $([ "$BEHIND_PROXY" == "true" ] && echo 'Yes' || echo 'No')"
@@ -563,7 +563,7 @@ export_variables() {
   # Panel variables
   export PANEL_REPO
   export PANEL_REPO_PRIVATE
-  export GITHUB_TOKEN="$GITHUB_TOKEN_PANEL"
+  export GITHUB_TOKEN_PANEL
   export PANEL_INSTALL_METHOD
   export PANEL_RELEASE_VERSION
   export PANEL_FQDN
@@ -587,8 +587,8 @@ export_variables() {
   export WINGS_VARIANT
   export WINGS_REPO="$ELYTRA_REPO"
   export ELYTRA_REPO
-  export ELYTRA_REPO_PRIVATE
-  export GITHUB_TOKEN_ELYTRA
+  export WINGS_REPO_PRIVATE="$ELYTRA_REPO_PRIVATE"
+  export GITHUB_TOKEN_WINGS="$GITHUB_TOKEN_ELYTRA"
   export ELYTRA_RELEASE_VERSION
   export NODE_NAME
   export NODE_DESCRIPTION

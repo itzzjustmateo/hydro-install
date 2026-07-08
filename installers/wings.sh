@@ -239,7 +239,9 @@ fi
 check_existing() {
   if check_existing_installation "wings"; then
     echo ""
-    if ! bool_input "Continue with installation? This will replace the existing installation" "n"; then
+    local confirm_replace=""
+    bool_input confirm_replace "Continue with installation? This will replace the existing installation" "n"
+    if [ "$confirm_replace" != "y" ]; then
       error "Installation aborted."
       exit 1
     fi

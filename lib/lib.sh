@@ -623,14 +623,36 @@ select_wings_variant() {
 # menu (installers/auto-update-wings.sh) updates the same daemon instead of
 # silently falling back to Go Wings defaults.
 save_wings_update_config() {
+  # installers/both.sh tracks separate Panel/Wings tokens as GITHUB_TOKEN_WINGS;
+  # installers/wings.sh (Wings-only) only ever has the plain GITHUB_TOKEN.
+  local wings_token="${GITHUB_TOKEN_WINGS:-${GITHUB_TOKEN:-}}"
   mkdir -p /etc/hydrodactyl
   {
     echo "WINGS_VARIANT=\"${WINGS_VARIANT}\""
     echo "WINGS_REPO=\"${WINGS_REPO}\""
     echo "WINGS_REPO_PRIVATE=\"${WINGS_REPO_PRIVATE:-false}\""
-    echo "GITHUB_TOKEN=\"${GITHUB_TOKEN:-}\""
+    echo "GITHUB_TOKEN=\"${wings_token}\""
   } >/etc/hydrodactyl/auto-update-wings.env
   chmod 600 /etc/hydrodactyl/auto-update-wings.env
+}
+
+# Persist the Panel repo/token/install-method actually used, so the manual
+# update menu (installers/auto-update-panel.sh) updates from the same
+# source instead of silently falling back to the default public repo.
+# Usage: save_panel_update_config <"releases"|"git">
+save_panel_update_config() {
+  local update_method="${1:-releases}"
+  # installers/both.sh tracks separate Panel/Wings tokens as GITHUB_TOKEN_PANEL;
+  # installers/panel.sh (Panel-only) only ever has the plain GITHUB_TOKEN.
+  local panel_token="${GITHUB_TOKEN_PANEL:-${GITHUB_TOKEN:-}}"
+  mkdir -p /etc/hydrodactyl
+  {
+    echo "PANEL_REPO=\"${PANEL_REPO}\""
+    echo "PANEL_REPO_PRIVATE=\"${PANEL_REPO_PRIVATE:-false}\""
+    echo "GITHUB_TOKEN=\"${panel_token}\""
+    echo "UPDATE_METHOD=\"${update_method}\""
+  } >/etc/hydrodactyl/auto-update-panel.env
+  chmod 600 /etc/hydrodactyl/auto-update-panel.env
 }
 
 # ------------------ Validation Functions ----------------- #
@@ -678,12 +700,52 @@ is_ip_address() {
     return 0
   fi
 
-  # IPv6: hex groups separated by colons, optionally with "::" compression
-  if [[ "$ip" =~ ^[0-9a-fA-F:]+$ ]] && [[ "$ip" == *:* ]]; then
+  # IPv6: hex groups separated by colons, optionally with a single "::"
+  # compression. This isn't full RFC 4291 validation, but it rejects the
+  # obvious garbage (":::" , a bare ":", too many/few groups) that a plain
+  # "colon/hex characters only" check would let through.
+  if [[ "$ip" == *:* ]] && [[ "$ip" =~ ^[0-9a-fA-F:]+$ ]]; then
+    [[ "$ip" == *:::* ]] && return 1
+
+    local compressed=false
+    if [[ "$ip" == *::* ]]; then
+      # At most one "::" compression is allowed.
+      [[ "${ip/::/}" == *::* ]] && return 1
+      compressed=true
+    fi
+
+    local group_count=0
+    local group groups
+    IFS=':' read -ra groups <<<"${ip//::/:}"
+    for group in "${groups[@]}"; do
+      [ -z "$group" ] && continue
+      [[ "$group" =~ ^[0-9a-fA-F]{1,4}$ ]] || return 1
+      ((group_count++))
+    done
+
+    if [ "$compressed" == true ]; then
+      [ "$group_count" -le 7 ] || return 1
+    else
+      [ "$group_count" -eq 8 ] || return 1
+    fi
+
     return 0
   fi
 
   return 1
+}
+
+# Wrap an address for embedding in a scheme://host URL - IPv6 literals must
+# be bracketed per RFC 3986 (e.g. http://[2001:db8::1]/); hostnames and IPv4
+# addresses pass through unchanged since neither can contain a colon once
+# validated by check_fqdn/is_ip_address.
+panel_url_host() {
+  local host="$1"
+  if [[ "$host" == *:* ]]; then
+    echo "[$host]"
+  else
+    echo "$host"
+  fi
 }
 
 cmd_exists() {
@@ -2791,10 +2853,23 @@ remove_auto_updater_panel() {
 }
 
 remove_auto_updater_elytra() {
-  output "Removing Wings auto-updater..."
+  output "Removing Wings/Elytra auto-updater..."
 
+  # Installs from before scheduled auto-updates existed for Wings used
+  # "elytra"-named units (this project's daemon was Elytra-only back then).
+  # No code path creates any systemd unit for Wings/Elytra anymore, but stop
+  # and remove both naming conventions in case an in-between install created
+  # the newer name before the scheduling layer itself was removed.
+  systemctl stop hydrodactyl-elytra-auto-update.timer 2>/dev/null || true
+  systemctl disable hydrodactyl-elytra-auto-update.timer 2>/dev/null || true
   systemctl stop hydrodactyl-wings-auto-update.timer 2>/dev/null || true
   systemctl disable hydrodactyl-wings-auto-update.timer 2>/dev/null || true
+
+  rm -f /etc/systemd/system/hydrodactyl-elytra-auto-update.service
+  rm -f /etc/systemd/system/hydrodactyl-elytra-auto-update.timer
+  rm -f /usr/local/bin/hydrodactyl-auto-update-elytra.sh
+  rm -f /etc/hydrodactyl/auto-update-elytra.conf
+  rm -f /etc/hydrodactyl/auto-update-elytra.env
 
   rm -f /etc/systemd/system/hydrodactyl-wings-auto-update.service
   rm -f /etc/systemd/system/hydrodactyl-wings-auto-update.timer
@@ -2804,7 +2879,7 @@ remove_auto_updater_elytra() {
 
   systemctl daemon-reload
 
-  success "Wings auto-updater removed"
+  success "Wings/Elytra auto-updater removed"
 }
 
 # ------------------ Script Execution Functions ----------------- #

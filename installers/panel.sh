@@ -278,6 +278,9 @@ install_panel_release() {
   echo "$release_tag" > /etc/hydrodactyl/panel-version
   chmod 644 /etc/hydrodactyl/panel-version
 
+  # Persist the repo/token/method for the manual update menu
+  save_panel_update_config "releases"
+
   output "Creating installation directory..."
   mkdir -p "$INSTALL_DIR"
   cd "$INSTALL_DIR"
@@ -382,6 +385,9 @@ install_panel_clone() {
   echo "git:${commit_hash}" > /etc/hydrodactyl/panel-version
   chmod 644 /etc/hydrodactyl/panel-version
 
+  # Persist the repo/token/method for the manual update menu
+  save_panel_update_config "git"
+
   cp .env.example .env
 
   # Install composer and dependencies
@@ -410,9 +416,11 @@ configure_panel() {
   php artisan key:generate --force
 
   # Determine app URL
-  local app_url="http://$PANEL_FQDN"
-  [ "$ASSUME_SSL" == true ] && app_url="https://$PANEL_FQDN"
-  [ "$CONFIGURE_LETSENCRYPT" == true ] && app_url="https://$PANEL_FQDN"
+  local panel_url_host_part
+  panel_url_host_part=$(panel_url_host "$PANEL_FQDN")
+  local app_url="http://${panel_url_host_part}"
+  [ "$ASSUME_SSL" == true ] && app_url="https://${panel_url_host_part}"
+  [ "$CONFIGURE_LETSENCRYPT" == true ] && app_url="https://${panel_url_host_part}"
 
   # Setup environment
   output "Configuring environment..."
@@ -598,7 +606,7 @@ main() {
   echo ""
   output "🎉 Your Hydrodactyl Panel has been installed successfully!"
   echo ""
-  output "Panel URL: ${COLOR_ORANGE}$(panel_scheme)://${PANEL_FQDN}${COLOR_NC}"
+  output "Panel URL: ${COLOR_ORANGE}$(panel_scheme)://$(panel_url_host "$PANEL_FQDN")${COLOR_NC}"
   output "Admin Email: ${COLOR_ORANGE}${PANEL_ADMIN_EMAIL}${COLOR_NC}"
   output "Admin Username: ${COLOR_ORANGE}${PANEL_ADMIN_USERNAME}${COLOR_NC}"
   output "Admin Password: ${COLOR_ORANGE}**hidden** (hope you remember it!)${COLOR_NC}"
@@ -606,7 +614,7 @@ main() {
   output "Database credentials saved to: ${COLOR_ORANGE}/root/.config/hydrodactyl/db-credentials${COLOR_NC}"
   echo ""
   output "phpMyAdmin Access:"
-  output "  URL: ${COLOR_ORANGE}http://${PANEL_FQDN}:8081${COLOR_NC}"
+  output "  URL: ${COLOR_ORANGE}http://$(panel_url_host "$PANEL_FQDN"):8081${COLOR_NC}"
   output "  Username: ${COLOR_ORANGE}phpmyadmin${COLOR_NC}"
   output "  Password: ${COLOR_ORANGE}${PHPMYADMIN_PASSWORD}${COLOR_NC}"
   echo ""

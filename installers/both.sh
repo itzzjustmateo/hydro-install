@@ -81,10 +81,19 @@ GAME_PORT_END="${GAME_PORT_END:-28025}"
 PANEL_REPO_PRIVATE="${PANEL_REPO_PRIVATE:-false}"
 WINGS_REPO_PRIVATE="${WINGS_REPO_PRIVATE:-false}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+# Panel and Wings can be hosted in different repos with different tokens
+# (e.g. a public panel fork + a private custom Wings repo); GITHUB_TOKEN is
+# kept as a single-value fallback for direct CLI/env-var usage.
+GITHUB_TOKEN_PANEL="${GITHUB_TOKEN_PANEL:-$GITHUB_TOKEN}"
+GITHUB_TOKEN_WINGS="${GITHUB_TOKEN_WINGS:-$GITHUB_TOKEN}"
 
 # Paths
 INSTALL_DIR="${INSTALL_DIR:-/var/www/hydrodactyl}"
-ELYTRA_DIR="${ELYTRA_DIR:-/etc/pterodactyl}"
+# This script only ever installs Wings, never legacy Elytra - always use the
+# Wings config dir. lib.sh unconditionally exports ELYTRA_DIR="/etc/elytra"
+# for the legacy Elytra flow, so a "${ELYTRA_DIR:-...}" default here would
+# never apply (it's already non-empty by the time this line runs).
+ELYTRA_DIR="/etc/pterodactyl"
 PANEL_CONFIG_DIR="${PANEL_CONFIG_DIR:-/etc/hydrodactyl}"
 
 # Node ID (will be set during installation)
@@ -172,7 +181,9 @@ check_existing() {
 
   if [ "$has_existing" == true ]; then
     echo ""
-    if ! bool_input "Continue with installation? This may overwrite existing files" "n"; then
+    local confirm_replace=""
+    bool_input confirm_replace "Continue with installation? This may overwrite existing files" "n"
+    if [ "$confirm_replace" != "y" ]; then
       error "Installation aborted."
       exit 1
     fi
@@ -225,7 +236,7 @@ install_panel_release() {
   fi
 
   # Only require token for private repos
-  if [ "$PANEL_REPO_PRIVATE" == "true" ] && [ -z "$GITHUB_TOKEN" ]; then
+  if [ "$PANEL_REPO_PRIVATE" == "true" ] && [ -z "$GITHUB_TOKEN_PANEL" ]; then
     error "GitHub token is required to download the panel from the private repository."
     error "Please provide a token using --github-token or set the GITHUB_TOKEN environment variable."
     exit 1
@@ -249,8 +260,8 @@ install_panel_release() {
     "--header" "X-GitHub-Api-Version: 2022-11-28"
   )
 
-  if [ -n "$GITHUB_TOKEN" ]; then
-    curl_headers+=("--header" "Authorization: Bearer $GITHUB_TOKEN")
+  if [ -n "$GITHUB_TOKEN_PANEL" ]; then
+    curl_headers+=("--header" "Authorization: Bearer $GITHUB_TOKEN_PANEL")
   fi
 
   # Get the release info from GitHub API
@@ -285,6 +296,9 @@ install_panel_release() {
   echo "$release_tag" > /etc/hydrodactyl/panel-version
   chmod 644 /etc/hydrodactyl/panel-version
 
+  # Persist the repo/token/method for the manual update menu
+  save_panel_update_config "releases"
+
   output "Creating installation directory..."
   mkdir -p "$INSTALL_DIR"
   cd "$INSTALL_DIR"
@@ -297,8 +311,8 @@ install_panel_release() {
     "--header" "X-GitHub-Api-Version: 2022-11-28"
   )
 
-  if [ -n "$GITHUB_TOKEN" ]; then
-    download_headers+=("--header" "Authorization: Bearer $GITHUB_TOKEN")
+  if [ -n "$GITHUB_TOKEN_PANEL" ]; then
+    download_headers+=("--header" "Authorization: Bearer $GITHUB_TOKEN_PANEL")
   fi
 
   # Download using the asset API URL
@@ -327,9 +341,9 @@ install_panel_release() {
     output ".env.example not found in release, downloading from repository..."
     local env_url="https://raw.githubusercontent.com/${PANEL_REPO}/main/.env.example"
 
-    if [ -n "$GITHUB_TOKEN" ]; then
+    if [ -n "$GITHUB_TOKEN_PANEL" ]; then
       curl -fsSL \
-        --header "Authorization: Bearer $GITHUB_TOKEN" \
+        --header "Authorization: Bearer $GITHUB_TOKEN_PANEL" \
         --header "Accept: application/vnd.github.v3.raw" \
         -o .env.example \
         "$env_url" 2>/dev/null || warning "Failed to download .env.example from repository"
@@ -372,7 +386,7 @@ install_panel_clone() {
 
   # Simple token-based auth: embed token in URL if provided
   local git_url="https://github.com/${PANEL_REPO}.git"
-  [ -n "$GITHUB_TOKEN" ] && git_url="https://${GITHUB_TOKEN}@github.com/${PANEL_REPO}.git"
+  [ -n "$GITHUB_TOKEN_PANEL" ] && git_url="https://${GITHUB_TOKEN_PANEL}@github.com/${PANEL_REPO}.git"
 
   output "Cloning from https://github.com/${PANEL_REPO}.git"
   if ! git clone "$git_url" "$INSTALL_DIR"; then
@@ -402,6 +416,9 @@ install_panel_clone() {
   mkdir -p /etc/hydrodactyl
   echo "git:${commit_hash}" > /etc/hydrodactyl/panel-version
   chmod 644 /etc/hydrodactyl/panel-version
+
+  # Persist the repo/token/method for the manual update menu
+  save_panel_update_config "git"
 
   success "Panel cloned to $INSTALL_DIR"
 }
@@ -481,9 +498,11 @@ configure_panel_environment() {
   php artisan key:generate --force
 
   # Determine app URL
-  local app_url="http://$PANEL_FQDN"
-  [ "$ASSUME_SSL" == true ] && app_url="https://$PANEL_FQDN"
-  [ "$CONFIGURE_LETSENCRYPT" == true ] && app_url="https://$PANEL_FQDN"
+  local panel_url_host_part
+  panel_url_host_part=$(panel_url_host "$PANEL_FQDN")
+  local app_url="http://${panel_url_host_part}"
+  [ "$ASSUME_SSL" == true ] && app_url="https://${panel_url_host_part}"
+  [ "$CONFIGURE_LETSENCRYPT" == true ] && app_url="https://${panel_url_host_part}"
 
   # Setup environment using artisan commands
   output "Configuring environment..."
@@ -590,7 +609,7 @@ create_node_in_panel() {
   # Check if we have API key for API-based creation
   if [ -n "$PANEL_API_KEY" ] && [ -n "$PANEL_FQDN" ]; then
     local panel_url
-    panel_url="$(panel_scheme)://${PANEL_FQDN}"
+    panel_url="$(panel_scheme)://$(panel_url_host "$PANEL_FQDN")"
 
     # Step 1: Detect country and get/create location
     output "Detecting server location..."
@@ -729,7 +748,7 @@ install_wings_daemon() {
   # Get latest release
   output "Fetching latest Wings release..."
   local latest_release
-  latest_release=$(get_latest_release "$WINGS_REPO" "$GITHUB_TOKEN")
+  latest_release=$(get_latest_release "$WINGS_REPO" "$GITHUB_TOKEN_WINGS")
 
   if [ -z "$latest_release" ] || [ "$latest_release" == "null" ]; then
     error "Could not fetch latest release from $WINGS_REPO"
@@ -740,7 +759,7 @@ install_wings_daemon() {
 
   # Download binary
   output "Downloading Wings binary..."
-  if ! download_release_asset "$WINGS_REPO" "$asset_name" "/usr/local/bin/wings" "$GITHUB_TOKEN"; then
+  if ! download_release_asset "$WINGS_REPO" "$asset_name" "/usr/local/bin/wings" "$GITHUB_TOKEN_WINGS"; then
     error "Failed to download Wings binary"
     exit 1
   fi
@@ -765,7 +784,7 @@ install_wings_daemon() {
 
   # Determine panel URL based on configured SSL/TLS
   local panel_url
-  panel_url="$(panel_scheme)://${PANEL_FQDN}"
+  panel_url="$(panel_scheme)://$(panel_url_host "$PANEL_FQDN")"
 
   # Debug output
   output "DEBUG: Elytra configuration values:"
@@ -969,7 +988,7 @@ main() {
 
     if [ -n "$ALLOCATION_ID" ]; then
       # Determine panel URL based on configured SSL/TLS
-      PANEL_URL="$(panel_scheme)://${PANEL_FQDN}"
+      PANEL_URL="$(panel_scheme)://$(panel_url_host "$PANEL_FQDN")"
 
       # Create the server
       if create_minecraft_server "$PANEL_URL" "$PANEL_API_KEY" "$NODE_ID" "$LOCATION_ID" "$ALLOCATION_ID"; then
@@ -1001,7 +1020,7 @@ main() {
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   output "  Panel Information"
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  output "Panel URL:      ${COLOR_ORANGE}$(panel_scheme)://${PANEL_FQDN}${COLOR_NC}"
+  output "Panel URL:      ${COLOR_ORANGE}$(panel_scheme)://$(panel_url_host "$PANEL_FQDN")${COLOR_NC}"
   output "Admin Email:    ${COLOR_ORANGE}${PANEL_ADMIN_EMAIL}${COLOR_NC}"
   output "Admin Username: ${COLOR_ORANGE}${PANEL_ADMIN_USERNAME}${COLOR_NC}"
   output "Admin Password: ${COLOR_ORANGE}${PANEL_ADMIN_PASSWORD}${COLOR_NC}"
@@ -1013,7 +1032,7 @@ main() {
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   output "  phpMyAdmin Database Access"
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  output "URL:      ${COLOR_ORANGE}http://${PANEL_FQDN}:8081${COLOR_NC}"
+  output "URL:      ${COLOR_ORANGE}http://$(panel_url_host "$PANEL_FQDN"):8081${COLOR_NC}"
   output "Username: ${COLOR_ORANGE}phpmyadmin${COLOR_NC}"
   output "Password: ${COLOR_ORANGE}${PHPMYADMIN_PASSWORD}${COLOR_NC}"
   output "Alternative Logins:"
@@ -1026,7 +1045,7 @@ main() {
   output "Node Name:        ${COLOR_ORANGE}${NODE_NAME}${COLOR_NC}"
   output "Node ID:          ${COLOR_ORANGE}${NODE_ID}${COLOR_NC}"
   output "Node Description: ${COLOR_ORANGE}${NODE_DESCRIPTION}${COLOR_NC}"
-  output "Database Host:    ${COLOR_ORANGE}${PANEL_FQDN}:3306${COLOR_NC}"
+  output "Database Host:    ${COLOR_ORANGE}$(panel_url_host "$PANEL_FQDN"):3306${COLOR_NC}"
   output "Database User:    ${COLOR_ORANGE}dbhost${COLOR_NC}"
   echo ""
   if [ -n "$CREATED_SERVER_ID" ]; then
@@ -1062,7 +1081,7 @@ main() {
   output "If you need to reconfigure Wings manually, run:"
   output ""
   output "  ${COLOR_ORANGE}cd /etc/pterodactyl && sudo wings configure \\"
-  output "    --panel-url '$(panel_scheme)://${PANEL_FQDN}' \\"
+  output "    --panel-url '$(panel_scheme)://$(panel_url_host "$PANEL_FQDN")' \\"
   output "    --token '<your-api-key>' \\"
   output "    --node '${NODE_ID}'${COLOR_NC}"
   echo ""
