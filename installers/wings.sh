@@ -178,7 +178,10 @@ parse_arguments "$@"
 WINGS_INSTALL_DIR="/etc/pterodactyl"
 PANEL_CONFIG_DIR="${PANEL_CONFIG_DIR:-/etc/hydrodactyl}"
 WINGS_VARIANT="${WINGS_VARIANT:-go}"
-WINGS_REPO="${WINGS_REPO:-pterodactyl/wings}"
+# Repo default depends on variant (pterodactyl/wings vs calagopus/wings) and
+# is resolved in install_wings() - do not default it here, or a
+# variant-specific default below would never apply once this is non-empty.
+WINGS_REPO="${WINGS_REPO:-}"
 
 PANEL_URL="${PANEL_URL:-}"
 NODE_TOKEN="${NODE_TOKEN:-}"
