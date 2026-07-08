@@ -411,6 +411,16 @@ configure_panel() {
 
   cd "$INSTALL_DIR"
 
+  # Clear any bootstrap cache baked into the release tarball or created by
+  # composer's post-install scripts (e.g. package:discover/optimize running
+  # against the still-default .env we just copied). A stale cached config
+  # makes Laravel ignore .env entirely - including the key we're about to
+  # generate - and "php artisan key:generate" itself fails with
+  # "No application encryption key has been specified" before writing
+  # anything. `artisan config:clear` can't fix this (it needs the framework
+  # to boot too), so remove the cache files directly.
+  rm -f bootstrap/cache/*.php
+
   # Generate application key
   output "Generating application key..."
   php artisan key:generate --force
