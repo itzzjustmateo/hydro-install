@@ -721,8 +721,11 @@ check_existing_installation() {
   if [ "$component" == "panel" ] && [ -d "/var/www/hydrodactyl" ]; then
     warning "Existing panel installation detected at /var/www/hydrodactyl"
     has_existing=true
-  elif [ "$component" == "elytra" ] && [ -f "/usr/local/bin/wings" ]; then
+  elif [ "$component" == "wings" ] && [ -f "/usr/local/bin/wings" ]; then
     warning "Existing Wings installation detected at /usr/local/bin/wings"
+    has_existing=true
+  elif [ "$component" == "elytra" ] && [ -f "/usr/local/bin/elytra" ]; then
+    warning "Existing Elytra installation detected at /usr/local/bin/elytra"
     has_existing=true
   fi
 
@@ -4118,10 +4121,92 @@ check_elytra_health() {
   return 0
 }
 
-# Check both panel and Elytra health
+# Check Wings (Go or Wings-RS) health
+check_wings_health() {
+  local has_errors=false
+
+  echo ""
+  output "${COLOR_ORANGE}Wings Health Check${COLOR_NC}"
+  echo ""
+
+  # Check binary exists
+  if [ -f "/usr/local/bin/wings" ]; then
+    output "✓ Wings binary exists at /usr/local/bin/wings"
+
+    # Check binary is executable
+    if [ -x "/usr/local/bin/wings" ]; then
+      output "✓ Wings binary is executable"
+    else
+      warning "Wings binary is not executable"
+      has_errors=true
+    fi
+
+    # Check binary version
+    local version
+    version=$(/usr/local/bin/wings --version 2>/dev/null | head -1)
+    if [ -n "$version" ]; then
+      output "✓ Wings version: $version"
+    fi
+  else
+    error "Wings binary not found at /usr/local/bin/wings"
+    has_errors=true
+  fi
+
+  # Check config directory
+  if [ -d "/etc/pterodactyl" ]; then
+    output "✓ Wings config directory exists"
+
+    if [ -f "/etc/pterodactyl/config.yml" ]; then
+      output "✓ Wings config file exists"
+    else
+      warning "Wings config file not found"
+      has_errors=true
+    fi
+  else
+    warning "Wings config directory not found"
+    has_errors=true
+  fi
+
+  # Check data directories
+  for dir in /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups; do
+    if [ -d "$dir" ]; then
+      output "✓ Data directory exists: $dir"
+    else
+      warning "Data directory missing: $dir"
+    fi
+  done
+
+  # Check Docker
+  if systemctl is-active --quiet docker 2>/dev/null; then
+    output "✓ Docker is running"
+  else
+    warning "Docker is not running"
+    has_errors=true
+  fi
+
+  # Check service
+  if systemctl is-active --quiet wings 2>/dev/null; then
+    output "✓ Wings service is running"
+  elif systemctl is-enabled --quiet wings 2>/dev/null; then
+    warning "Wings service is enabled but not running"
+  else
+    warning "Wings service is not enabled"
+  fi
+
+  echo ""
+  if [ "$has_errors" == true ]; then
+    warning "Health check completed with warnings/errors"
+  else
+    success "Wings health check passed!"
+  fi
+
+  return 0
+}
+
+# Check both panel and Wings health
 check_both_health() {
   check_panel_health "$INSTALL_DIR"
-  check_elytra_health
+  check_wings_health
 }
 
 # Auto-fix Elytra permission issues

@@ -166,7 +166,7 @@ check_existing() {
     has_existing=true
   fi
 
-  if check_existing_installation "elytra"; then
+  if check_existing_installation "wings"; then
     has_existing=true
   fi
 

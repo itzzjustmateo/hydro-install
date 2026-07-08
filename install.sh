@@ -501,7 +501,7 @@ show_menu() {
         elif [ "$PANEL_INSTALLED" == true ]; then
           check_panel_health
         elif [ "$ELYTRA_INSTALLED" == true ]; then
-          check_elytra_health
+          check_wings_health
         else
           error "Nothing installed to check. Install Hydrodactyl or Wings first."
           sleep 2
