@@ -19,7 +19,7 @@ This installer is a fork of the [Pyrodactyl Installer](https://github.com/Muspel
 - **Beautiful Flame UI** — Orange gradient interface
 - **Flexible Installation** — Install panel, Elytra, or both on the same machine
 - **Private Repository Support** — Full support for private GitHub repositories with token validation
-- **On-Demand Updates** — Update the panel and Wings from the installer menu whenever you choose (no unattended scheduled updates)
+- **On-Demand Updates** — Update panel and Wings anytime from the menu
 - **SSL/TLS Ready** — Let's Encrypt integration with automatic renewal and service restart hooks
 - **Firewall Configuration** — Automatic UFW/FirewallD setup
 - **OS Support** — Ubuntu 22.04/24.04, Debian 11/12, Rocky Linux 8/9, AlmaLinux 8/9
