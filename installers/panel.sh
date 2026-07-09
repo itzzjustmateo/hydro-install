@@ -133,6 +133,12 @@ install_dependencies() {
     install_packages "certbot python3-certbot-nginx"
   fi
 
+  # Enable Redis now - configure_panel() runs artisan commands with
+  # --cache=redis/--session=redis/--queue=redis and needs a live
+  # connection well before setup_services() (which used to be the only
+  # place this was enabled) ever runs.
+  enable_redis
+
   success "Dependencies installed"
 }
 
@@ -512,9 +518,6 @@ setup_services() {
     find "$INSTALL_DIR/bootstrap/cache" -type d -exec chmod 755 {} \; 2>/dev/null || true
     find "$INSTALL_DIR/bootstrap/cache" -type f -exec chmod 644 {} \; 2>/dev/null || true
   fi
-
-  # Enable Redis
-  enable_redis
 
   # Enable nginx
   systemctl enable nginx

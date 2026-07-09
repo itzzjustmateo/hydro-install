@@ -223,6 +223,12 @@ install_panel_dependencies() {
   # Install common packages
   install_packages "nginx mariadb-server redis-server curl tar unzip git certbot python3-certbot-nginx jq"
 
+  # Enable Redis now - configure_panel_environment() runs artisan commands
+  # with --cache=redis/--session=redis/--queue=redis and needs a live
+  # connection well before setup_panel_services() (which used to be the
+  # only place this was enabled) ever runs.
+  enable_redis
+
   success "Panel dependencies installed"
 }
 
@@ -592,9 +598,6 @@ setup_panel_services() {
     find "$INSTALL_DIR/bootstrap/cache" -type d -exec chmod 755 {} \; 2>/dev/null || true
     find "$INSTALL_DIR/bootstrap/cache" -type f -exec chmod 644 {} \; 2>/dev/null || true
   fi
-
-  # Enable Redis
-  enable_redis
 
   # Enable nginx
   systemctl enable nginx
