@@ -661,6 +661,15 @@ save_panel_update_config() {
 # Usage: wings_release_arch <"go"|"rs">
 wings_release_arch() {
   local variant="$1"
+
+  case "$variant" in
+    go | rs) ;;
+    *)
+      error "Unsupported Wings variant: $variant (expected 'go' or 'rs')"
+      return 1
+      ;;
+  esac
+
   local machine
   machine=$(uname -m)
 

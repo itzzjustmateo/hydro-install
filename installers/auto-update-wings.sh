@@ -338,6 +338,14 @@ get_download_url() {
   # Determine architecture and asset name based on the installed Wings variant.
   # This script is self-contained (no lib.sh dependency), so the
   # architecture mapping is inlined rather than shared via a lib.sh helper.
+  case "$WINGS_VARIANT" in
+    go | rs) ;;
+    *)
+      error "Unsupported Wings variant: $WINGS_VARIANT (expected 'go' or 'rs')"
+      exit 1
+      ;;
+  esac
+
   local machine
   machine=$(uname -m)
 
