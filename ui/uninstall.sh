@@ -44,6 +44,7 @@ check_root
 
 REMOVE_PANEL=false
 REMOVE_ELYTRA=false
+REMOVE_WINGS=false
 REMOVE_AUTO_UPDATERS=false
 REMOVE_DATABASE=false
 REMOVE_DATA=false
@@ -53,6 +54,7 @@ REMOVE_DATA=false
 detect_installed_components() {
   PANEL_INSTALLED=false
   ELYTRA_INSTALLED=false
+  WINGS_INSTALLED=false
   PANEL_UPDATER_INSTALLED=false
   ELYTRA_UPDATER_INSTALLED=false
 
@@ -60,8 +62,15 @@ detect_installed_components() {
     PANEL_INSTALLED=true
   fi
 
+  # Legacy standalone Elytra daemon
   if [ -f "/usr/local/bin/elytra" ]; then
     ELYTRA_INSTALLED=true
+  fi
+
+  # Wings/Wings-RS daemon - same binary path for both variants, so no
+  # further detection is needed to know whether uninstall has work to do
+  if [ -f "/usr/local/bin/wings" ]; then
+    WINGS_INSTALLED=true
   fi
 
   if systemctl is-enabled --quiet hydrodactyl-panel-auto-update.timer 2>/dev/null; then
@@ -88,10 +97,16 @@ show_main_menu() {
     echo -e "  ${COLOR_RED}✗${COLOR_NC} Hydrodactyl Panel"
   fi
 
-  if [ "$ELYTRA_INSTALLED" == true ]; then
-    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Elytra Daemon"
+  if [ "$WINGS_INSTALLED" == true ]; then
+    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Wings Daemon"
   else
-    echo -e "  ${COLOR_RED}✗${COLOR_NC} Elytra Daemon"
+    echo -e "  ${COLOR_RED}✗${COLOR_NC} Wings Daemon"
+  fi
+
+  if [ "$ELYTRA_INSTALLED" == true ]; then
+    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Elytra Daemon (legacy)"
+  else
+    echo -e "  ${COLOR_RED}✗${COLOR_NC} Elytra Daemon (legacy)"
   fi
 
   if [ "$PANEL_UPDATER_INSTALLED" == true ] || [ "$ELYTRA_UPDATER_INSTALLED" == true ]; then
@@ -104,10 +119,10 @@ show_main_menu() {
   output "What would you like to uninstall?"
   echo ""
   output "[${COLOR_ORANGE}0${COLOR_NC}] Uninstall Panel only"
-  output "[${COLOR_ORANGE}1${COLOR_NC}] Uninstall Elytra only"
-  output "[${COLOR_ORANGE}2${COLOR_NC}] Uninstall both Panel and Elytra"
+  output "[${COLOR_ORANGE}1${COLOR_NC}] Uninstall Daemon only (Wings/Elytra)"
+  output "[${COLOR_ORANGE}2${COLOR_NC}] Uninstall both Panel and Daemon"
   output "[${COLOR_ORANGE}3${COLOR_NC}] Remove auto-updaters only"
-  output "[${COLOR_ORANGE}4${COLOR_NC}] Uninstall everything (Panel, Elytra, Auto-updaters)"
+  output "[${COLOR_ORANGE}4${COLOR_NC}] Uninstall everything (Panel, Daemon, Auto-updaters)"
   output "[${COLOR_ORANGE}5${COLOR_NC}] Cancel"
   echo ""
 
@@ -127,22 +142,24 @@ show_main_menu() {
         return
         ;;
       1)
-        if [ "$ELYTRA_INSTALLED" == false ]; then
-          error "Elytra is not installed"
+        if [ "$ELYTRA_INSTALLED" == false ] && [ "$WINGS_INSTALLED" == false ]; then
+          error "No daemon is installed"
           continue
         fi
-        REMOVE_ELYTRA=true
-        confirm_uninstall "Elytra"
+        REMOVE_ELYTRA=$ELYTRA_INSTALLED
+        REMOVE_WINGS=$WINGS_INSTALLED
+        confirm_uninstall "the daemon"
         return
         ;;
       2)
-        if [ "$PANEL_INSTALLED" == false ] && [ "$ELYTRA_INSTALLED" == false ]; then
-          error "Neither Panel nor Elytra are installed"
+        if [ "$PANEL_INSTALLED" == false ] && [ "$ELYTRA_INSTALLED" == false ] && [ "$WINGS_INSTALLED" == false ]; then
+          error "Neither Panel nor a daemon are installed"
           continue
         fi
         REMOVE_PANEL=true
-        REMOVE_ELYTRA=true
-        confirm_uninstall "both Panel and Elytra"
+        REMOVE_ELYTRA=$ELYTRA_INSTALLED
+        REMOVE_WINGS=$WINGS_INSTALLED
+        confirm_uninstall "both Panel and the daemon"
         return
         ;;
       3)
@@ -155,12 +172,13 @@ show_main_menu() {
         return
         ;;
       4)
-        if [ "$PANEL_INSTALLED" == false ] && [ "$ELYTRA_INSTALLED" == false ]; then
+        if [ "$PANEL_INSTALLED" == false ] && [ "$ELYTRA_INSTALLED" == false ] && [ "$WINGS_INSTALLED" == false ]; then
           error "Nothing is installed"
           continue
         fi
         REMOVE_PANEL=true
-        REMOVE_ELYTRA=true
+        REMOVE_ELYTRA=$ELYTRA_INSTALLED
+        REMOVE_WINGS=$WINGS_INSTALLED
         REMOVE_AUTO_UPDATERS=true
         confirm_uninstall "everything"
         return
@@ -204,6 +222,16 @@ confirm_uninstall() {
     [ "$remove_data" == "y" ] && REMOVE_DATA=true
   fi
 
+  if [ "$REMOVE_WINGS" == true ]; then
+    echo ""
+    output "Wings removal includes:"
+    output "  - Wings binary (/usr/local/bin/wings)"
+    output "  - Wings configuration (/etc/pterodactyl)"
+    output "  - Systemd service (wings)"
+    output "  - Docker containers (game servers will be stopped)"
+    echo ""
+  fi
+
   if [ "$REMOVE_ELYTRA" == true ]; then
     echo ""
     output "Elytra removal includes:"
@@ -240,6 +268,7 @@ confirm_uninstall() {
 export_variables() {
   export REMOVE_PANEL
   export REMOVE_ELYTRA
+  export REMOVE_WINGS
   export REMOVE_AUTO_UPDATERS
   export REMOVE_DATABASE
   export REMOVE_DATA
@@ -250,15 +279,17 @@ export_variables() {
 main() {
   detect_installed_components
 
-  if [ "$PANEL_INSTALLED" == false ] && [ "$ELYTRA_INSTALLED" == false ] && [ "$PANEL_UPDATER_INSTALLED" == false ] && [ "$ELYTRA_UPDATER_INSTALLED" == false ]; then
+  if [ "$PANEL_INSTALLED" == false ] && [ "$ELYTRA_INSTALLED" == false ] && [ "$WINGS_INSTALLED" == false ] && [ "$PANEL_UPDATER_INSTALLED" == false ] && [ "$ELYTRA_UPDATER_INSTALLED" == false ]; then
     print_header
     print_flame "Nothing to Uninstall"
     output "No Hydrodactyl components were detected on this system."
     echo ""
     output "If you believe this is an error, you may need to manually remove:"
     output "  - /var/www/hydrodactyl (Panel files)"
-    output "  - /usr/local/bin/elytra (Elytra binary)"
-    output "  - /etc/elytra (Elytra configuration)"
+    output "  - /usr/local/bin/wings (Wings binary)"
+    output "  - /etc/pterodactyl (Wings configuration)"
+    output "  - /usr/local/bin/elytra (legacy Elytra binary)"
+    output "  - /etc/elytra (legacy Elytra configuration)"
     exit 0
   fi
 
