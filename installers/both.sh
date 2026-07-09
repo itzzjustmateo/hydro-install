@@ -511,6 +511,20 @@ configure_panel_environment() {
   # to boot too), so remove the cache files directly.
   rm -f bootstrap/cache/*.php
 
+  # p:environment:setup never touches APP_KEY, so "key:generate" has to be
+  # the thing that sets it - but Laravel boots EncryptionServiceProvider
+  # (which requires app.key to already be non-empty) before any console
+  # command runs, including key:generate itself. With a fresh .env (APP_KEY
+  # empty), that boot step throws "No application encryption key has been
+  # specified" before key:generate ever gets a chance to write a new one.
+  # Seed a throwaway key first so boot succeeds; key:generate --force then
+  # overwrites it with the real one.
+  if grep -q "^APP_KEY=" .env; then
+    sed -i "s|^APP_KEY=.*$|APP_KEY=base64:$(head -c 32 /dev/urandom | base64 | tr -d '\n')|g" .env
+  else
+    echo "APP_KEY=base64:$(head -c 32 /dev/urandom | base64 | tr -d '\n')" >> .env
+  fi
+
   # Generate application key
   output "Generating application key..."
   php artisan key:generate --force
