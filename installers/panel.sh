@@ -341,6 +341,10 @@ install_panel_release() {
 
   cp .env.example .env
 
+  # Match the official install docs: set storage/bootstrap-cache permissions
+  # right after getting the source, before composer/artisan touch them.
+  chmod -R 755 storage/* bootstrap/cache/
+
   # Install composer and dependencies
   install_composer
 
@@ -389,6 +393,10 @@ install_panel_clone() {
   save_panel_update_config "git"
 
   cp .env.example .env
+
+  # Match the official install docs: set storage/bootstrap-cache permissions
+  # right after getting the source, before composer/artisan touch them.
+  chmod -R 755 storage/* bootstrap/cache/
 
   # Install composer and dependencies
   install_composer
