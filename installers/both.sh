@@ -352,9 +352,9 @@ install_panel_release() {
         --header "Authorization: Bearer $GITHUB_TOKEN_PANEL" \
         --header "Accept: application/vnd.github.v3.raw" \
         -o .env.example \
-        "$env_url" 2>/dev/null || warning "Failed to download .env.example from repository"
+        "$env_url" || warning "Failed to download .env.example from repository"
     else
-      curl -fsSL -o .env.example "$env_url" 2>/dev/null || warning "Failed to download .env.example from repository"
+      curl -fsSL -o .env.example "$env_url" || warning "Failed to download .env.example from repository"
     fi
 
     if [ ! -f ".env.example" ]; then
