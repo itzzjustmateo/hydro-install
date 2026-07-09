@@ -655,6 +655,29 @@ save_panel_update_config() {
   chmod 600 /etc/hydrodactyl/auto-update-panel.env
 }
 
+# Map `uname -m` to the release-asset architecture naming Wings/Wings-RS
+# use, failing clearly on an unrecognized architecture instead of silently
+# guessing aarch64/arm64 for anything that isn't x86_64.
+# Usage: wings_release_arch <"go"|"rs">
+wings_release_arch() {
+  local variant="$1"
+  local machine
+  machine=$(uname -m)
+
+  case "$machine" in
+    x86_64)
+      [ "$variant" == "rs" ] && echo "x86_64" || echo "amd64"
+      ;;
+    aarch64 | arm64)
+      [ "$variant" == "rs" ] && echo "aarch64" || echo "arm64"
+      ;;
+    *)
+      error "Unsupported architecture: $machine (Wings only supports x86_64 and aarch64/arm64)"
+      return 1
+      ;;
+  esac
+}
+
 # ------------------ Validation Functions ----------------- #
 
 check_fqdn() {
@@ -2136,9 +2159,17 @@ detect_installed_panels() {
     found+=("Struxa")
   fi
 
-  # Pterodactyl
+  # Pterodactyl - a bare /usr/local/bin/wings is NOT enough evidence on its
+  # own, since this installer's own Wings/Wings-RS daemon lives at that
+  # identical path. Only count it if there's no /etc/hydrodactyl/wings-version
+  # tracking file (written at install time by installers/wings.sh and
+  # installers/both.sh), meaning some other, non-Hydrodactyl Wings put it there.
+  local foreign_wings=false
+  if [ -f "/usr/local/bin/wings" ] && [ ! -f "/etc/hydrodactyl/wings-version" ]; then
+    foreign_wings=true
+  fi
   if ls /etc/nginx/sites-available/pterodactyl* 2>/dev/null | grep -q . || \
-     [ -d "/var/www/pterodactyl" ] || [ -f "/usr/local/bin/wings" ] || \
+     [ -d "/var/www/pterodactyl" ] || [ "$foreign_wings" == true ] || \
      systemctl is-enabled --quiet pteroq 2>/dev/null; then
     found+=("Pterodactyl")
   fi
@@ -2172,14 +2203,26 @@ remove_struxa() {
 remove_pterodactyl() {
   output "Removing Pterodactyl panel..."
   systemctl disable --now pteroq 2>/dev/null || true
-  systemctl disable --now wings 2>/dev/null || true
   rm -rf /var/www/pterodactyl
   rm -f /etc/nginx/sites-available/pterodactyl*
   rm -f /etc/nginx/sites-enabled/pterodactyl*
   rm -f /etc/systemd/system/pteroq*
-  rm -f /etc/systemd/system/wings*
-  rm -f /usr/local/bin/wings
-  rm -f /usr/local/bin/elytra
+
+  # Only remove the Wings binary/service/unit if it wasn't installed by this
+  # installer (see detect_installed_panels() for why a bare path isn't
+  # enough evidence on its own) - otherwise this would delete a legitimate,
+  # currently-in-use Hydrodactyl Wings/Wings-RS daemon.
+  if [ -f "/usr/local/bin/wings" ] && [ ! -f "/etc/hydrodactyl/wings-version" ]; then
+    systemctl disable --now wings 2>/dev/null || true
+    rm -f /etc/systemd/system/wings*
+    rm -f /usr/local/bin/wings
+  fi
+
+  # Same reasoning for a legacy Elytra install tracked by this installer.
+  if [ -f "/usr/local/bin/elytra" ] && [ ! -f "/etc/hydrodactyl/elytra-version" ]; then
+    rm -f /usr/local/bin/elytra
+  fi
+
   systemctl daemon-reload
   output "Pterodactyl panel removed."
 }

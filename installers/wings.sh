@@ -282,15 +282,13 @@ install_wings() {
   fi
 
   local arch
-  arch=$(uname -m)
+  arch=$(wings_release_arch "$WINGS_VARIANT") || exit 1
 
   local asset_name
   if [ "$WINGS_VARIANT" == "go" ]; then
-    [[ $arch == x86_64 ]] && arch=amd64 || arch=arm64
     asset_name="wings_linux_${arch}"
     WINGS_REPO="${WINGS_REPO:-pterodactyl/wings}"
   else
-    [[ $arch == x86_64 ]] && arch=x86_64 || arch=aarch64
     asset_name="wings-rs-${arch}-linux"
     WINGS_REPO="${WINGS_REPO:-calagopus/wings}"
   fi

@@ -535,12 +535,13 @@ configure_panel_environment() {
   output "Generating application key..."
   php artisan key:generate --force
 
-  # Determine app URL
+  # Determine app URL - panel_scheme() also accounts for a custom SSL
+  # certificate (SSL_CERT_PATH), unlike checking ASSUME_SSL/CONFIGURE_LETSENCRYPT
+  # alone, which left APP_URL on http while nginx actually served https.
   local panel_url_host_part
   panel_url_host_part=$(panel_url_host "$PANEL_FQDN")
-  local app_url="http://${panel_url_host_part}"
-  [ "$ASSUME_SSL" == true ] && app_url="https://${panel_url_host_part}"
-  [ "$CONFIGURE_LETSENCRYPT" == true ] && app_url="https://${panel_url_host_part}"
+  local app_url
+  app_url="$(panel_scheme)://${panel_url_host_part}"
 
   # Setup environment using artisan commands
   output "Configuring environment..."
@@ -767,15 +768,13 @@ install_wings_daemon() {
 
   # Determine architecture and asset name based on the selected Wings variant
   local arch
-  arch=$(uname -m)
+  arch=$(wings_release_arch "$WINGS_VARIANT") || exit 1
 
   local asset_name
   if [ "$WINGS_VARIANT" == "rs" ]; then
-    [[ $arch == x86_64 ]] && arch=x86_64 || arch=aarch64
     asset_name="wings-rs-${arch}-linux"
     WINGS_REPO="${WINGS_REPO:-calagopus/wings}"
   else
-    [[ $arch == x86_64 ]] && arch=amd64 || arch=arm64
     asset_name="wings_linux_${arch}"
     WINGS_REPO="${WINGS_REPO:-pterodactyl/wings}"
   fi

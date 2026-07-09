@@ -335,16 +335,30 @@ restart_wings() {
 get_download_url() {
   local version="$1"
 
-  # Determine architecture and asset name based on the installed Wings variant
+  # Determine architecture and asset name based on the installed Wings variant.
+  # This script is self-contained (no lib.sh dependency), so the
+  # architecture mapping is inlined rather than shared via a lib.sh helper.
+  local machine
+  machine=$(uname -m)
+
   local arch
-  arch=$(uname -m)
+  case "$machine" in
+    x86_64)
+      [ "$WINGS_VARIANT" == "rs" ] && arch="x86_64" || arch="amd64"
+      ;;
+    aarch64 | arm64)
+      [ "$WINGS_VARIANT" == "rs" ] && arch="aarch64" || arch="arm64"
+      ;;
+    *)
+      error "Unsupported architecture: $machine (Wings only supports x86_64 and aarch64/arm64)"
+      exit 1
+      ;;
+  esac
 
   local asset_name
   if [ "$WINGS_VARIANT" == "rs" ]; then
-    [[ $arch == x86_64 ]] && arch=x86_64 || arch=aarch64
     asset_name="wings-rs-${arch}-linux"
   else
-    [[ $arch == x86_64 ]] && arch=amd64 || arch=arm64
     asset_name="wings_linux_${arch}"
   fi
 
