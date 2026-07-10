@@ -154,7 +154,7 @@ else
 
   # Ask if user wants to continue anyway
   echo ""
-  local continue_anyway=""
+  continue_anyway=""
   while [[ "$continue_anyway" != "y" && "$continue_anyway" != "n" ]]; do
     echo -n "* Continue anyway? [y/N]: "
     read -r continue_anyway

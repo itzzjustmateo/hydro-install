@@ -254,8 +254,6 @@ check_installations() {
   ELYTRA_INSTALLED=false
   PANEL_VERSION=""
   ELYTRA_VERSION=""
-  PANEL_UPDATER_INSTALLED=false
-  ELYTRA_UPDATER_INSTALLED=false
 
   # Check for Hydrodactyl
   if [ -d "/var/www/hydrodactyl" ]; then
@@ -265,20 +263,12 @@ check_installations() {
     fi
   fi
 
-  # Check for Elytra
-  if [ -f "/usr/local/bin/elytra" ]; then
+  # Check for Wings
+  if [ -f "/usr/local/bin/wings" ]; then
     ELYTRA_INSTALLED=true
-    if [ -f "/etc/hydrodactyl/elytra-version" ]; then
-      ELYTRA_VERSION=$(cat "/etc/hydrodactyl/elytra-version" 2>/dev/null || echo "")
+    if [ -f "/etc/hydrodactyl/wings-version" ]; then
+      ELYTRA_VERSION=$(cat "/etc/hydrodactyl/wings-version" 2>/dev/null || echo "")
     fi
-  fi
-
-  if systemctl is-enabled --quiet hydrodactyl-panel-auto-update.timer 2>/dev/null; then
-    PANEL_UPDATER_INSTALLED=true
-  fi
-
-  if systemctl is-enabled --quiet hydrodactyl-elytra-auto-update.timer 2>/dev/null; then
-    ELYTRA_UPDATER_INSTALLED=true
   fi
 }
 
@@ -306,21 +296,9 @@ show_welcome() {
   fi
 
   if [ "$ELYTRA_INSTALLED" == true ]; then
-    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Elytra installed${ELYTRA_VERSION:+ ($ELYTRA_VERSION)}"
+    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Wings installed${ELYTRA_VERSION:+ ($ELYTRA_VERSION)}"
   else
-    echo -e "  ${COLOR_RED}✗${COLOR_NC} Elytra not installed"
-  fi
-
-  if [ "$PANEL_UPDATER_INSTALLED" == true ]; then
-    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Panel auto-updater enabled"
-  else
-    echo -e "  ${COLOR_RED}✗${COLOR_NC} Panel auto-updater not installed"
-  fi
-
-  if [ "$ELYTRA_UPDATER_INSTALLED" == true ]; then
-    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Elytra auto-updater enabled"
-  else
-    echo -e "  ${COLOR_RED}✗${COLOR_NC} Elytra auto-updater not installed"
+    echo -e "  ${COLOR_RED}✗${COLOR_NC} Wings not installed"
   fi
 
   echo ""
@@ -365,29 +343,38 @@ run_panel_update() {
 
 run_elytra_update() {
   print_header
-  print_flame "Update Elytra Daemon"
+  print_flame "Update Wings Daemon"
 
-  if [ ! -f "/usr/local/bin/elytra" ]; then
-    error "Elytra is not installed at /usr/local/bin/elytra"
+  if [ ! -f "/usr/local/bin/wings" ]; then
+    error "Wings is not installed at /usr/local/bin/wings"
     return 1
   fi
 
-  # Check if auto-updater env file exists
-  if [ -f "/etc/hydrodactyl/auto-update-elytra.env" ]; then
+  # Check if a complete auto-updater env file exists (installs from before
+  # variant tracking was added may have no file, or one missing WINGS_VARIANT)
+  if [ -f "/etc/hydrodactyl/auto-update-wings.env" ] && grep -q '^WINGS_VARIANT=' "/etc/hydrodactyl/auto-update-wings.env"; then
     output "Using existing auto-updater configuration..."
   else
-    # Create temporary env file with defaults
-    mkdir -p /etc/hydrodactyl
-    echo "ELYTRA_REPO=\"pyrohost/elytra\"" > /etc/hydrodactyl/auto-update-elytra.env
-    echo "GITHUB_TOKEN=\"\"" >> /etc/hydrodactyl/auto-update-elytra.env
-    chmod 600 /etc/hydrodactyl/auto-update-elytra.env
+    warning "No saved Wings variant found for this install (it may predate variant tracking)."
+    local is_rs_variant="n"
+    bool_input is_rs_variant "Is the currently installed Wings a Wings-RS (Rust) build, rather than the standard Go Wings?" "n"
+
+    WINGS_VARIANT="go"
+    WINGS_REPO="pterodactyl/wings"
+    if [ "$is_rs_variant" == "y" ]; then
+      WINGS_VARIANT="rs"
+      WINGS_REPO="calagopus/wings"
+    fi
+    GITHUB_TOKEN=""
+    WINGS_REPO_PRIVATE="false"
+    save_wings_update_config
   fi
 
-  output "Getting and running Elytra auto-updater..."
+  output "Getting and running Wings auto-updater..."
   echo ""
 
   # Get and run the auto-update script
-  if ! get_script "installers" "auto-update-elytra"; then
+  if ! get_script "installers" "auto-update-wings"; then
     error "Update failed"
     return 1
   fi
@@ -398,7 +385,7 @@ run_elytra_update() {
 
 run_both_updates() {
   print_header
-  print_flame "Update Both Panel and Elytra"
+  print_flame "Update Both Panel and Wings"
 
   run_panel_update
   echo ""
@@ -418,8 +405,8 @@ show_menu() {
     output "${COLOR_ORANGE}What would you like to do?${COLOR_NC}"
     echo ""
     output "[${COLOR_ORANGE}0${COLOR_NC}] Install Hydrodactyl Panel"
-    output "[${COLOR_ORANGE}1${COLOR_NC}] Install Elytra Daemon"
-    output "[${COLOR_ORANGE}2${COLOR_NC}] Install both Panel and Elytra (same machine)"
+    output "[${COLOR_ORANGE}1${COLOR_NC}] Install Wings Daemon"
+    output "[${COLOR_ORANGE}2${COLOR_NC}] Install both Panel and Wings (same machine)"
     echo ""
 
     # Update options - gray out if not installed
@@ -431,34 +418,32 @@ show_menu() {
     fi
 
     if [ "$ELYTRA_INSTALLED" == true ]; then
-      output "[${COLOR_ORANGE}4${COLOR_NC}] Update Elytra Daemon"
+      output "[${COLOR_ORANGE}4${COLOR_NC}] Update Wings Daemon"
     else
-      echo -e "* [4] ${COLOR_DARK_GRAY}Update Elytra Daemon (not installed)${COLOR_NC}"
+      echo -e "* [4] ${COLOR_DARK_GRAY}Update Wings Daemon (not installed)${COLOR_NC}"
     fi
 
     if [ "$PANEL_INSTALLED" == true ] && [ "$ELYTRA_INSTALLED" == true ]; then
-      output "[${COLOR_ORANGE}5${COLOR_NC}] Update both Panel and Elytra"
+      output "[${COLOR_ORANGE}5${COLOR_NC}] Update both Panel and Wings"
     else
-      echo -e "* [5] ${COLOR_DARK_GRAY}Update both Panel and Elytra (not available)${COLOR_NC}"
+      echo -e "* [5] ${COLOR_DARK_GRAY}Update both Panel and Wings (not available)${COLOR_NC}"
     fi
 
     echo ""
-    output "[${COLOR_ORANGE}6${COLOR_NC}] Auto Updater Management"
+    output "[${COLOR_ORANGE}6${COLOR_NC}] Repair / Fix Common Issues"
     echo ""
-    output "[${COLOR_ORANGE}7${COLOR_NC}] Repair / Fix Common Issues"
+    output "[${COLOR_ORANGE}7${COLOR_NC}] Health Check"
     echo ""
-    output "[${COLOR_ORANGE}8${COLOR_NC}] Health Check"
+    output "[${COLOR_ORANGE}8${COLOR_NC}] Uninstall Hydrodactyl / Wings"
     echo ""
-    output "[${COLOR_ORANGE}9${COLOR_NC}] Uninstall Hydrodactyl / Elytra"
+    output "[${COLOR_ORANGE}9${COLOR_NC}] View Installation Information"
     echo ""
-    output "[${COLOR_ORANGE}10${COLOR_NC}] View Installation Information"
+    output "[${COLOR_ORANGE}10${COLOR_NC}] Remove Other Panels (Struxa, Pterodactyl, Dokploy, Coolify)"
     echo ""
-    output "[${COLOR_ORANGE}11${COLOR_NC}] Remove Other Panels (Struxa, Pterodactyl, Dokploy, Coolify)"
-    echo ""
-    output "[${COLOR_ORANGE}12${COLOR_NC}] Exit"
+    output "[${COLOR_ORANGE}11${COLOR_NC}] Exit"
     echo ""
 
-    echo -n "* Select an option [0-12]: "
+    echo -n "* Select an option [0-11]: "
     read -r choice
 
     case "$choice" in
@@ -467,7 +452,7 @@ show_menu() {
         continue
         ;;
       1)
-        execute_ui "elytra"
+        execute_ui "wings"
         continue
         ;;
       2)
@@ -485,7 +470,7 @@ show_menu() {
         ;;
       4)
         if [ "$ELYTRA_INSTALLED" == false ]; then
-          error "Elytra Daemon is not installed"
+          error "Wings Daemon is not installed"
           sleep 2
           continue
         fi
@@ -494,7 +479,7 @@ show_menu() {
         ;;
       5)
         if [ "$PANEL_INSTALLED" == false ] || [ "$ELYTRA_INSTALLED" == false ]; then
-          error "Both Panel and Elytra must be installed to use this option"
+          error "Both Panel and Wings must be installed to use this option"
           sleep 2
           continue
         fi
@@ -502,23 +487,19 @@ show_menu() {
         continue
         ;;
       6)
-        execute_ui "auto-updater-menu"
-        continue
-        ;;
-      7)
         execute_ui "repair"
         continue
         ;;
-      8)
+      7)
         # Health Check - runs based on what's installed
         if [ "$PANEL_INSTALLED" == true ] && [ "$ELYTRA_INSTALLED" == true ]; then
           check_both_health
         elif [ "$PANEL_INSTALLED" == true ]; then
           check_panel_health
         elif [ "$ELYTRA_INSTALLED" == true ]; then
-          check_elytra_health
+          check_wings_health
         else
-          error "Nothing installed to check. Install Hydrodactyl or Elytra first."
+          error "Nothing installed to check. Install Hydrodactyl or Wings first."
           sleep 2
           continue
         fi
@@ -526,15 +507,15 @@ show_menu() {
         read -r
         continue
         ;;
-      9)
+      8)
         execute_ui "uninstall"
         continue
         ;;
-      10)
+      9)
         execute_ui "view-info"
         continue
         ;;
-      11)
+      10)
         # Remove other panels
         local detected_panels
         detected_panels=($(detect_installed_panels))
@@ -587,12 +568,12 @@ show_menu() {
         read -r
         continue
         ;;
-      12)
+      11)
         output "Exiting..."
         exit 0
         ;;
       *)
-        error "Invalid option. Please select 0-12."
+        error "Invalid option. Please select 0-11."
         ;;
     esac
   done

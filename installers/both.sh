@@ -61,8 +61,23 @@ else
   MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-$(gen_passwd 64)}"
 fi
 
-# Elytra configuration
-ELYTRA_REPO="${ELYTRA_REPO:-pyrohost/elytra}"
+# Wings configuration
+WINGS_VARIANT="${WINGS_VARIANT:-go}"
+WINGS_VARIANT=$(echo "$WINGS_VARIANT" | tr '[:upper:]' '[:lower:]')
+# Validate here, before install_docker/panel/daemon setup run, instead of
+# only in wings_release_arch() deep inside install_wings_daemon() - a typo
+# in the WINGS_VARIANT env var would otherwise waste that work before failing.
+case "$WINGS_VARIANT" in
+  go | rs) ;;
+  *)
+    error "Unsupported Wings variant: $WINGS_VARIANT (expected 'go' or 'rs')"
+    exit 1
+    ;;
+esac
+# Repo default depends on variant (pterodactyl/wings vs calagopus/wings) and
+# is resolved in install_wings_daemon() - do not default it here, or a
+# variant-specific default below would never apply once this is non-empty.
+WINGS_REPO="${WINGS_REPO:-}"
 NODE_NAME="${NODE_NAME:-local}"
 NODE_DESCRIPTION="${NODE_DESCRIPTION:-Local Node}"
 NODE_TOKEN="${NODE_TOKEN:-$(gen_passwd 32)}"
@@ -72,17 +87,24 @@ BEHIND_PROXY="${BEHIND_PROXY:-false}"
 CONFIGURE_FIREWALL="${CONFIGURE_FIREWALL:-false}"
 GAME_PORT_START="${GAME_PORT_START:-27015}"
 GAME_PORT_END="${GAME_PORT_END:-28025}"
-INSTALL_AUTO_UPDATER_PANEL="${INSTALL_AUTO_UPDATER_PANEL:-false}"
-INSTALL_AUTO_UPDATER_ELYTRA="${INSTALL_AUTO_UPDATER_ELYTRA:-false}"
 
 # GitHub
 PANEL_REPO_PRIVATE="${PANEL_REPO_PRIVATE:-false}"
-ELYTRA_REPO_PRIVATE="${ELYTRA_REPO_PRIVATE:-false}"
+WINGS_REPO_PRIVATE="${WINGS_REPO_PRIVATE:-false}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+# Panel and Wings can be hosted in different repos with different tokens
+# (e.g. a public panel fork + a private custom Wings repo); GITHUB_TOKEN is
+# kept as a single-value fallback for direct CLI/env-var usage.
+GITHUB_TOKEN_PANEL="${GITHUB_TOKEN_PANEL:-$GITHUB_TOKEN}"
+GITHUB_TOKEN_WINGS="${GITHUB_TOKEN_WINGS:-$GITHUB_TOKEN}"
 
 # Paths
 INSTALL_DIR="${INSTALL_DIR:-/var/www/hydrodactyl}"
-ELYTRA_DIR="${ELYTRA_DIR:-/etc/elytra}"
+# This script only ever installs Wings, never legacy Elytra - always use the
+# Wings config dir. lib.sh unconditionally exports ELYTRA_DIR="/etc/elytra"
+# for the legacy Elytra flow, so a "${ELYTRA_DIR:-...}" default here would
+# never apply (it's already non-empty by the time this line runs).
+ELYTRA_DIR="/etc/pterodactyl"
 PANEL_CONFIG_DIR="${PANEL_CONFIG_DIR:-/etc/hydrodactyl}"
 
 # Node ID (will be set during installation)
@@ -116,9 +138,16 @@ validate_configuration() {
     exit 1
   fi
 
-  if ! check_fqdn "$PANEL_FQDN"; then
+  if ! check_fqdn "$PANEL_FQDN" && ! is_ip_address "$PANEL_FQDN"; then
     error "Invalid FQDN: $PANEL_FQDN"
     exit 1
+  fi
+
+  if is_ip_address "$PANEL_FQDN" && { [ "$CONFIGURE_LETSENCRYPT" == true ] || [ -n "$SSL_CERT_PATH" ]; }; then
+    warning "Let's Encrypt/custom SSL cannot be used with an IP address ($PANEL_FQDN). Disabling SSL."
+    CONFIGURE_LETSENCRYPT=false
+    SSL_CERT_PATH=""
+    SSL_KEY_PATH=""
   fi
 
   success "Configuration valid"
@@ -135,10 +164,17 @@ if (( ${#missing[@]} > 0 )); then
 fi
 
 # Validate FQDN
-if ! check_fqdn "$PANEL_FQDN"; then
+if ! check_fqdn "$PANEL_FQDN" && ! is_ip_address "$PANEL_FQDN"; then
   error "Invalid FQDN: $PANEL_FQDN"
-  error "FQDN must be a domain name, not an IP address"
+  error "FQDN must be a valid domain name or IP address"
   exit 1
+fi
+
+if is_ip_address "$PANEL_FQDN" && { [ "$CONFIGURE_LETSENCRYPT" == true ] || [ -n "$SSL_CERT_PATH" ]; }; then
+  warning "Let's Encrypt/custom SSL cannot be used with an IP address ($PANEL_FQDN). Disabling SSL."
+  CONFIGURE_LETSENCRYPT=false
+  SSL_CERT_PATH=""
+  SSL_KEY_PATH=""
 fi
 
 # ---------------- Installation Functions ---------------- #
@@ -150,19 +186,21 @@ check_existing() {
     has_existing=true
   fi
 
-  if check_existing_installation "elytra"; then
+  if check_existing_installation "wings"; then
     has_existing=true
   fi
 
   if [ "$has_existing" == true ]; then
     echo ""
-    if ! bool_input "Continue with installation? This may overwrite existing files" "n"; then
+    local confirm_replace=""
+    bool_input confirm_replace "Continue with installation? This may overwrite existing files" "n"
+    if [ "$confirm_replace" != "y" ]; then
       error "Installation aborted."
       exit 1
     fi
 
     # Stop services if they exist
-    systemctl stop elytra 2>/dev/null || true
+    systemctl stop wings 2>/dev/null || true
     systemctl stop hydroq 2>/dev/null || true
   fi
 }
@@ -175,23 +213,8 @@ install_panel_dependencies() {
   update_repos true
 
   case "$OS" in
-    ubuntu)
-      output "Setting up Ubuntu repositories..."
-      install_packages "software-properties-common apt-transport-https ca-certificates gnupg2"
-      add-apt-repository universe -y
-      LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
-      update_repos true
-      install_packages "php${PHP_VERSION}-fpm php${PHP_VERSION}-cli php${PHP_VERSION}-gd php${PHP_VERSION}-mysql php${PHP_VERSION}-pdo php${PHP_VERSION}-mbstring php${PHP_VERSION}-tokenizer php${PHP_VERSION}-bcmath php${PHP_VERSION}-xml php${PHP_VERSION}-curl php${PHP_VERSION}-zip php${PHP_VERSION}-intl php${PHP_VERSION}-redis php${PHP_VERSION}-sqlite3"
-
-      ensure_php_default
-      ;;
-
-    debian)
-      output "Setting up Debian repositories..."
-      install_packages "dirmngr ca-certificates apt-transport-https lsb-release"
-      curl -o /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
-      echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/php.list
-      update_repos true
+    ubuntu|debian)
+      configure_php_apt_repo
       install_packages "php${PHP_VERSION}-fpm php${PHP_VERSION}-cli php${PHP_VERSION}-gd php${PHP_VERSION}-mysql php${PHP_VERSION}-pdo php${PHP_VERSION}-mbstring php${PHP_VERSION}-tokenizer php${PHP_VERSION}-bcmath php${PHP_VERSION}-xml php${PHP_VERSION}-curl php${PHP_VERSION}-zip php${PHP_VERSION}-intl php${PHP_VERSION}-redis php${PHP_VERSION}-sqlite3"
 
       ensure_php_default
@@ -211,6 +234,12 @@ install_panel_dependencies() {
   # Install common packages
   install_packages "nginx mariadb-server redis-server curl tar unzip git certbot python3-certbot-nginx jq"
 
+  # Enable Redis now - configure_panel_environment() runs artisan commands
+  # with --cache=redis/--session=redis/--queue=redis and needs a live
+  # connection well before setup_panel_services() (which used to be the
+  # only place this was enabled) ever runs.
+  enable_redis
+
   success "Panel dependencies installed"
 }
 
@@ -224,7 +253,7 @@ install_panel_release() {
   fi
 
   # Only require token for private repos
-  if [ "$PANEL_REPO_PRIVATE" == "true" ] && [ -z "$GITHUB_TOKEN" ]; then
+  if [ "$PANEL_REPO_PRIVATE" == "true" ] && [ -z "$GITHUB_TOKEN_PANEL" ]; then
     error "GitHub token is required to download the panel from the private repository."
     error "Please provide a token using --github-token or set the GITHUB_TOKEN environment variable."
     exit 1
@@ -248,8 +277,8 @@ install_panel_release() {
     "--header" "X-GitHub-Api-Version: 2022-11-28"
   )
 
-  if [ -n "$GITHUB_TOKEN" ]; then
-    curl_headers+=("--header" "Authorization: Bearer $GITHUB_TOKEN")
+  if [ -n "$GITHUB_TOKEN_PANEL" ]; then
+    curl_headers+=("--header" "Authorization: Bearer $GITHUB_TOKEN_PANEL")
   fi
 
   # Get the release info from GitHub API
@@ -284,6 +313,9 @@ install_panel_release() {
   echo "$release_tag" > /etc/hydrodactyl/panel-version
   chmod 644 /etc/hydrodactyl/panel-version
 
+  # Persist the repo/token/method for the manual update menu
+  save_panel_update_config "releases"
+
   output "Creating installation directory..."
   mkdir -p "$INSTALL_DIR"
   cd "$INSTALL_DIR"
@@ -296,8 +328,8 @@ install_panel_release() {
     "--header" "X-GitHub-Api-Version: 2022-11-28"
   )
 
-  if [ -n "$GITHUB_TOKEN" ]; then
-    download_headers+=("--header" "Authorization: Bearer $GITHUB_TOKEN")
+  if [ -n "$GITHUB_TOKEN_PANEL" ]; then
+    download_headers+=("--header" "Authorization: Bearer $GITHUB_TOKEN_PANEL")
   fi
 
   # Download using the asset API URL
@@ -326,14 +358,14 @@ install_panel_release() {
     output ".env.example not found in release, downloading from repository..."
     local env_url="https://raw.githubusercontent.com/${PANEL_REPO}/main/.env.example"
 
-    if [ -n "$GITHUB_TOKEN" ]; then
+    if [ -n "$GITHUB_TOKEN_PANEL" ]; then
       curl -fsSL \
-        --header "Authorization: Bearer $GITHUB_TOKEN" \
+        --header "Authorization: Bearer $GITHUB_TOKEN_PANEL" \
         --header "Accept: application/vnd.github.v3.raw" \
         -o .env.example \
-        "$env_url" 2>/dev/null || warning "Failed to download .env.example from repository"
+        "$env_url" || warning "Failed to download .env.example from repository"
     else
-      curl -fsSL -o .env.example "$env_url" 2>/dev/null || warning "Failed to download .env.example from repository"
+      curl -fsSL -o .env.example "$env_url" || warning "Failed to download .env.example from repository"
     fi
 
     if [ ! -f ".env.example" ]; then
@@ -344,6 +376,10 @@ install_panel_release() {
   fi
 
   cp .env.example .env
+
+  # Match the official install docs: set storage/bootstrap-cache permissions
+  # right after getting the source, before composer/artisan touch them.
+  chmod -R 755 storage/* bootstrap/cache/
 
   # Install composer and dependencies
   install_composer
@@ -371,7 +407,7 @@ install_panel_clone() {
 
   # Simple token-based auth: embed token in URL if provided
   local git_url="https://github.com/${PANEL_REPO}.git"
-  [ -n "$GITHUB_TOKEN" ] && git_url="https://${GITHUB_TOKEN}@github.com/${PANEL_REPO}.git"
+  [ -n "$GITHUB_TOKEN_PANEL" ] && git_url="https://${GITHUB_TOKEN_PANEL}@github.com/${PANEL_REPO}.git"
 
   output "Cloning from https://github.com/${PANEL_REPO}.git"
   if ! git clone "$git_url" "$INSTALL_DIR"; then
@@ -381,6 +417,10 @@ install_panel_clone() {
 
   cd "$INSTALL_DIR"
   cp .env.example .env
+
+  # Match the official install docs: set storage/bootstrap-cache permissions
+  # right after getting the source, before composer/artisan touch them.
+  chmod -R 755 storage/* bootstrap/cache/
 
   # Install composer and dependencies
   install_composer
@@ -401,6 +441,9 @@ install_panel_clone() {
   mkdir -p /etc/hydrodactyl
   echo "git:${commit_hash}" > /etc/hydrodactyl/panel-version
   chmod 644 /etc/hydrodactyl/panel-version
+
+  # Persist the repo/token/method for the manual update menu
+  save_panel_update_config "git"
 
   success "Panel cloned to $INSTALL_DIR"
 }
@@ -475,14 +518,41 @@ configure_panel_environment() {
 
   cd "$INSTALL_DIR"
 
+  # Clear any bootstrap cache baked into the release tarball or created by
+  # composer's post-install scripts (e.g. package:discover/optimize running
+  # against the still-default .env we just copied). A stale cached config
+  # makes Laravel ignore .env entirely - including the key we're about to
+  # generate - and "php artisan key:generate" itself fails with
+  # "No application encryption key has been specified" before writing
+  # anything. `artisan config:clear` can't fix this (it needs the framework
+  # to boot too), so remove the cache files directly.
+  rm -f bootstrap/cache/*.php
+
+  # p:environment:setup never touches APP_KEY, so "key:generate" has to be
+  # the thing that sets it - but Laravel boots EncryptionServiceProvider
+  # (which requires app.key to already be non-empty) before any console
+  # command runs, including key:generate itself. With a fresh .env (APP_KEY
+  # empty), that boot step throws "No application encryption key has been
+  # specified" before key:generate ever gets a chance to write a new one.
+  # Seed a throwaway key first so boot succeeds; key:generate --force then
+  # overwrites it with the real one.
+  if grep -q "^APP_KEY=" .env; then
+    sed -i "s|^APP_KEY=.*$|APP_KEY=base64:$(head -c 32 /dev/urandom | base64 | tr -d '\n')|g" .env
+  else
+    echo "APP_KEY=base64:$(head -c 32 /dev/urandom | base64 | tr -d '\n')" >> .env
+  fi
+
   # Generate application key
   output "Generating application key..."
   php artisan key:generate --force
 
-  # Determine app URL
-  local app_url="http://$PANEL_FQDN"
-  [ "$ASSUME_SSL" == true ] && app_url="https://$PANEL_FQDN"
-  [ "$CONFIGURE_LETSENCRYPT" == true ] && app_url="https://$PANEL_FQDN"
+  # Determine app URL - panel_scheme() also accounts for a custom SSL
+  # certificate (SSL_CERT_PATH), unlike checking ASSUME_SSL/CONFIGURE_LETSENCRYPT
+  # alone, which left APP_URL on http while nginx actually served https.
+  local panel_url_host_part
+  panel_url_host_part=$(panel_url_host "$PANEL_FQDN")
+  local app_url
+  app_url="$(panel_scheme)://${panel_url_host_part}"
 
   # Setup environment using artisan commands
   output "Configuring environment..."
@@ -519,7 +589,7 @@ configure_panel_environment() {
     --name-first="$PANEL_ADMIN_FIRSTNAME" \
     --name-last="$PANEL_ADMIN_LASTNAME" \
     --password="$PANEL_ADMIN_PASSWORD" \
-    --admin=1 </dev/null
+    --admin </dev/null
 
   success "Environment configured"
 }
@@ -541,9 +611,6 @@ setup_panel_services() {
     find "$INSTALL_DIR/bootstrap/cache" -type f -exec chmod 644 {} \; 2>/dev/null || true
   fi
 
-  # Enable Redis
-  enable_redis
-
   # Enable nginx
   systemctl enable nginx
 
@@ -562,7 +629,7 @@ setup_panel_services() {
     php_socket=$(get_php_socket)
 
     local use_ssl=false
-    [ -n "$SSL_CERT_PATH" ] && [ -n "$SSL_KEY_PATH" ] && use_ssl=true
+    has_custom_ssl_cert && use_ssl=true
 
     install_nginx_config "$PANEL_FQDN" "$php_socket" "$use_ssl" "$SSL_CERT_PATH" "$SSL_KEY_PATH"
   fi
@@ -588,7 +655,8 @@ create_node_in_panel() {
 
   # Check if we have API key for API-based creation
   if [ -n "$PANEL_API_KEY" ] && [ -n "$PANEL_FQDN" ]; then
-    local panel_url="https://${PANEL_FQDN}"
+    local panel_url
+    panel_url="$(panel_scheme)://$(panel_url_host "$PANEL_FQDN")"
 
     # Step 1: Detect country and get/create location
     output "Detecting server location..."
@@ -654,8 +722,8 @@ create_node_in_panel() {
     --locationId="$location_id" \
     --fqdn="$PANEL_FQDN" \
     --public=1 \
-    --scheme=https \
-    --proxy=$([ "$BEHIND_PROXY" == "true" ] && echo "yes" || echo "no") \
+    --scheme="$(panel_scheme)" \
+    --proxy="$([ "$BEHIND_PROXY" == "true" ] && echo "yes" || echo "no")" \
     --maxMemory="$max_memory" \
     --overallocateMemory=0 \
     --maxDisk="$max_disk" \
@@ -676,8 +744,8 @@ create_node_in_panel() {
 
 # ---------------- Elytra Installation ---------------- #
 
-install_elytra_daemon() {
-  print_flame "Installing Elytra Daemon"
+install_wings_daemon() {
+  print_flame "Installing Wings Daemon"
 
   # Install Docker using shared function from lib.sh
   install_docker
@@ -685,9 +753,9 @@ install_elytra_daemon() {
   # Create directories
   mkdir -p "$ELYTRA_DIR"
   mkdir -p "$PANEL_CONFIG_DIR"
-  mkdir -p /var/lib/elytra/volumes
-  mkdir -p /var/lib/elytra/archives
-  mkdir -p /var/lib/elytra/backups
+  mkdir -p /var/lib/pterodactyl/volumes
+  mkdir -p /var/lib/pterodactyl/archives
+  mkdir -p /var/lib/pterodactyl/backups
 
   # Create hydrodactyl group first (required for user creation)
   output "Creating hydrodactyl system group..."
@@ -709,38 +777,47 @@ install_elytra_daemon() {
     usermod -aG docker hydrodactyl 2>/dev/null || true
   fi
 
-  # Determine architecture
+  # Determine architecture and asset name based on the selected Wings variant
   local arch
-  arch=$(uname -m)
-  [[ $arch == x86_64 ]] && arch=amd64 || arch=arm64
+  arch=$(wings_release_arch "$WINGS_VARIANT") || exit 1
 
-  local asset_name="elytra_linux_${arch}"
+  local asset_name
+  if [ "$WINGS_VARIANT" == "rs" ]; then
+    asset_name="wings-rs-${arch}-linux"
+    WINGS_REPO="${WINGS_REPO:-calagopus/wings}"
+  else
+    asset_name="wings_linux_${arch}"
+    WINGS_REPO="${WINGS_REPO:-pterodactyl/wings}"
+  fi
 
   # Get latest release
-  output "Fetching latest Elytra release..."
+  output "Fetching latest Wings release..."
   local latest_release
-  latest_release=$(get_latest_release "$ELYTRA_REPO" "$GITHUB_TOKEN")
+  latest_release=$(get_latest_release "$WINGS_REPO" "$GITHUB_TOKEN_WINGS")
 
   if [ -z "$latest_release" ] || [ "$latest_release" == "null" ]; then
-    error "Could not fetch latest release from $ELYTRA_REPO"
+    error "Could not fetch latest release from $WINGS_REPO"
     exit 1
   fi
 
   info "Latest release: $latest_release"
 
   # Download binary
-  output "Downloading Elytra binary..."
-  if ! download_release_asset "$ELYTRA_REPO" "$asset_name" "/usr/local/bin/elytra" "$GITHUB_TOKEN"; then
-    error "Failed to download Elytra binary"
+  output "Downloading Wings binary..."
+  if ! download_release_asset "$WINGS_REPO" "$asset_name" "/usr/local/bin/wings" "$GITHUB_TOKEN_WINGS"; then
+    error "Failed to download Wings binary"
     exit 1
   fi
 
-  chmod +x /usr/local/bin/elytra
+  chmod +x /usr/local/bin/wings
 
   # Save version from GitHub release tag for auto-updater tracking
   mkdir -p /etc/hydrodactyl
-  echo "$latest_release" > /etc/hydrodactyl/elytra-version
-  chmod 644 /etc/hydrodactyl/elytra-version
+  echo "$latest_release" > /etc/hydrodactyl/wings-version
+  chmod 644 /etc/hydrodactyl/wings-version
+
+  # Persist the installed variant/repo for the manual update menu
+  save_wings_update_config
 
   # Create Elytra config directory
   output "Creating Elytra config directory at ${ELYTRA_DIR}..."
@@ -750,8 +827,9 @@ install_elytra_daemon() {
     exit 1
   fi
 
-  # Determine panel URL - always use HTTPS for API
-  local panel_url="https://${PANEL_FQDN}"
+  # Determine panel URL based on configured SSL/TLS
+  local panel_url
+  panel_url="$(panel_scheme)://$(panel_url_host "$PANEL_FQDN")"
 
   # Debug output
   output "DEBUG: Elytra configuration values:"
@@ -759,16 +837,14 @@ install_elytra_daemon() {
   output "DEBUG: PANEL_FQDN=${PANEL_FQDN}"
   output "DEBUG: ELYTRA_DIR=${ELYTRA_DIR}"
 
-  # Configure Elytra using the official configure command
-  output "Configuring Elytra using 'elytra configure' command..."
-  cd "${ELYTRA_DIR}" && elytra configure --panel-url "${panel_url}" --token "${PANEL_API_KEY}" --node "${NODE_ID}"
-
-  if [ $? -ne 0 ]; then
-    error "Failed to configure Elytra"
+  # Configure Wings using the official configure command
+  output "Configuring Wings using 'wings configure' command..."
+  if ! (cd "${ELYTRA_DIR}" && wings configure --panel-url "${panel_url}" --token "${PANEL_API_KEY}" --node "${NODE_ID}"); then
+    error "Failed to configure Wings"
     exit 1
   fi
 
-  output "DEBUG: Elytra configured successfully"
+  output "DEBUG: Wings configured successfully"
 
   # Disable permission checking to prevent Elytra from resetting permissions
   output "Disabling permission checks in Elytra config..."
@@ -801,43 +877,43 @@ install_elytra_daemon() {
   install_rustic
 
   # Get systemd service
-  output "Setting up Elytra service..."
-  if ! get_config "elytra.service" "/etc/systemd/system/elytra.service"; then
-    error "Failed to get Elytra service file"
+  output "Setting up Wings service..."
+  if ! get_config "wings.service" "/etc/systemd/system/wings.service"; then
+    error "Failed to get Wings service file"
     exit 1
   fi
 
   systemctl daemon-reload
-  systemctl enable elytra
-  systemctl restart elytra
+  systemctl enable wings
+  systemctl restart wings
 
   # Wait for service to start
   sleep 3
 
-  if systemctl is-active --quiet elytra; then
-    success "Elytra is running"
+  if systemctl is-active --quiet wings; then
+    success "Wings is running"
   else
-    warning "Elytra service may not have started properly"
+    warning "Wings service may not have started properly"
   fi
 
   # Set proper ownership and permissions on Elytra data directories (after service starts)
   output "Ensuring Elytra data directories exist..."
-  mkdir -p /var/lib/elytra/volumes /var/lib/elytra/archives /var/lib/elytra/backups
+  mkdir -p /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups
 
   output "Setting final permissions on Elytra data directories..."
-  chown -R 8888:8888 /var/lib/elytra/volumes /var/lib/elytra/archives /var/lib/elytra/backups "$ELYTRA_DIR" 2>/dev/null || true
+  chown -R 8888:8888 /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups "$ELYTRA_DIR" 2>/dev/null || true
 
   # Set full permissions so containers can read/write/execute
   # Note: 777 is required for containerized game servers to access these directories
-  # Ensure parent /var/lib/elytra is accessible
-  chmod 755 /var/lib/elytra 2>/dev/null || true
+  # Ensure parent /var/lib/pterodactyl is accessible
+  chmod 755 /var/lib/pterodactyl 2>/dev/null || true
   # Ensure the volumes directory itself and all contents have 777
-  chmod 777 /var/lib/elytra/volumes 2>/dev/null || true
-  chmod -R 777 /var/lib/elytra/volumes/* 2>/dev/null || true
-  chmod 777 /var/lib/elytra/archives 2>/dev/null || true
-  chmod -R 777 /var/lib/elytra/archives/* 2>/dev/null || true
-  chmod 777 /var/lib/elytra/backups 2>/dev/null || true
-  chmod -R 777 /var/lib/elytra/backups/* 2>/dev/null || true
+  chmod 777 /var/lib/pterodactyl/volumes 2>/dev/null || true
+  chmod -R 777 /var/lib/pterodactyl/volumes/* 2>/dev/null || true
+  chmod 777 /var/lib/pterodactyl/archives 2>/dev/null || true
+  chmod -R 777 /var/lib/pterodactyl/archives/* 2>/dev/null || true
+  chmod 777 /var/lib/pterodactyl/backups 2>/dev/null || true
+  chmod -R 777 /var/lib/pterodactyl/backups/* 2>/dev/null || true
   chmod -R 755 "$ELYTRA_DIR" 2>/dev/null || true
   [ -f "$ELYTRA_DIR/config.yml" ] && chmod 600 "$ELYTRA_DIR/config.yml" 2>/dev/null || true
 
@@ -896,30 +972,12 @@ configure_firewall() {
   fi
 }
 
-install_auto_updaters() {
-  if [ "$INSTALL_AUTO_UPDATER_PANEL" == true ]; then
-    print_flame "Installing Panel Auto-Updater"
-    export PANEL_REPO
-    export PANEL_REPO_PRIVATE
-    export GITHUB_TOKEN
-    install_auto_updater_panel
-  fi
-
-  if [ "$INSTALL_AUTO_UPDATER_ELYTRA" == true ]; then
-    print_flame "Installing Elytra Auto-Updater"
-    export ELYTRA_REPO
-    export ELYTRA_REPO_PRIVATE
-    export GITHUB_TOKEN
-    install_auto_updater_elytra
-  fi
-}
-
 # ---------------- Main ---------------- #
 
 main() {
   print_header
   print_flame "Starting Combined Installation"
-  output "This will install Hydrodactyl Panel and Elytra on the same machine."
+  output "This will install Hydrodactyl Panel and Wings on the same machine."
   echo ""
 
   validate_configuration
@@ -963,8 +1021,8 @@ main() {
   # Setup database host for the panel
   setup_database_host "$PANEL_FQDN"
 
-  # Elytra installation
-  install_elytra_daemon
+  # Wings installation
+  install_wings_daemon
 
   # Create Minecraft server if requested and API key is available
   if [ "$CREATE_MINECRAFT_SERVER" == "true" ] && [ -n "$PANEL_API_KEY" ]; then
@@ -974,8 +1032,8 @@ main() {
     ALLOCATION_ID=$(mysql -u root -p"${MYSQL_ROOT_PASSWORD}" -D panel -N -B -e "SELECT id FROM allocations WHERE node_id=${NODE_ID} LIMIT 1;" 2>/dev/null || echo "")
 
     if [ -n "$ALLOCATION_ID" ]; then
-      # Determine panel URL - always use HTTPS for API
-      PANEL_URL="https://${PANEL_FQDN}"
+      # Determine panel URL based on configured SSL/TLS
+      PANEL_URL="$(panel_scheme)://$(panel_url_host "$PANEL_FQDN")"
 
       # Create the server
       if create_minecraft_server "$PANEL_URL" "$PANEL_API_KEY" "$NODE_ID" "$LOCATION_ID" "$ALLOCATION_ID"; then
@@ -993,9 +1051,6 @@ main() {
   # Firewall
   configure_firewall
 
-  # Auto-updaters
-  install_auto_updaters
-
   # Pause to let user review logs before showing completion screen
   echo ""
   output "Installation finished, press Enter to view details..."
@@ -1005,12 +1060,12 @@ main() {
   print_flame "Installation Complete!"
 
   echo ""
-  output "🎉 Hydrodactyl Panel and Elytra have been successfully installed!"
+  output "🎉 Hydrodactyl Panel and Wings have been successfully installed!"
   echo ""
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   output "  Panel Information"
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  output "Panel URL:      ${COLOR_ORANGE}https://${PANEL_FQDN}${COLOR_NC}"
+  output "Panel URL:      ${COLOR_ORANGE}$(panel_scheme)://$(panel_url_host "$PANEL_FQDN")${COLOR_NC}"
   output "Admin Email:    ${COLOR_ORANGE}${PANEL_ADMIN_EMAIL}${COLOR_NC}"
   output "Admin Username: ${COLOR_ORANGE}${PANEL_ADMIN_USERNAME}${COLOR_NC}"
   output "Admin Password: ${COLOR_ORANGE}${PANEL_ADMIN_PASSWORD}${COLOR_NC}"
@@ -1022,7 +1077,7 @@ main() {
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   output "  phpMyAdmin Database Access"
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  output "URL:      ${COLOR_ORANGE}http://${PANEL_FQDN}:8081${COLOR_NC}"
+  output "URL:      ${COLOR_ORANGE}http://$(panel_url_host "$PANEL_FQDN"):8081${COLOR_NC}"
   output "Username: ${COLOR_ORANGE}phpmyadmin${COLOR_NC}"
   output "Password: ${COLOR_ORANGE}${PHPMYADMIN_PASSWORD}${COLOR_NC}"
   output "Alternative Logins:"
@@ -1035,7 +1090,7 @@ main() {
   output "Node Name:        ${COLOR_ORANGE}${NODE_NAME}${COLOR_NC}"
   output "Node ID:          ${COLOR_ORANGE}${NODE_ID}${COLOR_NC}"
   output "Node Description: ${COLOR_ORANGE}${NODE_DESCRIPTION}${COLOR_NC}"
-  output "Database Host:    ${COLOR_ORANGE}${PANEL_FQDN}:3306${COLOR_NC}"
+  output "Database Host:    ${COLOR_ORANGE}$(panel_url_host "$PANEL_FQDN"):3306${COLOR_NC}"
   output "Database User:    ${COLOR_ORANGE}dbhost${COLOR_NC}"
   echo ""
   if [ -n "$CREATED_SERVER_ID" ]; then
@@ -1059,29 +1114,21 @@ main() {
   output "Both components are configured to work together on this machine!"
   echo ""
 
-  if [ "$INSTALL_AUTO_UPDATER_PANEL" == true ] || [ "$INSTALL_AUTO_UPDATER_ELYTRA" == true ]; then
-    output "✅ Auto-updaters are enabled and will check for updates hourly."
-    echo ""
-  fi
-
   output "Service Commands:"
   output "  ${COLOR_ORANGE}systemctl status hydroq${COLOR_NC}    - Panel queue worker"
-  output "  ${COLOR_ORANGE}systemctl status elytra${COLOR_NC}    - Elytra daemon"
-  output "  ${COLOR_ORANGE}journalctl -u elytra -f${COLOR_NC}   - View Elytra logs"
+  output "  ${COLOR_ORANGE}systemctl status wings${COLOR_NC}     - Wings daemon"
+  output "  ${COLOR_ORANGE}journalctl -u wings -f${COLOR_NC}    - View Wings logs"
   echo ""
 
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   output "  Manual Reconfiguration"
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  output "If you need to reconfigure Elytra manually, run:"
+  output "If you need to reconfigure Wings manually, run:"
   output ""
-  output "  ${COLOR_ORANGE}cd /etc/elytra && sudo elytra configure \\"
-  output "    --panel-url 'https://${PANEL_FQDN}' \\"
+  output "  ${COLOR_ORANGE}cd /etc/pterodactyl && sudo wings configure \\"
+  output "    --panel-url '$(panel_scheme)://$(panel_url_host "$PANEL_FQDN")' \\"
   output "    --token '<your-api-key>' \\"
   output "    --node '${NODE_ID}'${COLOR_NC}"
-  output ""
-  output "Or use the installer function (if running the installer):"
-  output "  ${COLOR_ORANGE}configure_elytra 'https://${PANEL_FQDN}' '<api-key>' '${NODE_ID}'${COLOR_NC}"
   echo ""
 
   print_brake 70

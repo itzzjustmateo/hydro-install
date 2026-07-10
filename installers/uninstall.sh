@@ -8,6 +8,7 @@ source /tmp/hydrodactyl-lib.sh
 # Configuration
 PANEL_DIR="/var/www/hydrodactyl"
 ELYTRA_DIR="/etc/elytra"
+WINGS_DIR="/etc/pterodactyl"
 PANEL_DATA_DIR="/var/lib/hydrodactyl"
 
 remove_panel() {
@@ -50,22 +51,34 @@ remove_panel() {
     success "Panel removed"
 }
 
-remove_elytra() {
-    print_flame "Removing Elytra"
+# Shared daemon-removal steps for Elytra and Wings/Wings-RS, so their
+# uninstall logic (service, binary, config, Docker containers, data dir,
+# tracking files) can't silently drift apart as separate copies.
+# Usage: remove_daemon_common <label> <service> <binary> <config_dir> <data_dir> <version_file...>
+remove_daemon_common() {
+    local label="$1"
+    local service="$2"
+    local binary="$3"
+    local config_dir="$4"
+    local data_dir="$5"
+    shift 5
+    local version_files=("$@")
+
+    print_flame "Removing ${label}"
 
     # Stop and remove service
-    output "Stopping Elytra service..."
-    systemctl stop elytra 2>/dev/null || true
-    systemctl disable elytra 2>/dev/null || true
+    output "Stopping ${label} service..."
+    systemctl stop "$service" 2>/dev/null || true
+    systemctl disable "$service" 2>/dev/null || true
 
     # Remove binary
-    output "Removing Elytra binary..."
-    rm -f /usr/local/bin/elytra
+    output "Removing ${label} binary..."
+    rm -f "$binary"
 
     # Remove configuration
-    if [ -d "$ELYTRA_DIR" ]; then
-        output "Removing Elytra configuration..."
-        rm -rf "$ELYTRA_DIR"
+    if [ -d "$config_dir" ]; then
+        output "Removing ${label} configuration..."
+        rm -rf "$config_dir"
     fi
 
     # Stop and remove all game servers (Docker containers)
@@ -74,19 +87,33 @@ remove_elytra() {
     docker ps -aq --filter "name=fly-" | xargs -r docker rm 2>/dev/null || true
 
     # Remove systemd service
-    rm -f /etc/systemd/system/elytra.service
+    rm -f "/etc/systemd/system/${service}.service"
     systemctl daemon-reload
 
-    # Remove Elytra data directory
-    if [ -d "/var/lib/elytra" ]; then
-        output "Removing Elytra data directory..."
-        rm -rf /var/lib/elytra
+    # Remove data directory
+    if [ -d "$data_dir" ]; then
+        output "Removing ${label} data directory..."
+        rm -rf "$data_dir"
     fi
 
-    # Remove Elytra version file
-    rm -f /etc/hydrodactyl/elytra-version
+    # Remove version/tracking files
+    local version_file
+    for version_file in "${version_files[@]}"; do
+        rm -f "$version_file"
+    done
 
-    # Remove hydrodactyl user (if it exists)
+    # Success message is printed by the caller, not here - remove_elytra()
+    # has an extra user-removal step after this returns, and printing
+    # "removed" before that step completes would be misleading.
+}
+
+remove_elytra() {
+    remove_daemon_common "Elytra" "elytra" "/usr/local/bin/elytra" "$ELYTRA_DIR" \
+        "/var/lib/elytra" "/etc/hydrodactyl/elytra-version"
+
+    # Remove hydrodactyl user (if it exists). Elytra-specific: remove_wings()
+    # deliberately does not do this, since its system user may be shared
+    # with a still-installed panel (see remove_wings() below).
     if id -u hydrodactyl >/dev/null 2>&1; then
         output "Removing hydrodactyl user..."
         userdel hydrodactyl 2>/dev/null || true
@@ -94,6 +121,21 @@ remove_elytra() {
     fi
 
     success "Elytra removed"
+}
+
+remove_wings() {
+    # Binary path is the same for both the Go and Wings-RS variants.
+    remove_daemon_common "Wings" "wings" "/usr/local/bin/wings" "$WINGS_DIR" \
+        "/var/lib/pterodactyl" "/etc/hydrodactyl/wings-version" "/etc/hydrodactyl/auto-update-wings.env"
+
+    # Note: unlike remove_elytra(), this intentionally does not delete a
+    # system user. installers/wings.sh (standalone) creates a dedicated
+    # "pterodactyl" user, but installers/both.sh (combined) instead reuses
+    # the "hydrodactyl" user shared with the panel - deleting it here would
+    # break a still-installed panel. Which one applies isn't knowable from
+    # an uninstall script alone, so neither is touched.
+
+    success "Wings removed"
 }
 
 remove_auto_updaters() {
@@ -267,6 +309,10 @@ main() {
         remove_elytra
     fi
 
+    if [ "$REMOVE_WINGS" == "true" ]; then
+        remove_wings
+    fi
+
     if [ "$REMOVE_DATABASE" == "true" ]; then
         remove_database
     fi
@@ -276,7 +322,7 @@ main() {
     fi
 
     # Ask about package cleanup only if removing everything
-    if [ "$REMOVE_PANEL" == "true" ] && [ "$REMOVE_ELYTRA" == "true" ]; then
+    if [ "$REMOVE_PANEL" == "true" ] && { [ "$REMOVE_ELYTRA" == "true" ] || [ "$REMOVE_WINGS" == "true" ]; }; then
         cleanup_packages
     fi
 

@@ -40,7 +40,6 @@ PANEL_URL=""
 NODE_TOKEN=""
 NODE_ID=""
 CONFIGURE_FIREWALL=false
-INSTALL_AUTO_UPDATER=false
 CONFIGURE_LETSENCRYPT=false
 SSL_CERT_PATH=""
 SSL_KEY_PATH=""
@@ -321,28 +320,6 @@ configure_ssl() {
   fi
 }
 
-# ------------------ Auto-Updater ----------------- #
-
-configure_auto_updater() {
-  print_header
-  print_flame "Auto-Updater Configuration"
-
-  output "Auto-updaters allow automatic updates but may cause unexpected downtime."
-  output "You can always install them later from the installer menu."
-  echo ""
-
-  local install_auto_update=""
-  bool_input install_auto_update "Install auto-updater for Wings?" "n"
-
-  if [ "$install_auto_update" == "y" ]; then
-    INSTALL_AUTO_UPDATER=true
-    output "Auto-updater will be installed"
-  else
-    INSTALL_AUTO_UPDATER=false
-    output "Auto-updater will not be installed"
-  fi
-}
-
 # ------------------ Firewall ----------------- #
 
 configure_firewall() {
@@ -374,7 +351,6 @@ show_summary() {
   echo -e "  ${COLOR_ORANGE}Behind Proxy:${COLOR_NC}      $([ "$BEHIND_PROXY" == "true" ] && echo 'Yes' || echo 'No')"
   echo -e "  ${COLOR_ORANGE}SSL:${COLOR_NC}               $([ "$CONFIGURE_LETSENCRYPT" == "true" ] && echo 'Let'\''s Encrypt' || ([ -n "$SSL_CERT_PATH" ] && echo 'Custom' || echo 'None'))"
   echo -e "  ${COLOR_ORANGE}FQDN:${COLOR_NC}              $([ -n "$FQDN" ] && echo "$FQDN" || echo 'Not set')"
-  echo -e "  ${COLOR_ORANGE}Auto-Updater:${COLOR_NC}      $([ "$INSTALL_AUTO_UPDATER" == "true" ] && echo 'Yes' || echo 'No')"
   echo -e "  ${COLOR_ORANGE}Firewall:${COLOR_NC}          $([ "$CONFIGURE_FIREWALL" == "true" ] && echo 'Yes' || echo 'No')"
   echo ""
 
@@ -401,7 +377,6 @@ export_variables() {
   export NODE_TOKEN
   export NODE_ID
   export CONFIGURE_FIREWALL
-  export INSTALL_AUTO_UPDATER
   export CONFIGURE_LETSENCRYPT
   export SSL_EMAIL
   export SSL_CERT_PATH
@@ -429,7 +404,6 @@ main() {
   configure_panel_connection
   configure_network
   configure_ssl
-  configure_auto_updater
   configure_firewall
   show_summary
 

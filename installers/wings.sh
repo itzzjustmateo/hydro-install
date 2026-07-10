@@ -90,14 +90,6 @@ parse_arguments() {
         CONFIGURE_FIREWALL="false"
         shift
         ;;
-      --install-auto-updater)
-        INSTALL_AUTO_UPDATER="true"
-        shift
-        ;;
-      --no-auto-updater)
-        INSTALL_AUTO_UPDATER="false"
-        shift
-        ;;
       --behind-proxy)
         BEHIND_PROXY="true"
         shift
@@ -163,8 +155,6 @@ Options:
   --variant <go|rs>              Wings variant: go (Pterodactyl) or rs (wings-rs)
   --configure-firewall           Enable firewall configuration
   --no-firewall                  Disable firewall configuration
-  --install-auto-updater         Install auto-updater
-  --no-auto-updater              Don't install auto-updater
   --behind-proxy                 Node is behind a proxy
   --assume-ssl                   Assume SSL is already configured
   --configure-letsencrypt        Obtain SSL certificate via Let's Encrypt
@@ -188,7 +178,21 @@ parse_arguments "$@"
 WINGS_INSTALL_DIR="/etc/pterodactyl"
 PANEL_CONFIG_DIR="${PANEL_CONFIG_DIR:-/etc/hydrodactyl}"
 WINGS_VARIANT="${WINGS_VARIANT:-go}"
-WINGS_REPO="${WINGS_REPO:-pterodactyl/wings}"
+WINGS_VARIANT=$(echo "$WINGS_VARIANT" | tr '[:upper:]' '[:lower:]')
+# Validate here, before install_docker/directory/user setup run, instead of
+# only in wings_release_arch() deep inside install_wings() - a typo like
+# "--variant Go" would otherwise waste that work before failing.
+case "$WINGS_VARIANT" in
+  go | rs) ;;
+  *)
+    error "Unsupported Wings variant: $WINGS_VARIANT (expected 'go' or 'rs')"
+    exit 1
+    ;;
+esac
+# Repo default depends on variant (pterodactyl/wings vs calagopus/wings) and
+# is resolved in install_wings() - do not default it here, or a
+# variant-specific default below would never apply once this is non-empty.
+WINGS_REPO="${WINGS_REPO:-}"
 
 PANEL_URL="${PANEL_URL:-}"
 NODE_TOKEN="${NODE_TOKEN:-}"
@@ -202,8 +206,6 @@ FQDN="${FQDN:-}"
 CONFIGURE_FIREWALL="${CONFIGURE_FIREWALL:-false}"
 GAME_PORT_START="${GAME_PORT_START:-27015}"
 GAME_PORT_END="${GAME_PORT_END:-28025}"
-
-INSTALL_AUTO_UPDATER="${INSTALL_AUTO_UPDATER:-false}"
 
 WINGS_REPO_PRIVATE="${WINGS_REPO_PRIVATE:-false}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
@@ -251,7 +253,9 @@ fi
 check_existing() {
   if check_existing_installation "wings"; then
     echo ""
-    if ! bool_input "Continue with installation? This will replace the existing installation" "n"; then
+    local confirm_replace=""
+    bool_input confirm_replace "Continue with installation? This will replace the existing installation" "n"
+    if [ "$confirm_replace" != "y" ]; then
       error "Installation aborted."
       exit 1
     fi
@@ -289,15 +293,13 @@ install_wings() {
   fi
 
   local arch
-  arch=$(uname -m)
+  arch=$(wings_release_arch "$WINGS_VARIANT") || exit 1
 
   local asset_name
   if [ "$WINGS_VARIANT" == "go" ]; then
-    [[ $arch == x86_64 ]] && arch=amd64 || arch=arm64
     asset_name="wings_linux_${arch}"
     WINGS_REPO="${WINGS_REPO:-pterodactyl/wings}"
   else
-    [[ $arch == x86_64 ]] && arch=x86_64 || arch=aarch64
     asset_name="wings-rs-${arch}-linux"
     WINGS_REPO="${WINGS_REPO:-calagopus/wings}"
   fi
@@ -331,6 +333,9 @@ install_wings() {
   mkdir -p /etc/hydrodactyl
   echo "$target_release" > /etc/hydrodactyl/wings-version
   chmod 644 /etc/hydrodactyl/wings-version
+
+  # Persist the installed variant/repo for the manual update menu
+  save_wings_update_config
 
   if /usr/local/bin/wings --version >/dev/null 2>&1; then
     info "Wings binary verified: $(/usr/local/bin/wings --version 2>/dev/null || echo 'unknown')"
@@ -687,20 +692,6 @@ configure_firewall() {
   fi
 }
 
-install_auto_updater_if_requested() {
-  if [ "$INSTALL_AUTO_UPDATER" == true ]; then
-    print_flame "Installing Auto-Updater"
-
-    export WINGS_REPO
-    export WINGS_REPO_PRIVATE
-    export GITHUB_TOKEN
-
-    install_auto_updater_wings
-
-    success "Auto-updater installed"
-  fi
-}
-
 # ---------------- Main ---------------- #
 
 main() {
@@ -789,7 +780,6 @@ main() {
     start_wings
 
     configure_firewall
-    install_auto_updater_if_requested
     verify_connection
   fi
 
@@ -860,10 +850,6 @@ main() {
     echo ""
   fi
 
-  if [ "$INSTALL_AUTO_UPDATER" == true ]; then
-    output "Auto-updater is enabled and will check for updates hourly."
-    echo ""
-  fi
 
   print_brake 70
 

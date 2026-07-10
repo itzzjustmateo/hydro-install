@@ -1,6 +1,3 @@
- ```
-hydrodactyl\install-scripts\new\ui\panel.sh
-```
 #!/bin/bash
 
 set -e
@@ -40,6 +37,7 @@ GITHUB_TOKEN=""
 PANEL_INSTALL_METHOD="release"
 PANEL_RELEASE_VERSION="${PANEL_RELEASE_VERSION:-latest}"
 PANEL_FQDN=""
+PANEL_IS_IP=false
 PANEL_TIMEZONE="UTC"
 PANEL_ADMIN_EMAIL=""
 PANEL_ADMIN_USERNAME=""
@@ -48,7 +46,6 @@ PANEL_ADMIN_LASTNAME=""
 PANEL_ADMIN_PASSWORD=""
 CONFIGURE_LETSENCRYPT=false
 CONFIGURE_FIREWALL=false
-INSTALL_AUTO_UPDATER=false
 SSL_CERT_PATH=""
 SSL_KEY_PATH=""
 DB_HOST="127.0.0.1"
@@ -189,13 +186,19 @@ configure_fqdn() {
 
   output "Please enter the domain or subdomain for your panel."
   output "Example: ${COLOR_ORANGE}panel.example.com${COLOR_NC}"
+  output "An IP address (e.g., ${COLOR_ORANGE}192.168.1.10${COLOR_NC}) is also accepted, but SSL will not be available."
   echo ""
 
   local valid_fqdn=false
+  PANEL_IS_IP=false
   while [ "$valid_fqdn" == false ]; do
-    required_input PANEL_FQDN "Domain/Subdomain: " "Domain is required"
+    required_input PANEL_FQDN "Domain/Subdomain/IP: " "Domain is required"
 
-    if check_fqdn "$PANEL_FQDN"; then
+    if is_ip_address "$PANEL_FQDN"; then
+      PANEL_IS_IP=true
+      warning "You entered an IP address. Let's Encrypt will not be available for IP addresses."
+      valid_fqdn=true
+    elif check_fqdn "$PANEL_FQDN"; then
       # Verify DNS resolution
       output "Verifying DNS for ${PANEL_FQDN}..."
       local verify_result=1
@@ -208,7 +211,7 @@ configure_fqdn() {
         error "Please fix your DNS configuration or enter a different domain."
       fi
     else
-      error "Invalid FQDN format. Must be a valid domain name (not IP address)."
+      error "Invalid format. Must be a valid domain name or IP address."
     fi
   done
 
@@ -220,6 +223,15 @@ configure_fqdn() {
 configure_ssl() {
   print_header
   print_flame "SSL/TLS Configuration"
+
+  if [ "$PANEL_IS_IP" == true ]; then
+    warning "Let's Encrypt will not be available for IP addresses (${PANEL_FQDN})."
+    output "SSL will not be configured. Use a domain name instead if you need HTTPS."
+    CONFIGURE_LETSENCRYPT=false
+    SSL_CERT_PATH=""
+    SSL_KEY_PATH=""
+    return
+  fi
 
   local use_ssl=""
   bool_input use_ssl "Would you like to use SSL/HTTPS?" "y"
@@ -399,25 +411,6 @@ configure_admin_account() {
 
 # ------------------ Auto-Updater ----------------- #
 
-configure_auto_updater() {
-  print_header
-  print_flame "Auto-Updater Configuration"
-
-  output "Auto-updaters allow automatic updates but may cause unexpected downtime."
-  output "You can always install them later from the installer menu."
-  echo ""
-
-  local install_auto_update=""
-  bool_input install_auto_update "Install auto-updater for the panel?" "n"
-
-  if [ "$install_auto_update" == "y" ]; then
-    INSTALL_AUTO_UPDATER=true
-    output "Auto-updater will be installed"
-  else
-    output "Auto-updater will not be installed"
-  fi
-}
-
 # ------------------ Firewall ----------------- #
 
 configure_firewall() {
@@ -442,7 +435,6 @@ show_summary() {
   echo -e "  ${COLOR_ORANGE}Database:${COLOR_NC}          ${DB_NAME}@${DB_HOST}:${DB_PORT}"
   echo -e "  ${COLOR_ORANGE}Timezone:${COLOR_NC}          ${PANEL_TIMEZONE}"
   echo -e "  ${COLOR_ORANGE}Admin Email:${COLOR_NC}       ${PANEL_ADMIN_EMAIL}"
-  echo -e "  ${COLOR_ORANGE}Auto-Updater:${COLOR_NC}      $([ "$INSTALL_AUTO_UPDATER" == "true" ] && echo 'Yes' || echo 'No')"
   echo -e "  ${COLOR_ORANGE}Firewall:${COLOR_NC}          $([ "$CONFIGURE_FIREWALL" == "true" ] && echo 'Yes' || echo 'No')"
   echo ""
 
@@ -472,7 +464,6 @@ export_variables() {
   export PANEL_ADMIN_PASSWORD
   export CONFIGURE_LETSENCRYPT
   export CONFIGURE_FIREWALL
-  export INSTALL_AUTO_UPDATER
   export SSL_CERT_PATH
   export SSL_KEY_PATH
   export DB_HOST
@@ -495,7 +486,6 @@ main() {
   configure_database
   configure_timezone
   configure_admin_account
-  configure_auto_updater
   configure_firewall
   show_summary
 

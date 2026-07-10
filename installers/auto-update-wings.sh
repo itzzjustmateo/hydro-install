@@ -26,7 +26,8 @@ if [ -f /etc/hydrodactyl/auto-update-wings.env ]; then
 fi
 
 # Default config (can be overridden by /etc/hydrodactyl/auto-update-wings.env)
-WINGS_REPO="${WINGS_REPO:-pyrohost/wings}"
+WINGS_VARIANT="${WINGS_VARIANT:-go}"
+WINGS_REPO="${WINGS_REPO:-pterodactyl/wings}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 INSTALL_DIR="${INSTALL_DIR:-/etc/wings}"
 LOG_FILE="${LOG_FILE:-/var/log/hydrodactyl-wings-auto-update.log}"
@@ -334,12 +335,33 @@ restart_wings() {
 get_download_url() {
   local version="$1"
 
-  # Determine architecture
-  local arch
-  arch=$(uname -m)
-  [[ $arch == x86_64 ]] && arch=amd64 || arch=arm64
+  # Determine architecture and asset name based on the installed Wings variant.
+  # This script is self-contained (no lib.sh dependency), so the
+  # architecture mapping is inlined rather than shared via a lib.sh helper.
+  # WINGS_VARIANT is already normalized/validated in main() before this runs.
+  local machine
+  machine=$(uname -m)
 
-  local asset_name="wings_linux_${arch}"
+  local arch
+  case "$machine" in
+    x86_64)
+      [ "$WINGS_VARIANT" == "rs" ] && arch="x86_64" || arch="amd64"
+      ;;
+    aarch64 | arm64)
+      [ "$WINGS_VARIANT" == "rs" ] && arch="aarch64" || arch="arm64"
+      ;;
+    *)
+      error "Unsupported architecture: $machine (Wings only supports x86_64 and aarch64/arm64)"
+      exit 1
+      ;;
+  esac
+
+  local asset_name
+  if [ "$WINGS_VARIANT" == "rs" ]; then
+    asset_name="wings-rs-${arch}-linux"
+  else
+    asset_name="wings_linux_${arch}"
+  fi
 
   # Get asset download URL from GitHub API
   local release_info
@@ -819,6 +841,19 @@ main() {
   # Setup
   setup_colors
   load_config
+
+  # Normalize and validate here, right after load_config() (which may
+  # re-source CONFIG_FILE and override the top-level default) and before
+  # acquire_lock/create_backup run - a typo left in the env file would
+  # otherwise waste a backup before get_download_url() caught it.
+  WINGS_VARIANT=$(echo "$WINGS_VARIANT" | tr '[:upper:]' '[:lower:]')
+  case "$WINGS_VARIANT" in
+    go | rs) ;;
+    *)
+      error "Unsupported Wings variant: $WINGS_VARIANT (expected 'go' or 'rs')"
+      exit $EXIT_ERROR
+      ;;
+  esac
 
   # Ensure directories exist
   mkdir -p "$(dirname "$LOG_FILE")"

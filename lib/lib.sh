@@ -25,6 +25,8 @@ export GITHUB_URL="$GITHUB_BASE_URL/$GITHUB_SOURCE"
 
 export DEFAULT_PANEL_REPO="BlueprintFramework/hydrodactyl"
 export DEFAULT_ELYTRA_REPO="pyrohost/elytra"
+export DEFAULT_WINGS_REPO="pterodactyl/wings"
+export DEFAULT_WINGS_RS_REPO="calagopus/wings"
 
 # ------------------ Path Configuration ----------------- #
 
@@ -189,10 +191,10 @@ welcome() {
     echo -e "  ${COLOR_RED}✗${COLOR_NC} Panel not installed"
   fi
 
-  if [ -f "/usr/local/bin/elytra" ]; then
-    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Elytra installed"
+  if [ -f "/usr/local/bin/wings" ]; then
+    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Wings installed"
   else
-    echo -e "  ${COLOR_RED}✗${COLOR_NC} Elytra not installed"
+    echo -e "  ${COLOR_RED}✗${COLOR_NC} Wings not installed"
   fi
 
   if systemctl is-enabled --quiet hydrodactyl-panel-auto-update.timer 2>/dev/null; then
@@ -201,10 +203,10 @@ welcome() {
     echo -e "  ${COLOR_RED}✗${COLOR_NC} Panel auto-updater not installed"
   fi
 
-  if systemctl is-enabled --quiet hydrodactyl-elytra-auto-update.timer 2>/dev/null; then
-    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Elytra auto-updater enabled"
+  if systemctl is-enabled --quiet hydrodactyl-wings-auto-update.timer 2>/dev/null; then
+    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Wings auto-updater enabled"
   else
-    echo -e "  ${COLOR_RED}✗${COLOR_NC} Elytra auto-updater not installed"
+    echo -e "  ${COLOR_RED}✗${COLOR_NC} Wings auto-updater not installed"
   fi
 
   echo ""
@@ -277,6 +279,7 @@ detect_os() {
     ubuntu)
       [ "$OS_VER_MAJOR" == "22" ] && SUPPORTED=true
       [ "$OS_VER_MAJOR" == "24" ] && SUPPORTED=true
+      [ "$OS_VER_MAJOR" -ge "26" ] 2>/dev/null && SUPPORTED=true
       export DEBIAN_FRONTEND=noninteractive
       ;;
     debian)
@@ -563,6 +566,114 @@ check_docker_compatibility() {
   return 0
 }
 
+# Ask which Wings variant to install
+select_wings_variant() {
+  echo ""
+  output "Which Wings variant would you like to install?"
+  echo ""
+  output "[${COLOR_ORANGE}0${COLOR_NC}] Pterodactyl Wings (Go)"
+  output "    The official Pterodactyl server daemon, written in Go."
+  output "    Most stable, widely used, and battle-tested in production."
+  output "    Best for: production environments, maximum compatibility."
+  echo ""
+  output "[${COLOR_ORANGE}1${COLOR_NC}] wings-rs (Rust)"
+  output "    A lightweight Rust reimplementation of Wings."
+  output "    Lower memory usage, faster startup, additional features."
+  output "    Best for: resource-constrained servers, advanced users."
+  echo ""
+
+  local variant_choice=""
+  while [[ "$variant_choice" != "0" && "$variant_choice" != "1" ]]; do
+    echo -n "* Select [0-1]: "
+    read -r variant_choice
+    if [[ "$variant_choice" != "0" && "$variant_choice" != "1" ]]; then
+      error "Invalid selection. Please enter 0 or 1."
+    fi
+  done
+
+  if [ "$variant_choice" == "0" ]; then
+    WINGS_VARIANT="go"
+    WINGS_REPO="${WINGS_REPO:-$DEFAULT_WINGS_REPO}"
+    export WINGS_VARIANT="go"
+    export WINGS_REPO
+    output "Selected: Pterodactyl Wings (Go)"
+  else
+    WINGS_VARIANT="rs"
+    WINGS_REPO="${WINGS_REPO:-$DEFAULT_WINGS_RS_REPO}"
+    export WINGS_VARIANT="rs"
+    export WINGS_REPO
+    output "Selected: wings-rs (Rust)"
+  fi
+}
+
+# Persist the Wings variant/repo actually installed, so the manual update
+# menu (installers/auto-update-wings.sh) updates the same daemon instead of
+# silently falling back to Go Wings defaults.
+save_wings_update_config() {
+  # installers/both.sh tracks separate Panel/Wings tokens as GITHUB_TOKEN_WINGS;
+  # installers/wings.sh (Wings-only) only ever has the plain GITHUB_TOKEN.
+  local wings_token="${GITHUB_TOKEN_WINGS:-${GITHUB_TOKEN:-}}"
+  mkdir -p /etc/hydrodactyl
+  {
+    echo "WINGS_VARIANT=\"${WINGS_VARIANT}\""
+    echo "WINGS_REPO=\"${WINGS_REPO}\""
+    echo "WINGS_REPO_PRIVATE=\"${WINGS_REPO_PRIVATE:-false}\""
+    echo "GITHUB_TOKEN=\"${wings_token}\""
+  } >/etc/hydrodactyl/auto-update-wings.env
+  chmod 600 /etc/hydrodactyl/auto-update-wings.env
+}
+
+# Persist the Panel repo/token/install-method actually used, so the manual
+# update menu (installers/auto-update-panel.sh) updates from the same
+# source instead of silently falling back to the default public repo.
+# Usage: save_panel_update_config <"releases"|"git">
+save_panel_update_config() {
+  local update_method="${1:-releases}"
+  # installers/both.sh tracks separate Panel/Wings tokens as GITHUB_TOKEN_PANEL;
+  # installers/panel.sh (Panel-only) only ever has the plain GITHUB_TOKEN.
+  local panel_token="${GITHUB_TOKEN_PANEL:-${GITHUB_TOKEN:-}}"
+  mkdir -p /etc/hydrodactyl
+  {
+    echo "PANEL_REPO=\"${PANEL_REPO}\""
+    echo "PANEL_REPO_PRIVATE=\"${PANEL_REPO_PRIVATE:-false}\""
+    echo "GITHUB_TOKEN=\"${panel_token}\""
+    echo "UPDATE_METHOD=\"${update_method}\""
+  } >/etc/hydrodactyl/auto-update-panel.env
+  chmod 600 /etc/hydrodactyl/auto-update-panel.env
+}
+
+# Map `uname -m` to the release-asset architecture naming Wings/Wings-RS
+# use, failing clearly on an unrecognized architecture instead of silently
+# guessing aarch64/arm64 for anything that isn't x86_64.
+# Usage: wings_release_arch <"go"|"rs">
+wings_release_arch() {
+  local variant="$1"
+
+  case "$variant" in
+    go | rs) ;;
+    *)
+      error "Unsupported Wings variant: $variant (expected 'go' or 'rs')"
+      return 1
+      ;;
+  esac
+
+  local machine
+  machine=$(uname -m)
+
+  case "$machine" in
+    x86_64)
+      [ "$variant" == "rs" ] && echo "x86_64" || echo "amd64"
+      ;;
+    aarch64 | arm64)
+      [ "$variant" == "rs" ] && echo "aarch64" || echo "arm64"
+      ;;
+    *)
+      error "Unsupported architecture: $machine (Wings only supports x86_64 and aarch64/arm64)"
+      return 1
+      ;;
+  esac
+}
+
 # ------------------ Validation Functions ----------------- #
 
 check_fqdn() {
@@ -589,8 +700,95 @@ check_fqdn() {
   return 0
 }
 
+# Check whether the given string is a literal IPv4 or IPv6 address.
+# Used to allow IP-based panel installs (no domain/DNS available) while
+# still rejecting them from check_fqdn.
+is_ip_address() {
+  local ip="$1"
+
+  [ -z "$ip" ] && return 1
+
+  # IPv4: four dot-separated octets, each 0-255
+  if [[ "$ip" =~ ^([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,3})$ ]]; then
+    local octet
+    for octet in "${BASH_REMATCH[@]:1}"; do
+      # Force base-10 interpretation so a leading zero (e.g. "08") isn't
+      # parsed as an (invalid) octal literal.
+      (( 10#$octet > 255 )) && return 1
+    done
+    return 0
+  fi
+
+  # IPv6: hex groups separated by colons, optionally with a single "::"
+  # compression. This isn't full RFC 4291 validation, but it rejects the
+  # obvious garbage (":::" , a bare ":", too many/few groups) that a plain
+  # "colon/hex characters only" check would let through.
+  if [[ "$ip" == *:* ]] && [[ "$ip" =~ ^[0-9a-fA-F:]+$ ]]; then
+    [[ "$ip" == *:::* ]] && return 1
+
+    local compressed=false
+    if [[ "$ip" == *::* ]]; then
+      # At most one "::" compression is allowed.
+      [[ "${ip/::/}" == *::* ]] && return 1
+      compressed=true
+    fi
+
+    local group_count=0
+    local group groups
+    IFS=':' read -ra groups <<<"${ip//::/:}"
+    for group in "${groups[@]}"; do
+      [ -z "$group" ] && continue
+      [[ "$group" =~ ^[0-9a-fA-F]{1,4}$ ]] || return 1
+      ((group_count++))
+    done
+
+    if [ "$compressed" == true ]; then
+      [ "$group_count" -le 7 ] || return 1
+    else
+      [ "$group_count" -eq 8 ] || return 1
+    fi
+
+    return 0
+  fi
+
+  return 1
+}
+
+# Wrap an address for embedding in a scheme://host URL - IPv6 literals must
+# be bracketed per RFC 3986 (e.g. http://[2001:db8::1]/); hostnames and IPv4
+# addresses pass through unchanged since neither can contain a colon once
+# validated by check_fqdn/is_ip_address.
+panel_url_host() {
+  local host="$1"
+  if [[ "$host" == *:* ]]; then
+    echo "[$host]"
+  else
+    echo "$host"
+  fi
+}
+
 cmd_exists() {
   command -v "$1" >/dev/null 2>&1
+}
+
+# Whether a usable custom SSL certificate is configured. Both paths are
+# required - the nginx use_ssl gates in installers/both.sh and
+# installers/panel.sh only enable SSL when both are set, so panel_scheme()
+# below must agree or APP_URL can claim https while nginx still serves http.
+has_custom_ssl_cert() {
+  [ -n "${SSL_CERT_PATH:-}" ] && [ -n "${SSL_KEY_PATH:-}" ]
+}
+
+# Determine whether the panel should be addressed over https or http, based
+# on the same SSL/TLS variables used to build the Laravel APP_URL
+# (configure_panel/configure_panel_environment in installers/panel.sh and
+# installers/both.sh). Echoes "https" or "http".
+panel_scheme() {
+  if [ "${CONFIGURE_LETSENCRYPT:-false}" == true ] || [ "${ASSUME_SSL:-false}" == true ] || has_custom_ssl_cert; then
+    echo "https"
+  else
+    echo "http"
+  fi
 }
 
 # Load existing database credentials from previous run
@@ -625,6 +823,9 @@ check_existing_installation() {
 
   if [ "$component" == "panel" ] && [ -d "/var/www/hydrodactyl" ]; then
     warning "Existing panel installation detected at /var/www/hydrodactyl"
+    has_existing=true
+  elif [ "$component" == "wings" ] && [ -f "/usr/local/bin/wings" ]; then
+    warning "Existing Wings installation detected at /usr/local/bin/wings"
     has_existing=true
   elif [ "$component" == "elytra" ] && [ -f "/usr/local/bin/elytra" ]; then
     warning "Existing Elytra installation detected at /usr/local/bin/elytra"
@@ -1286,6 +1487,50 @@ install_packages() {
   esac
 }
 
+# Configure the PHP APT repository for Debian/Ubuntu.
+# Ubuntu 22.04/24.04 use the ppa:ondrej/php Launchpad PPA. Starting with
+# Ubuntu 26.04 (Resolute), that PPA is being merged into packages.sury.org
+# and is no longer published for new releases, so Resolute and later use
+# packages.sury.org directly, the same as Debian.
+configure_php_apt_repo() {
+  case "$OS" in
+    ubuntu)
+      if [ "$OS_VER_MAJOR" -ge 26 ] 2>/dev/null; then
+        output "Ubuntu ${OS_VER_MAJOR} detected - using packages.sury.org (ppa:ondrej/php is not published for this release)..."
+        install_sury_php_repo
+      else
+        output "Configuring Ubuntu repositories..."
+        install_packages "software-properties-common apt-transport-https ca-certificates gnupg2"
+        add-apt-repository universe -y
+        LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
+      fi
+      ;;
+    debian)
+      output "Configuring Debian repositories..."
+      install_sury_php_repo
+      ;;
+  esac
+
+  update_repos true
+}
+
+# Add the packages.sury.org PHP APT repository, following the official
+# instructions at https://packages.sury.org/php/README.txt: install the
+# keyring package (rather than dearmoring a key into the globally-trusted
+# /etc/apt/trusted.gpg.d/) and scope trust to this source via signed-by.
+# Shared by both the Debian branch and Ubuntu 26.04+ in configure_php_apt_repo().
+install_sury_php_repo() {
+  install_packages "lsb-release ca-certificates curl"
+
+  local sury_keyring_deb
+  sury_keyring_deb=$(mktemp --suffix=.deb)
+  curl -sSL -o "$sury_keyring_deb" https://packages.sury.org/debsuryorg-archive-keyring.deb
+  dpkg -i "$sury_keyring_deb"
+  rm -f "$sury_keyring_deb"
+
+  echo "deb [signed-by=/usr/share/keyrings/debsuryorg-archive-keyring.gpg] https://packages.sury.org/php/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/php.list
+}
+
 # ------------------ MySQL/MariaDB Functions ----------------- #
 
 configure_mariadb_tcp() {
@@ -1918,9 +2163,17 @@ detect_installed_panels() {
     found+=("Struxa")
   fi
 
-  # Pterodactyl
+  # Pterodactyl - a bare /usr/local/bin/wings is NOT enough evidence on its
+  # own, since this installer's own Wings/Wings-RS daemon lives at that
+  # identical path. Only count it if there's no /etc/hydrodactyl/wings-version
+  # tracking file (written at install time by installers/wings.sh and
+  # installers/both.sh), meaning some other, non-Hydrodactyl Wings put it there.
+  local foreign_wings=false
+  if [ -f "/usr/local/bin/wings" ] && [ ! -f "/etc/hydrodactyl/wings-version" ]; then
+    foreign_wings=true
+  fi
   if ls /etc/nginx/sites-available/pterodactyl* 2>/dev/null | grep -q . || \
-     [ -d "/var/www/pterodactyl" ] || [ -f "/usr/local/bin/wings" ] || \
+     [ -d "/var/www/pterodactyl" ] || [ "$foreign_wings" == true ] || \
      systemctl is-enabled --quiet pteroq 2>/dev/null; then
     found+=("Pterodactyl")
   fi
@@ -1954,14 +2207,26 @@ remove_struxa() {
 remove_pterodactyl() {
   output "Removing Pterodactyl panel..."
   systemctl disable --now pteroq 2>/dev/null || true
-  systemctl disable --now wings 2>/dev/null || true
   rm -rf /var/www/pterodactyl
   rm -f /etc/nginx/sites-available/pterodactyl*
   rm -f /etc/nginx/sites-enabled/pterodactyl*
   rm -f /etc/systemd/system/pteroq*
-  rm -f /etc/systemd/system/wings*
-  rm -f /usr/local/bin/wings
-  rm -f /usr/local/bin/elytra
+
+  # Only remove the Wings binary/service/unit if it wasn't installed by this
+  # installer (see detect_installed_panels() for why a bare path isn't
+  # enough evidence on its own) - otherwise this would delete a legitimate,
+  # currently-in-use Hydrodactyl Wings/Wings-RS daemon.
+  if [ -f "/usr/local/bin/wings" ] && [ ! -f "/etc/hydrodactyl/wings-version" ]; then
+    systemctl disable --now wings 2>/dev/null || true
+    rm -f /etc/systemd/system/wings*
+    rm -f /usr/local/bin/wings
+  fi
+
+  # Same reasoning for a legacy Elytra install tracked by this installer.
+  if [ -f "/usr/local/bin/elytra" ] && [ ! -f "/etc/hydrodactyl/elytra-version" ]; then
+    rm -f /usr/local/bin/elytra
+  fi
+
   systemctl daemon-reload
   output "Pterodactyl panel removed."
 }
@@ -2235,6 +2500,19 @@ install_nginx_config() {
   local config_file="/etc/nginx/sites-available/hydrodactyl.conf"
 
   if [ "$ssl" == true ] && [ -n "$cert_path" ] && [ -n "$key_path" ]; then
+    # Fail loudly on a missing cert/key rather than writing a vhost that
+    # references files nginx can't read - installers/wings.sh and
+    # installers/elytra.sh already guard the same way before using
+    # SSL_CERT_PATH/SSL_KEY_PATH.
+    if [ ! -f "$cert_path" ]; then
+      error "SSL certificate file not found: $cert_path"
+      exit 1
+    fi
+    if [ ! -f "$key_path" ]; then
+      error "SSL key file not found: $key_path"
+      exit 1
+    fi
+
     # Get SSL config
     if ! get_config "nginx_ssl.conf" "$config_file"; then
       exit 1
@@ -2278,6 +2556,10 @@ install_nginx_config() {
     else
       systemctl start nginx
     fi
+  else
+    error "Nginx configuration test failed - not starting/reloading nginx."
+    error "Check the config with: nginx -t"
+    exit 1
   fi
 
   success "Nginx configured"
@@ -2608,87 +2890,14 @@ restart_hydroq() {
   fi
 }
 
-# ------------------ Auto-Updater Functions ----------------- #
-
-install_auto_updater_panel() {
-  output "Installing Panel auto-updater..."
-
-  mkdir -p /etc/hydrodactyl
-
-  # Get auto-update script
-  if ! get_script "installers" "auto-update-panel" "/usr/local/bin/hydrodactyl-auto-update-panel.sh"; then
-    error "Failed to get auto-update script"
-    exit 1
-  fi
-
-  # Auto-detect update method based on installation type
-  local update_method="releases"
-  if [ -d "/var/www/hydrodactyl/.git" ]; then
-    update_method="git"
-    output "Detected git-based installation - will use git for updates"
-  else
-    output "Detected release-based installation - will check GitHub releases"
-  fi
-
-  # Create config
-  echo "PANEL_REPO=\"${PANEL_REPO:-BlueprintFramework/hydrodactyl}\"" > /etc/hydrodactyl/auto-update-panel.env
-  echo "GITHUB_TOKEN=\"${GITHUB_TOKEN:-}\"" >> /etc/hydrodactyl/auto-update-panel.env
-  echo "UPDATE_METHOD=\"${update_method}\"" >> /etc/hydrodactyl/auto-update-panel.env
-  echo "PANEL_REPO_PRIVATE=\"${PANEL_REPO_PRIVATE:-false}\"" >> /etc/hydrodactyl/auto-update-panel.env
-  chmod 600 /etc/hydrodactyl/auto-update-panel.env
-
-  # Get systemd service
-  if ! get_config "auto-update-panel.service" "/etc/systemd/system/hydrodactyl-panel-auto-update.service"; then
-    exit 1
-  fi
-
-  # Get systemd timer
-  if ! get_config "auto-update-panel.timer" "/etc/systemd/system/hydrodactyl-panel-auto-update.timer"; then
-    exit 1
-  fi
-
-  systemctl daemon-reload
-  systemctl enable --now hydrodactyl-panel-auto-update.timer
-
-  success "Panel auto-updater installed"
-}
-
-install_auto_updater_elytra() {
-  output "Installing Elytra auto-updater..."
-
-  mkdir -p /etc/hydrodactyl
-
-  # Get auto-update script
-  if ! get_script "installers" "auto-update-elytra" "/usr/local/bin/hydrodactyl-auto-update-elytra.sh"; then
-    error "Failed to get auto-update script"
-    exit 1
-  fi
-
-  # Elytra always uses release-based updates (distributed as binary)
-  output "Elytra uses release-based updates"
-
-  # Create config
-  echo "ELYTRA_REPO=\"${ELYTRA_REPO:-pyrohost/elytra}\"" > /etc/hydrodactyl/auto-update-elytra.env
-  echo "GITHUB_TOKEN=\"${GITHUB_TOKEN:-}\"" >> /etc/hydrodactyl/auto-update-elytra.env
-  echo "UPDATE_METHOD=\"releases\"" >> /etc/hydrodactyl/auto-update-elytra.env
-  echo "ELYTRA_REPO_PRIVATE=\"${ELYTRA_REPO_PRIVATE:-false}\"" >> /etc/hydrodactyl/auto-update-elytra.env
-  chmod 600 /etc/hydrodactyl/auto-update-elytra.env
-
-  # Get systemd service
-  if ! get_config "auto-update-elytra.service" "/etc/systemd/system/hydrodactyl-elytra-auto-update.service"; then
-    exit 1
-  fi
-
-  # Get systemd timer
-  if ! get_config "auto-update-elytra.timer" "/etc/systemd/system/hydrodactyl-elytra-auto-update.timer"; then
-    exit 1
-  fi
-
-  systemctl daemon-reload
-  systemctl enable --now hydrodactyl-elytra-auto-update.timer
-
-  success "Elytra auto-updater installed"
-}
+# ------------------ Auto-Updater Removal Functions ----------------- #
+#
+# Scheduled (systemd timer based) auto-updates have been removed - they were
+# a recurring source of unattended-breakage reports. Updating is still fully
+# supported as an on-demand action via install.sh's "Update Panel/Wings/Both"
+# menu options, which invoke installers/auto-update-{panel,wings}.sh directly.
+# These remove_* functions are kept so installers/uninstall.sh can still clean
+# up a scheduled auto-updater left over from an older install.
 
 remove_auto_updater_panel() {
   output "Removing Panel auto-updater..."
@@ -2708,10 +2917,17 @@ remove_auto_updater_panel() {
 }
 
 remove_auto_updater_elytra() {
-  output "Removing Elytra auto-updater..."
+  output "Removing Wings/Elytra auto-updater..."
 
+  # Installs from before scheduled auto-updates existed for Wings used
+  # "elytra"-named units (this project's daemon was Elytra-only back then).
+  # No code path creates any systemd unit for Wings/Elytra anymore, but stop
+  # and remove both naming conventions in case an in-between install created
+  # the newer name before the scheduling layer itself was removed.
   systemctl stop hydrodactyl-elytra-auto-update.timer 2>/dev/null || true
   systemctl disable hydrodactyl-elytra-auto-update.timer 2>/dev/null || true
+  systemctl stop hydrodactyl-wings-auto-update.timer 2>/dev/null || true
+  systemctl disable hydrodactyl-wings-auto-update.timer 2>/dev/null || true
 
   rm -f /etc/systemd/system/hydrodactyl-elytra-auto-update.service
   rm -f /etc/systemd/system/hydrodactyl-elytra-auto-update.timer
@@ -2719,9 +2935,15 @@ remove_auto_updater_elytra() {
   rm -f /etc/hydrodactyl/auto-update-elytra.conf
   rm -f /etc/hydrodactyl/auto-update-elytra.env
 
+  rm -f /etc/systemd/system/hydrodactyl-wings-auto-update.service
+  rm -f /etc/systemd/system/hydrodactyl-wings-auto-update.timer
+  rm -f /usr/local/bin/hydrodactyl-auto-update-wings.sh
+  rm -f /etc/hydrodactyl/auto-update-wings.conf
+  rm -f /etc/hydrodactyl/auto-update-wings.env
+
   systemctl daemon-reload
 
-  success "Elytra auto-updater removed"
+  success "Wings/Elytra auto-updater removed"
 }
 
 # ------------------ Script Execution Functions ----------------- #
@@ -3759,7 +3981,7 @@ show_panel_completion() {
   echo ""
   output "Your Hydrodactyl panel has been installed and configured."
   echo ""
-  [ -n "$FQDN" ] && output "Panel URL: https://$FQDN"
+  [ -n "$FQDN" ] && output "Panel URL: $(panel_scheme)://$FQDN"
   [ -n "$user_email" ] && output "Admin Email: $user_email"
   [ -n "$user_username" ] && output "Admin Username: $user_username"
   [ -n "$user_password" ] && output "Admin Password: (saved in install info)"
@@ -3814,17 +4036,17 @@ show_both_completion() {
   echo ""
   print_brake 70
   echo ""
-  output "Both Hydrodactyl Panel and Elytra Daemon have been installed."
+  output "Both Hydrodactyl Panel and the Wings daemon have been installed."
   echo ""
-  [ -n "$FQDN" ] && output "Panel URL: https://$FQDN"
+  [ -n "$FQDN" ] && output "Panel URL: $(panel_scheme)://$FQDN"
   [ -n "$user_email" ] && output "Admin Email: $user_email"
   [ -n "$user_username" ] && output "Admin Username: $user_username"
   [ -n "$NODE_NAME" ] && output "Node Name: $NODE_NAME"
   echo ""
   output "Next Steps:"
-  output "  1. Start Elytra: systemctl start elytra"
-  output "  2. Check Elytra status: systemctl status elytra"
-  output "  3. Access your panel at: https://$FQDN"
+  output "  1. Start Wings: systemctl start wings"
+  output "  2. Check Wings status: systemctl status wings"
+  output "  3. Access your panel at: $(panel_scheme)://$FQDN"
   output "  4. Log in with your admin credentials"
   echo ""
   output "To view installation information later, run:"
@@ -4052,10 +4274,92 @@ check_elytra_health() {
   return 0
 }
 
-# Check both panel and Elytra health
+# Check Wings (Go or Wings-RS) health
+check_wings_health() {
+  local has_errors=false
+
+  echo ""
+  output "${COLOR_ORANGE}Wings Health Check${COLOR_NC}"
+  echo ""
+
+  # Check binary exists
+  if [ -f "/usr/local/bin/wings" ]; then
+    output "✓ Wings binary exists at /usr/local/bin/wings"
+
+    # Check binary is executable
+    if [ -x "/usr/local/bin/wings" ]; then
+      output "✓ Wings binary is executable"
+    else
+      warning "Wings binary is not executable"
+      has_errors=true
+    fi
+
+    # Check binary version
+    local version
+    version=$(/usr/local/bin/wings --version 2>/dev/null | head -1)
+    if [ -n "$version" ]; then
+      output "✓ Wings version: $version"
+    fi
+  else
+    error "Wings binary not found at /usr/local/bin/wings"
+    has_errors=true
+  fi
+
+  # Check config directory
+  if [ -d "/etc/pterodactyl" ]; then
+    output "✓ Wings config directory exists"
+
+    if [ -f "/etc/pterodactyl/config.yml" ]; then
+      output "✓ Wings config file exists"
+    else
+      warning "Wings config file not found"
+      has_errors=true
+    fi
+  else
+    warning "Wings config directory not found"
+    has_errors=true
+  fi
+
+  # Check data directories
+  for dir in /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups; do
+    if [ -d "$dir" ]; then
+      output "✓ Data directory exists: $dir"
+    else
+      warning "Data directory missing: $dir"
+    fi
+  done
+
+  # Check Docker
+  if systemctl is-active --quiet docker 2>/dev/null; then
+    output "✓ Docker is running"
+  else
+    warning "Docker is not running"
+    has_errors=true
+  fi
+
+  # Check service
+  if systemctl is-active --quiet wings 2>/dev/null; then
+    output "✓ Wings service is running"
+  elif systemctl is-enabled --quiet wings 2>/dev/null; then
+    warning "Wings service is enabled but not running"
+  else
+    warning "Wings service is not enabled"
+  fi
+
+  echo ""
+  if [ "$has_errors" == true ]; then
+    warning "Health check completed with warnings/errors"
+  else
+    success "Wings health check passed!"
+  fi
+
+  return 0
+}
+
+# Check both panel and Wings health
 check_both_health() {
   check_panel_health "$INSTALL_DIR"
-  check_elytra_health
+  check_wings_health
 }
 
 # Auto-fix Elytra permission issues

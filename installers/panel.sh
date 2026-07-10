@@ -46,7 +46,6 @@ CONFIGURE_LETSENCRYPT="${CONFIGURE_LETSENCRYPT:-false}"
 SSL_CERT_PATH="${SSL_CERT_PATH:-}"
 SSL_KEY_PATH="${SSL_KEY_PATH:-}"
 CONFIGURE_FIREWALL="${CONFIGURE_FIREWALL:-false}"
-INSTALL_AUTO_UPDATER="${INSTALL_AUTO_UPDATER:-false}"
 PANEL_REPO_PRIVATE="${PANEL_REPO_PRIVATE:-false}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 
@@ -84,9 +83,16 @@ validate_configuration() {
     exit 1
   fi
 
-  if ! check_fqdn "$PANEL_FQDN"; then
+  if ! check_fqdn "$PANEL_FQDN" && ! is_ip_address "$PANEL_FQDN"; then
     error "Invalid FQDN: $PANEL_FQDN"
     exit 1
+  fi
+
+  if is_ip_address "$PANEL_FQDN" && { [ "$CONFIGURE_LETSENCRYPT" == true ] || [ -n "$SSL_CERT_PATH" ]; }; then
+    warning "Let's Encrypt/custom SSL cannot be used with an IP address ($PANEL_FQDN). Disabling SSL."
+    CONFIGURE_LETSENCRYPT=false
+    SSL_CERT_PATH=""
+    SSL_KEY_PATH=""
   fi
 
   success "Configuration valid"
@@ -100,24 +106,8 @@ install_dependencies() {
   update_repos true
 
   case "$OS" in
-    ubuntu)
-      output "Configuring Ubuntu repositories..."
-      install_packages "software-properties-common apt-transport-https ca-certificates gnupg2"
-      add-apt-repository universe -y
-      LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
-      update_repos true
-
-      install_packages "php${PHP_VERSION}-fpm php${PHP_VERSION}-cli php${PHP_VERSION}-gd php${PHP_VERSION}-mysql php${PHP_VERSION}-pdo php${PHP_VERSION}-mbstring php${PHP_VERSION}-tokenizer php${PHP_VERSION}-bcmath php${PHP_VERSION}-xml php${PHP_VERSION}-curl php${PHP_VERSION}-zip php${PHP_VERSION}-intl php${PHP_VERSION}-redis"
-
-      ensure_php_default
-      ;;
-
-    debian)
-      output "Configuring Debian repositories..."
-      install_packages "dirmngr ca-certificates apt-transport-https lsb-release"
-      curl -fsSL -o /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
-      echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/php.list
-      update_repos true
+    ubuntu|debian)
+      configure_php_apt_repo
 
       install_packages "php${PHP_VERSION}-fpm php${PHP_VERSION}-cli php${PHP_VERSION}-gd php${PHP_VERSION}-mysql php${PHP_VERSION}-pdo php${PHP_VERSION}-mbstring php${PHP_VERSION}-tokenizer php${PHP_VERSION}-bcmath php${PHP_VERSION}-xml php${PHP_VERSION}-curl php${PHP_VERSION}-zip php${PHP_VERSION}-intl php${PHP_VERSION}-redis"
 
@@ -142,6 +132,12 @@ install_dependencies() {
   if [ "$CONFIGURE_LETSENCRYPT" == true ]; then
     install_packages "certbot python3-certbot-nginx"
   fi
+
+  # Enable Redis now - configure_panel() runs artisan commands with
+  # --cache=redis/--session=redis/--queue=redis and needs a live
+  # connection well before setup_services() (which used to be the only
+  # place this was enabled) ever runs.
+  enable_redis
 
   success "Dependencies installed"
 }
@@ -288,6 +284,9 @@ install_panel_release() {
   echo "$release_tag" > /etc/hydrodactyl/panel-version
   chmod 644 /etc/hydrodactyl/panel-version
 
+  # Persist the repo/token/method for the manual update menu
+  save_panel_update_config "releases"
+
   output "Creating installation directory..."
   mkdir -p "$INSTALL_DIR"
   cd "$INSTALL_DIR"
@@ -334,9 +333,9 @@ install_panel_release() {
         --header "Authorization: Bearer $GITHUB_TOKEN" \
         --header "Accept: application/vnd.github.v3.raw" \
         -o .env.example \
-        "$env_url" 2>/dev/null || warning "Failed to download .env.example from repository"
+        "$env_url" || warning "Failed to download .env.example from repository"
     else
-      curl -fsSL -o .env.example "$env_url" 2>/dev/null || warning "Failed to download .env.example from repository"
+      curl -fsSL -o .env.example "$env_url" || warning "Failed to download .env.example from repository"
     fi
 
     if [ ! -f ".env.example" ]; then
@@ -347,6 +346,10 @@ install_panel_release() {
   fi
 
   cp .env.example .env
+
+  # Match the official install docs: set storage/bootstrap-cache permissions
+  # right after getting the source, before composer/artisan touch them.
+  chmod -R 755 storage/* bootstrap/cache/
 
   # Install composer and dependencies
   install_composer
@@ -392,7 +395,14 @@ install_panel_clone() {
   echo "git:${commit_hash}" > /etc/hydrodactyl/panel-version
   chmod 644 /etc/hydrodactyl/panel-version
 
+  # Persist the repo/token/method for the manual update menu
+  save_panel_update_config "git"
+
   cp .env.example .env
+
+  # Match the official install docs: set storage/bootstrap-cache permissions
+  # right after getting the source, before composer/artisan touch them.
+  chmod -R 755 storage/* bootstrap/cache/
 
   # Install composer and dependencies
   install_composer
@@ -415,14 +425,41 @@ configure_panel() {
 
   cd "$INSTALL_DIR"
 
+  # Clear any bootstrap cache baked into the release tarball or created by
+  # composer's post-install scripts (e.g. package:discover/optimize running
+  # against the still-default .env we just copied). A stale cached config
+  # makes Laravel ignore .env entirely - including the key we're about to
+  # generate - and "php artisan key:generate" itself fails with
+  # "No application encryption key has been specified" before writing
+  # anything. `artisan config:clear` can't fix this (it needs the framework
+  # to boot too), so remove the cache files directly.
+  rm -f bootstrap/cache/*.php
+
+  # p:environment:setup never touches APP_KEY, so "key:generate" has to be
+  # the thing that sets it - but Laravel boots EncryptionServiceProvider
+  # (which requires app.key to already be non-empty) before any console
+  # command runs, including key:generate itself. With a fresh .env (APP_KEY
+  # empty), that boot step throws "No application encryption key has been
+  # specified" before key:generate ever gets a chance to write a new one.
+  # Seed a throwaway key first so boot succeeds; key:generate --force then
+  # overwrites it with the real one.
+  if grep -q "^APP_KEY=" .env; then
+    sed -i "s|^APP_KEY=.*$|APP_KEY=base64:$(head -c 32 /dev/urandom | base64 | tr -d '\n')|g" .env
+  else
+    echo "APP_KEY=base64:$(head -c 32 /dev/urandom | base64 | tr -d '\n')" >> .env
+  fi
+
   # Generate application key
   output "Generating application key..."
   php artisan key:generate --force
 
-  # Determine app URL
-  local app_url="http://$PANEL_FQDN"
-  [ "$ASSUME_SSL" == true ] && app_url="https://$PANEL_FQDN"
-  [ "$CONFIGURE_LETSENCRYPT" == true ] && app_url="https://$PANEL_FQDN"
+  # Determine app URL - panel_scheme() also accounts for a custom SSL
+  # certificate (SSL_CERT_PATH), unlike checking ASSUME_SSL/CONFIGURE_LETSENCRYPT
+  # alone, which left APP_URL on http while nginx actually served https.
+  local panel_url_host_part
+  panel_url_host_part=$(panel_url_host "$PANEL_FQDN")
+  local app_url
+  app_url="$(panel_scheme)://${panel_url_host_part}"
 
   # Setup environment
   output "Configuring environment..."
@@ -459,7 +496,7 @@ configure_panel() {
     --name-first="$PANEL_ADMIN_FIRSTNAME" \
     --name-last="$PANEL_ADMIN_LASTNAME" \
     --password="$PANEL_ADMIN_PASSWORD" \
-    --admin=1 </dev/null
+    --admin </dev/null
 
   success "Panel configured"
 }
@@ -483,9 +520,6 @@ setup_services() {
     find "$INSTALL_DIR/bootstrap/cache" -type f -exec chmod 644 {} \; 2>/dev/null || true
   fi
 
-  # Enable Redis
-  enable_redis
-
   # Enable nginx
   systemctl enable nginx
 
@@ -504,7 +538,7 @@ setup_services() {
     php_socket=$(get_php_socket)
 
     local use_ssl=false
-    [ -n "$SSL_CERT_PATH" ] && [ -n "$SSL_KEY_PATH" ] && use_ssl=true
+    has_custom_ssl_cert && use_ssl=true
 
     install_nginx_config "$PANEL_FQDN" "$php_socket" "$use_ssl" "$SSL_CERT_PATH" "$SSL_KEY_PATH"
   fi
@@ -548,24 +582,6 @@ configure_firewall() {
   firewall_allow_ports "$ports"
 
   success "Firewall configured"
-}
-
-# ------------------ Auto-Updater ----------------- #
-
-setup_auto_updater() {
-  if [ "$INSTALL_AUTO_UPDATER" != true ]; then
-    return 0
-  fi
-
-  print_flame "Installing Auto-Updater"
-
-  export PANEL_REPO
-  export PANEL_REPO_PRIVATE
-  export GITHUB_TOKEN
-
-  install_auto_updater_panel
-
-  success "Auto-updater installed"
 }
 
 # ------------------ Main ----------------- #
@@ -618,7 +634,6 @@ main() {
   fi
 
   configure_firewall
-  setup_auto_updater
 
   # Final output
   print_header
@@ -627,7 +642,7 @@ main() {
   echo ""
   output "🎉 Your Hydrodactyl Panel has been installed successfully!"
   echo ""
-  output "Panel URL: ${COLOR_ORANGE}https://${PANEL_FQDN}${COLOR_NC}"
+  output "Panel URL: ${COLOR_ORANGE}$(panel_scheme)://$(panel_url_host "$PANEL_FQDN")${COLOR_NC}"
   output "Admin Email: ${COLOR_ORANGE}${PANEL_ADMIN_EMAIL}${COLOR_NC}"
   output "Admin Username: ${COLOR_ORANGE}${PANEL_ADMIN_USERNAME}${COLOR_NC}"
   output "Admin Password: ${COLOR_ORANGE}**hidden** (hope you remember it!)${COLOR_NC}"
@@ -635,7 +650,7 @@ main() {
   output "Database credentials saved to: ${COLOR_ORANGE}/root/.config/hydrodactyl/db-credentials${COLOR_NC}"
   echo ""
   output "phpMyAdmin Access:"
-  output "  URL: ${COLOR_ORANGE}http://${PANEL_FQDN}:8081${COLOR_NC}"
+  output "  URL: ${COLOR_ORANGE}http://$(panel_url_host "$PANEL_FQDN"):8081${COLOR_NC}"
   output "  Username: ${COLOR_ORANGE}phpmyadmin${COLOR_NC}"
   output "  Password: ${COLOR_ORANGE}${PHPMYADMIN_PASSWORD}${COLOR_NC}"
   echo ""
@@ -648,11 +663,6 @@ main() {
     output "Save this API key! You can use it to automatically configure"
     output "Elytra without manually entering node ID and token."
     output "When running elytra.sh, enter this API key when prompted."
-    echo ""
-  fi
-
-  if [ "$INSTALL_AUTO_UPDATER" == true ]; then
-    output "✅ Auto-updater is enabled and will check for updates hourly."
     echo ""
   fi
 
