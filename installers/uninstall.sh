@@ -102,7 +102,9 @@ remove_daemon_common() {
         rm -f "$version_file"
     done
 
-    success "${label} removed"
+    # Success message is printed by the caller, not here - remove_elytra()
+    # has an extra user-removal step after this returns, and printing
+    # "removed" before that step completes would be misleading.
 }
 
 remove_elytra() {
@@ -117,6 +119,8 @@ remove_elytra() {
         userdel hydrodactyl 2>/dev/null || true
         groupdel hydrodactyl 2>/dev/null || true
     fi
+
+    success "Elytra removed"
 }
 
 remove_wings() {
@@ -130,6 +134,8 @@ remove_wings() {
     # the "hydrodactyl" user shared with the panel - deleting it here would
     # break a still-installed panel. Which one applies isn't knowable from
     # an uninstall script alone, so neither is touched.
+
+    success "Wings removed"
 }
 
 remove_auto_updaters() {

@@ -338,14 +338,7 @@ get_download_url() {
   # Determine architecture and asset name based on the installed Wings variant.
   # This script is self-contained (no lib.sh dependency), so the
   # architecture mapping is inlined rather than shared via a lib.sh helper.
-  case "$WINGS_VARIANT" in
-    go | rs) ;;
-    *)
-      error "Unsupported Wings variant: $WINGS_VARIANT (expected 'go' or 'rs')"
-      exit 1
-      ;;
-  esac
-
+  # WINGS_VARIANT is already normalized/validated in main() before this runs.
   local machine
   machine=$(uname -m)
 
@@ -848,6 +841,19 @@ main() {
   # Setup
   setup_colors
   load_config
+
+  # Normalize and validate here, right after load_config() (which may
+  # re-source CONFIG_FILE and override the top-level default) and before
+  # acquire_lock/create_backup run - a typo left in the env file would
+  # otherwise waste a backup before get_download_url() caught it.
+  WINGS_VARIANT=$(echo "$WINGS_VARIANT" | tr '[:upper:]' '[:lower:]')
+  case "$WINGS_VARIANT" in
+    go | rs) ;;
+    *)
+      error "Unsupported Wings variant: $WINGS_VARIANT (expected 'go' or 'rs')"
+      exit $EXIT_ERROR
+      ;;
+  esac
 
   # Ensure directories exist
   mkdir -p "$(dirname "$LOG_FILE")"

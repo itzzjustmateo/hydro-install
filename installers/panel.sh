@@ -538,7 +538,7 @@ setup_services() {
     php_socket=$(get_php_socket)
 
     local use_ssl=false
-    [ -n "$SSL_CERT_PATH" ] && [ -n "$SSL_KEY_PATH" ] && use_ssl=true
+    has_custom_ssl_cert && use_ssl=true
 
     install_nginx_config "$PANEL_FQDN" "$php_socket" "$use_ssl" "$SSL_CERT_PATH" "$SSL_KEY_PATH"
   fi

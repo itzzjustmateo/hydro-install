@@ -178,6 +178,17 @@ parse_arguments "$@"
 WINGS_INSTALL_DIR="/etc/pterodactyl"
 PANEL_CONFIG_DIR="${PANEL_CONFIG_DIR:-/etc/hydrodactyl}"
 WINGS_VARIANT="${WINGS_VARIANT:-go}"
+WINGS_VARIANT=$(echo "$WINGS_VARIANT" | tr '[:upper:]' '[:lower:]')
+# Validate here, before install_docker/directory/user setup run, instead of
+# only in wings_release_arch() deep inside install_wings() - a typo like
+# "--variant Go" would otherwise waste that work before failing.
+case "$WINGS_VARIANT" in
+  go | rs) ;;
+  *)
+    error "Unsupported Wings variant: $WINGS_VARIANT (expected 'go' or 'rs')"
+    exit 1
+    ;;
+esac
 # Repo default depends on variant (pterodactyl/wings vs calagopus/wings) and
 # is resolved in install_wings() - do not default it here, or a
 # variant-specific default below would never apply once this is non-empty.

@@ -784,12 +784,20 @@ cmd_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+# Whether a usable custom SSL certificate is configured. Both paths are
+# required - the nginx use_ssl gates in installers/both.sh and
+# installers/panel.sh only enable SSL when both are set, so panel_scheme()
+# below must agree or APP_URL can claim https while nginx still serves http.
+has_custom_ssl_cert() {
+  [ -n "${SSL_CERT_PATH:-}" ] && [ -n "${SSL_KEY_PATH:-}" ]
+}
+
 # Determine whether the panel should be addressed over https or http, based
 # on the same SSL/TLS variables used to build the Laravel APP_URL
 # (configure_panel/configure_panel_environment in installers/panel.sh and
 # installers/both.sh). Echoes "https" or "http".
 panel_scheme() {
-  if [ "${CONFIGURE_LETSENCRYPT:-false}" == true ] || [ "${ASSUME_SSL:-false}" == true ] || [ -n "${SSL_CERT_PATH:-}" ]; then
+  if [ "${CONFIGURE_LETSENCRYPT:-false}" == true ] || [ "${ASSUME_SSL:-false}" == true ] || has_custom_ssl_cert; then
     echo "https"
   else
     echo "http"
@@ -2505,6 +2513,19 @@ install_nginx_config() {
   local config_file="/etc/nginx/sites-available/hydrodactyl.conf"
 
   if [ "$ssl" == true ] && [ -n "$cert_path" ] && [ -n "$key_path" ]; then
+    # Fail loudly on a missing cert/key rather than writing a vhost that
+    # references files nginx can't read - installers/wings.sh and
+    # installers/elytra.sh already guard the same way before using
+    # SSL_CERT_PATH/SSL_KEY_PATH.
+    if [ ! -f "$cert_path" ]; then
+      error "SSL certificate file not found: $cert_path"
+      exit 1
+    fi
+    if [ ! -f "$key_path" ]; then
+      error "SSL key file not found: $key_path"
+      exit 1
+    fi
+
     # Get SSL config
     if ! get_config "nginx_ssl.conf" "$config_file"; then
       exit 1
@@ -2548,6 +2569,10 @@ install_nginx_config() {
     else
       systemctl start nginx
     fi
+  else
+    error "Nginx configuration test failed - not starting/reloading nginx."
+    error "Check the config with: nginx -t"
+    exit 1
   fi
 
   success "Nginx configured"

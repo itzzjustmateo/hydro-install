@@ -63,6 +63,17 @@ fi
 
 # Wings configuration
 WINGS_VARIANT="${WINGS_VARIANT:-go}"
+WINGS_VARIANT=$(echo "$WINGS_VARIANT" | tr '[:upper:]' '[:lower:]')
+# Validate here, before install_docker/panel/daemon setup run, instead of
+# only in wings_release_arch() deep inside install_wings_daemon() - a typo
+# in the WINGS_VARIANT env var would otherwise waste that work before failing.
+case "$WINGS_VARIANT" in
+  go | rs) ;;
+  *)
+    error "Unsupported Wings variant: $WINGS_VARIANT (expected 'go' or 'rs')"
+    exit 1
+    ;;
+esac
 # Repo default depends on variant (pterodactyl/wings vs calagopus/wings) and
 # is resolved in install_wings_daemon() - do not default it here, or a
 # variant-specific default below would never apply once this is non-empty.
@@ -618,7 +629,7 @@ setup_panel_services() {
     php_socket=$(get_php_socket)
 
     local use_ssl=false
-    [ -n "$SSL_CERT_PATH" ] && [ -n "$SSL_KEY_PATH" ] && use_ssl=true
+    has_custom_ssl_cert && use_ssl=true
 
     install_nginx_config "$PANEL_FQDN" "$php_socket" "$use_ssl" "$SSL_CERT_PATH" "$SSL_KEY_PATH"
   fi
