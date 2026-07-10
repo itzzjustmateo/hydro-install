@@ -139,20 +139,7 @@ print_header() {
   clear 2>/dev/null || true
   echo ""
 
-  # Flame gradient header - smooth color transition from top to bottom
-  echo -e "${GRADIENT_1}    ╔══════════════════════════════════════════════════════════════════════════════════════╗"
-  echo -e "${GRADIENT_2}    ║                                                                                      ║"
-  echo -e "${GRADIENT_3}    ║     ___ ___            .___                 .___              __          .__                ║"
-  echo -e "${GRADIENT_4}    ║   /   |   \\ ___.__. __| _/______  ____   __| _/____    _____/  |_ ___.__.|  |               ║"
-  echo -e "${GRADIENT_5}    ║  /    ~    <   |  |/ __ |\\_  __ \\/  _ \\ / __ |\\__  \\ _/ ___\\   __<   |  ||  |              ║"
-  echo -e "${GRADIENT_6}    ║  \\    Y    /\\___  / /_/ | |  | \\(  <_> ) /_/ | / __ \\\\  \\___|  |  \\___  / |  |__             ║"
-  echo -e "${GRADIENT_7}    ║   \\___|_  / / ____\\____ | |__|   \\____/\\____ |(____  /\\___  >__|  / ____||____/             ║"
-  echo -e "${GRADIENT_8}    ║         \\/  \\/         \\/                   \\/     \\/     \\/      \\/                        ║"
-  echo -e "${GRADIENT_9}    ║                                                                                      ║"
-  echo -e "${GRADIENT_10}    ║                            Hydrodactyl Installation Manager                           ║"
-  echo -e "${GRADIENT_11}    ╚══════════════════════════════════════════════════════════════════════════════════════╝"
-  echo -e "${COLOR_NC}"
-  echo -e "    ${COLOR_ORANGE}Version:${COLOR_NC} ${SCRIPT_RELEASE}  ${COLOR_ORANGE}|${COLOR_NC}  ${COLOR_ORANGE}By:${COLOR_NC} ItzzMateo Studios"
+  echo -e "${COLOR_ORANGE}Hydrodactyl Installation Manager${COLOR_NC}  ${COLOR_ORANGE}|${COLOR_NC}  ${COLOR_ORANGE}Version:${COLOR_NC} ${SCRIPT_RELEASE}  ${COLOR_ORANGE}|${COLOR_NC}  ${COLOR_ORANGE}By:${COLOR_NC} ItzzMateo Studios"
   echo ""
 }
 
