@@ -1,7 +1,7 @@
 name: Branch Validation
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, edited, synchronize, reopened]
     branches: [main]
 
@@ -16,8 +16,9 @@ jobs:
     steps:
       - name: Check branch name
         id: check
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
         run: |
-          BRANCH_NAME="${{ github.head_ref }}"
           echo "Branch: $BRANCH_NAME"
 
           if echo "$BRANCH_NAME" | grep -qE '^(feature|fix|docs|chore|refactor|perf|test|ci|build|revert)/'; then
