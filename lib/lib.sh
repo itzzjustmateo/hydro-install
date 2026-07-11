@@ -329,6 +329,36 @@ detect_os() {
   fi
 }
 
+# ------------------ Daemon Binary Detection ----------------- #
+
+detect_elytra_binary() {
+  if [ -f "/usr/local/bin/elytra" ]; then
+    echo "/usr/local/bin/elytra"
+    return 0
+  fi
+
+  if [ -f "/usr/bin/elytra" ]; then
+    echo "/usr/bin/elytra"
+    return 0
+  fi
+
+  return 1
+}
+
+detect_wings_binary() {
+  if [ -f "/usr/local/bin/wings" ]; then
+    echo "/usr/local/bin/wings"
+    return 0
+  fi
+
+  if [ -f "/usr/bin/wings" ]; then
+    echo "/usr/bin/wings"
+    return 0
+  fi
+
+  return 1
+}
+
 # ------------------ Validation Functions ----------------- #
 
 # ------------------ System Resource Functions ----------------- #
@@ -981,6 +1011,16 @@ validate_release_tag() {
   return 0
 }
 
+# Map a daemon_type/component identifier to its display label
+# Usage: daemon_display_name <elytra|wings|...>
+daemon_display_name() {
+  case "$1" in
+    elytra) echo "Elytra" ;;
+    wings) echo "Wings" ;;
+    *) echo "$1" ;;
+  esac
+}
+
 # Prompt user to select a release version
 # For panel: shows last 4 releases, accepts "latest", tag, or "Release <tag>"
 # For any other component (elytra, wings, ...): asks latest vs specific, accepts "latest" or "vX.X.X"
@@ -1064,11 +1104,7 @@ select_release_version() {
   else
     # Non-panel component (elytra, wings, ...): simple latest vs specific
     local component_label
-    case "$component" in
-      elytra) component_label="Elytra" ;;
-      wings) component_label="Wings" ;;
-      *) component_label="$component" ;;
-    esac
+    component_label=$(daemon_display_name "$component")
 
     echo "" >&2
     output "${component_label} is installed from binary releases." >&2
@@ -3563,11 +3599,7 @@ create_node_via_api() {
   local daemon_type="${9:-elytra}"
 
   local daemon_label
-  case "$daemon_type" in
-    elytra) daemon_label="Elytra" ;;
-    wings) daemon_label="Wings" ;;
-    *) daemon_label="$daemon_type" ;;
-  esac
+  daemon_label=$(daemon_display_name "$daemon_type")
 
   output "Creating node: ${COLOR_ORANGE}${node_name}${COLOR_NC}" >&2
 
@@ -3892,6 +3924,10 @@ save_wings_install_info() {
 
   output "Saving Wings installation information..."
 
+  # installers/both.sh tracks separate Panel/Wings tokens as GITHUB_TOKEN_WINGS;
+  # installers/wings.sh (Wings-only) only ever has the plain GITHUB_TOKEN.
+  local wings_token="${GITHUB_TOKEN_WINGS:-${GITHUB_TOKEN:-}}"
+
   # Pre-create with owner-only permissions so the file is never briefly
   # world/group-readable under the process umask while it still contains
   # GITHUB_TOKEN/PANEL_API_KEY/NODE_TOKEN, before the chmod 600 below.
@@ -3906,7 +3942,7 @@ save_wings_install_info() {
     echo "INSTALL_TYPE=\"$install_type\""
     [ -n "$WINGS_VARIANT" ] && echo "WINGS_VARIANT=\"$WINGS_VARIANT\""
     [ -n "$WINGS_REPO" ] && echo "WINGS_REPO=\"$WINGS_REPO\""
-    [ -n "$GITHUB_TOKEN" ] && echo "GITHUB_TOKEN=\"$GITHUB_TOKEN\""
+    [ -n "$wings_token" ] && echo "GITHUB_TOKEN=\"$wings_token\""
     [ -n "$PANEL_FQDN" ] && echo "PANEL_FQDN=\"$PANEL_FQDN\""
     [ -n "$PANEL_URL" ] && echo "PANEL_URL=\"$PANEL_URL\""
     [ -n "$NODE_NAME" ] && echo "NODE_NAME=\"$NODE_NAME\""
@@ -4517,152 +4553,97 @@ check_both_health() {
   check_wings_health
 }
 
-# Auto-fix Elytra permission issues
-auto_fix_elytra_issues() {
-  info "Attempting to auto-fix Elytra issues..."
+# Auto-fix daemon (Elytra/Wings) permission issues - shared by
+# auto_fix_elytra_issues()/auto_fix_wings_issues() below, since both daemons
+# need identical binary/data-dir/config permission repair, differing only in
+# their paths, UID, and service name.
+# Usage: _auto_fix_daemon_issues <label> <binary_path> <data_root> <uid> <config_dir> <service> [skip_restart]
+_auto_fix_daemon_issues() {
+  local label="$1"
+  local binary_path="$2"
+  local data_root="$3"
+  local uid="$4"
+  local config_dir="$5"
+  local service="$6"
+  local skip_restart="${7:-}"
+
+  info "Attempting to auto-fix ${label} issues..."
 
   # Fix binary permissions
-  if [ -f "/usr/local/bin/elytra" ]; then
+  if [ -f "$binary_path" ]; then
     info "Fixing binary permissions..."
-    chmod +x /usr/local/bin/elytra
+    chmod +x "$binary_path"
   fi
 
   # Fix data directory permissions
   info "Fixing data directory permissions..."
-  mkdir -p /var/lib/elytra/volumes /var/lib/elytra/archives /var/lib/elytra/backups
+  mkdir -p "$data_root/volumes" "$data_root/archives" "$data_root/backups"
 
-  chown -R 8888:8888 /var/lib/elytra/volumes 2>/dev/null || true
-  chown -R 8888:8888 /var/lib/elytra/archives 2>/dev/null || true
-  chown -R 8888:8888 /var/lib/elytra/backups 2>/dev/null || true
-  chown -R 8888:8888 /etc/elytra 2>/dev/null || true
+  chown -R "${uid}:${uid}" "$data_root/volumes" 2>/dev/null || true
+  chown -R "${uid}:${uid}" "$data_root/archives" 2>/dev/null || true
+  chown -R "${uid}:${uid}" "$data_root/backups" 2>/dev/null || true
+  chown -R "${uid}:${uid}" "$config_dir" 2>/dev/null || true
 
   # Fix permissions
-  info "Fixing Elytra permissions..."
-
-  # Create directories if they don't exist
-  mkdir -p /var/lib/elytra/volumes /var/lib/elytra/archives /var/lib/elytra/backups
+  info "Fixing ${label} permissions..."
 
   # Set permissions for containerized game servers
   # Note: 777 is required because game server containers run as arbitrary UIDs
   # and must be able to read/write/execute in these directories
   info "Setting 777 permissions on data directories for container access..."
-  # Ensure parent /var/lib/elytra is accessible
-  chmod 755 /var/lib/elytra 2>/dev/null || true
-  # Ensure the volumes directory itself and all contents have 777
-  chmod 777 /var/lib/elytra/volumes 2>/dev/null || true
-  chmod -R 777 /var/lib/elytra/volumes/* 2>/dev/null || true
-  chmod 777 /var/lib/elytra/archives 2>/dev/null || true
-  chmod -R 777 /var/lib/elytra/archives/* 2>/dev/null || true
-  chmod 777 /var/lib/elytra/backups 2>/dev/null || true
-  chmod -R 777 /var/lib/elytra/backups/* 2>/dev/null || true
+  # Ensure parent data root is accessible
+  chmod 755 "$data_root" 2>/dev/null || true
+  # Ensure each data directory itself and all contents have 777
+  chmod -R 777 "$data_root/volumes" 2>/dev/null || true
+  chmod -R 777 "$data_root/archives" 2>/dev/null || true
+  chmod -R 777 "$data_root/backups" 2>/dev/null || true
 
-  # Set ACL default permissions so new directories inherit 777
+  # Set ACL default permissions so new files/directories inherit rwx on all
+  # three data directories - matches the explicit chmod 777 above, since
+  # containers run as arbitrary UIDs and need read/write/execute on files
+  # other containers create later too.
   if command -v setfacl >/dev/null 2>&1; then
     info "Setting default ACL permissions for new files..."
-    setfacl -R -m d:o:rx /var/lib/elytra/volumes 2>/dev/null || true
-    setfacl -R -m d:g:rx /var/lib/elytra/volumes 2>/dev/null || true
+    setfacl -R -m d:o:rwx,d:g:rwx "$data_root/volumes" "$data_root/archives" "$data_root/backups" 2>/dev/null || true
   fi
 
-  # Disable check_permissions_on_boot in Elytra config to prevent permission resets
-  if [ -f "/etc/elytra/config.yml" ]; then
-    info "Disabling permission checks in Elytra config..."
-    sed -i 's/check_permissions_on_boot: true/check_permissions_on_boot: false/' /etc/elytra/config.yml 2>/dev/null || true
+  # Disable check_permissions_on_boot in the daemon config to prevent permission resets
+  if [ -f "$config_dir/config.yml" ]; then
+    info "Disabling permission checks in ${label} config..."
+    sed -i 's/check_permissions_on_boot: true/check_permissions_on_boot: false/' "$config_dir/config.yml" 2>/dev/null || true
   fi
 
-  # Elytra config directory - create if needed and set more restrictive permissions
-  mkdir -p /etc/elytra
-  find /etc/elytra -type d -exec chmod 755 {} \; 2>/dev/null || true
+  # Config directory - create if needed and set more restrictive permissions
+  mkdir -p "$config_dir"
+  find "$config_dir" -type d -exec chmod 755 {} \; 2>/dev/null || true
   # SECURITY: Config contains daemon credentials - restrict to owner-only
-  find /etc/elytra -type f -name "config.yml" -exec chmod 600 {} \; 2>/dev/null || true
-  find /etc/elytra -type f ! -name "config.yml" -exec chmod 640 {} \; 2>/dev/null || true
+  find "$config_dir" -type f -name "config.yml" -exec chmod 600 {} \; 2>/dev/null || true
+  find "$config_dir" -type f ! -name "config.yml" -exec chmod 640 {} \; 2>/dev/null || true
 
-  # Restart Elytra service
-  info "Restarting Elytra service..."
-  systemctl restart elytra 2>/dev/null || true
+  if [ "$skip_restart" != "skip_restart" ]; then
+    info "Restarting ${label} service..."
+    systemctl restart "$service" 2>/dev/null || true
 
-  # Verify Elytra started
-  sleep 3
-  if systemctl is-active --quiet elytra 2>/dev/null; then
-    success "Elytra is now running"
-  else
-    warning "Elytra may still have issues - manual intervention may be required"
+    # Verify the service started
+    sleep 3
+    if systemctl is-active --quiet "$service" 2>/dev/null; then
+      success "${label} is now running"
+    else
+      warning "${label} may still have issues - manual intervention may be required"
+    fi
   fi
 
   success "Auto-fix completed"
 }
 
+# Auto-fix Elytra permission issues
+# Usage: auto_fix_elytra_issues [skip_restart]
+auto_fix_elytra_issues() {
+  _auto_fix_daemon_issues "Elytra" "/usr/local/bin/elytra" "/var/lib/elytra" "8888" "/etc/elytra" "elytra" "$1"
+}
+
 # Auto-fix Wings permission issues
+# Usage: auto_fix_wings_issues [skip_restart]
 auto_fix_wings_issues() {
-  info "Attempting to auto-fix Wings issues..."
-
-  # Fix binary permissions
-  if [ -f "/usr/local/bin/wings" ]; then
-    info "Fixing binary permissions..."
-    chmod +x /usr/local/bin/wings
-  fi
-
-  # Fix data directory permissions
-  info "Fixing data directory permissions..."
-  mkdir -p /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups
-
-  chown -R 9999:9999 /var/lib/pterodactyl/volumes 2>/dev/null || true
-  chown -R 9999:9999 /var/lib/pterodactyl/archives 2>/dev/null || true
-  chown -R 9999:9999 /var/lib/pterodactyl/backups 2>/dev/null || true
-  chown -R 9999:9999 /etc/pterodactyl 2>/dev/null || true
-
-  # Fix permissions
-  info "Fixing Wings permissions..."
-
-  # Create directories if they don't exist
-  mkdir -p /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups
-
-  # Set permissions for containerized game servers
-  # Note: 777 is required because game server containers run as arbitrary UIDs
-  # and must be able to read/write/execute in these directories
-  info "Setting 777 permissions on data directories for container access..."
-  # Ensure parent /var/lib/pterodactyl is accessible
-  chmod 755 /var/lib/pterodactyl 2>/dev/null || true
-  # Ensure the volumes directory itself and all contents have 777
-  chmod 777 /var/lib/pterodactyl/volumes 2>/dev/null || true
-  chmod -R 777 /var/lib/pterodactyl/volumes/* 2>/dev/null || true
-  chmod 777 /var/lib/pterodactyl/archives 2>/dev/null || true
-  chmod -R 777 /var/lib/pterodactyl/archives/* 2>/dev/null || true
-  chmod 777 /var/lib/pterodactyl/backups 2>/dev/null || true
-  chmod -R 777 /var/lib/pterodactyl/backups/* 2>/dev/null || true
-
-  # Set ACL default permissions so new directories inherit 777 - matches the
-  # explicit chmod 777 above, since containers run as arbitrary UIDs and
-  # need read/write/execute on files other containers create later too.
-  if command -v setfacl >/dev/null 2>&1; then
-    info "Setting default ACL permissions for new files..."
-    setfacl -R -m d:o:rwx /var/lib/pterodactyl/volumes 2>/dev/null || true
-    setfacl -R -m d:g:rwx /var/lib/pterodactyl/volumes 2>/dev/null || true
-  fi
-
-  # Disable check_permissions_on_boot in Wings config to prevent permission resets
-  if [ -f "/etc/pterodactyl/config.yml" ]; then
-    info "Disabling permission checks in Wings config..."
-    sed -i 's/check_permissions_on_boot: true/check_permissions_on_boot: false/' /etc/pterodactyl/config.yml 2>/dev/null || true
-  fi
-
-  # Wings config directory - create if needed and set more restrictive permissions
-  mkdir -p /etc/pterodactyl
-  find /etc/pterodactyl -type d -exec chmod 755 {} \; 2>/dev/null || true
-  # SECURITY: Config contains daemon credentials - restrict to owner-only
-  find /etc/pterodactyl -type f -name "config.yml" -exec chmod 600 {} \; 2>/dev/null || true
-  find /etc/pterodactyl -type f ! -name "config.yml" -exec chmod 640 {} \; 2>/dev/null || true
-
-  # Restart Wings service
-  info "Restarting Wings service..."
-  systemctl restart wings 2>/dev/null || true
-
-  # Verify Wings started
-  sleep 3
-  if systemctl is-active --quiet wings 2>/dev/null; then
-    success "Wings is now running"
-  else
-    warning "Wings may still have issues - manual intervention may be required"
-  fi
-
-  success "Auto-fix completed"
+  _auto_fix_daemon_issues "Wings" "/usr/local/bin/wings" "/var/lib/pterodactyl" "9999" "/etc/pterodactyl" "wings" "$1"
 }

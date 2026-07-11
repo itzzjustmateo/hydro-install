@@ -685,8 +685,7 @@ auto_fix_wings_issues() {
   # need read/write/execute on files other containers create later too.
   if command -v setfacl >/dev/null 2>&1; then
     info "Setting default ACL permissions for new files..."
-    setfacl -R -m d:o:rwx /var/lib/pterodactyl/volumes 2>/dev/null || true
-    setfacl -R -m d:g:rwx /var/lib/pterodactyl/volumes 2>/dev/null || true
+    setfacl -R -m d:o:rwx,d:g:rwx /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups 2>/dev/null || true
   fi
 
   # Disable check_permissions_on_boot in Wings config to prevent permission resets

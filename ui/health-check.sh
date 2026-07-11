@@ -141,33 +141,7 @@ detect_panel_location() {
   return 1
 }
 
-detect_elytra_binary() {
-  if [ -f "/usr/local/bin/elytra" ]; then
-    echo "/usr/local/bin/elytra"
-    return 0
-  fi
-
-  if [ -f "/usr/bin/elytra" ]; then
-    echo "/usr/bin/elytra"
-    return 0
-  fi
-
-  return 1
-}
-
-detect_wings_binary() {
-  if [ -f "/usr/local/bin/wings" ]; then
-    echo "/usr/local/bin/wings"
-    return 0
-  fi
-
-  if [ -f "/usr/bin/wings" ]; then
-    echo "/usr/bin/wings"
-    return 0
-  fi
-
-  return 1
-}
+# detect_elytra_binary() and detect_wings_binary() are shared, defined in lib.sh.
 
 # ------------------ Menu Functions ----------------- #
 

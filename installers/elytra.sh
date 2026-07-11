@@ -290,8 +290,8 @@ install_elytra() {
   output "Creating hydrodactyl system user..."
   if ! id -u hydrodactyl >/dev/null 2>&1; then
     useradd --system --no-create-home --shell /usr/sbin/nologin --uid 8888 --gid 8888 hydrodactyl 2>/dev/null || \
-    useradd --system --no-create-home --shell /sbin/nologin --uid 8888 hydrodactyl 2>/dev/null || \
-    useradd --system --no-create-home --shell /bin/false --uid 8888 hydrodactyl
+    useradd --system --no-create-home --shell /sbin/nologin --uid 8888 --gid 8888 hydrodactyl 2>/dev/null || \
+    useradd --system --no-create-home --shell /bin/false --uid 8888 --gid 8888 hydrodactyl
   fi
 
   # Add hydrodactyl user to docker group for container management

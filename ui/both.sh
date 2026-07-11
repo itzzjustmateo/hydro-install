@@ -343,11 +343,11 @@ configure_wings_variant() {
   if [ "$variant_choice" == "0" ]; then
     WINGS_VARIANT="go"
     WINGS_REPO="$DEFAULT_WINGS_REPO"
-    output "Selected: Wings (Go) - ${COLOR_ORANGE}${WINGS_REPO}${COLOR_NC}"
+    output "Selected: Pterodactyl Wings (Go) - ${COLOR_ORANGE}${WINGS_REPO}${COLOR_NC}"
   else
     WINGS_VARIANT="rs"
     WINGS_REPO="$DEFAULT_WINGS_RS_REPO"
-    output "Selected: Wings-RS (Rust) - ${COLOR_ORANGE}${WINGS_REPO}${COLOR_NC}"
+    output "Selected: wings-rs (Rust) - ${COLOR_ORANGE}${WINGS_REPO}${COLOR_NC}"
   fi
 }
 
@@ -520,7 +520,7 @@ show_summary() {
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   output "  Wings Daemon Configuration"
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo -e "  ${COLOR_ORANGE}Variant:${COLOR_NC}           $([ "$WINGS_VARIANT" == "go" ] && echo 'Wings (Go)' || echo 'Wings-RS (Rust)')"
+  echo -e "  ${COLOR_ORANGE}Variant:${COLOR_NC}           $([ "$WINGS_VARIANT" == "go" ] && echo 'Pterodactyl Wings (Go)' || echo 'wings-rs (Rust)')"
   echo -e "  ${COLOR_ORANGE}Repository:${COLOR_NC}        ${WINGS_REPO} $([ "$WINGS_REPO_PRIVATE" == "true" ] && echo '(private)' || echo '(public)')"
   echo -e "  ${COLOR_ORANGE}Release Version:${COLOR_NC}   ${WINGS_RELEASE_VERSION}"
   echo -e "  ${COLOR_ORANGE}Panel URL:${COLOR_NC}         $(panel_scheme)://$(panel_url_host "$PANEL_FQDN") (auto-configured)"

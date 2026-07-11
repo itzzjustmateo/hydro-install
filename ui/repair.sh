@@ -73,19 +73,7 @@ detect_panel_location() {
   return 1
 }
 
-detect_elytra_binary() {
-  if [ -f "/usr/local/bin/elytra" ]; then
-    echo "/usr/local/bin/elytra"
-    return 0
-  fi
-  
-  if [ -f "/usr/bin/elytra" ]; then
-    echo "/usr/bin/elytra"
-    return 0
-  fi
-  
-  return 1
-}
+# detect_elytra_binary() and detect_wings_binary() are shared, defined in lib.sh.
 
 detect_elytra_config_dir() {
   if [ -d "/etc/elytra" ] && [ -f "/etc/elytra/config.yml" ]; then
@@ -101,20 +89,6 @@ detect_elytra_config_dir() {
   # Default fallback
   echo "/etc/elytra"
   return 0
-}
-
-detect_wings_binary() {
-  if [ -f "/usr/local/bin/wings" ]; then
-    echo "/usr/local/bin/wings"
-    return 0
-  fi
-
-  if [ -f "/usr/bin/wings" ]; then
-    echo "/usr/bin/wings"
-    return 0
-  fi
-
-  return 1
 }
 
 # ------------------ Repair Functions ----------------- #
@@ -216,8 +190,11 @@ fix_wings_permissions() {
   output "Found Wings binary at: $wings_binary"
 
   # Reuse the shared fix routine from lib.sh (binary/data-dir/config
-  # permissions plus a service restart) instead of duplicating it here.
-  auto_fix_wings_issues
+  # permissions) instead of duplicating it here. Skip its restart step -
+  # restart_services() below is the single place Wings gets restarted,
+  # matching fix_elytra_permissions()'s design (permission fixes don't
+  # restart the service; "Restart All Services"/"Run All Fixes" does).
+  auto_fix_wings_issues skip_restart
 
   success "Wings permissions fixed"
   return 0
@@ -275,14 +252,14 @@ restart_services() {
   warning "Failed to restart redis (may not be installed)"
 
   local wings_binary
-  wings_binary=$(detect_wings_binary 2>/dev/null)
+  wings_binary=$(detect_wings_binary 2>/dev/null) || true
   if [ -n "$wings_binary" ]; then
     output "Restarting Wings..."
     systemctl restart wings 2>/dev/null || warning "Failed to restart wings (may not be installed)"
   fi
 
   local elytra_binary
-  elytra_binary=$(detect_elytra_binary 2>/dev/null)
+  elytra_binary=$(detect_elytra_binary 2>/dev/null) || true
   if [ -n "$elytra_binary" ]; then
     output "Restarting Elytra..."
     systemctl restart elytra 2>/dev/null || warning "Failed to restart elytra (may not be installed)"
