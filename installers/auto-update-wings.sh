@@ -643,7 +643,7 @@ post_update_health_check() {
 }
 
 auto_fix_wings_issues() {
-  info "Attempting to auto-fix issues..."
+  info "Attempting to auto-fix Wings issues..."
 
   # Fix binary permissions
   if [ -f "/usr/local/bin/wings" ]; then
@@ -680,6 +680,16 @@ auto_fix_wings_issues() {
   chmod 777 /var/lib/pterodactyl/backups 2>/dev/null || true
   chmod -R 777 /var/lib/pterodactyl/backups/* 2>/dev/null || true
 
+  # Set ACL default permissions so new directories inherit 777 - matches the
+  # explicit chmod 777 above, since containers run as arbitrary UIDs and
+  # need read/write/execute on files other containers create later too.
+  if command -v setfacl >/dev/null 2>&1; then
+    info "Setting default ACL permissions for new files..."
+    setfacl -R -m d:o:rwx /var/lib/pterodactyl/volumes 2>/dev/null || true
+    setfacl -R -m d:g:rwx /var/lib/pterodactyl/volumes 2>/dev/null || true
+  fi
+
+  # Disable check_permissions_on_boot in Wings config to prevent permission resets
   if [ -f "$INSTALL_DIR/config.yml" ]; then
     info "Disabling permission checks in Wings config..."
     sed -i 's/check_permissions_on_boot: true/check_permissions_on_boot: false/' "$INSTALL_DIR/config.yml" 2>/dev/null || true

@@ -78,7 +78,8 @@ main() {
     [ "$has_wings_info" == true ] && found_parts+=("Wings")
     [ "$has_elytra_info" == true ] && found_parts+=("Elytra")
     local found_list
-    found_list=$(IFS=', '; echo "${found_parts[*]}")
+    found_list=$(printf '%s, ' "${found_parts[@]}")
+    found_list=${found_list%, }
     output "Installation information found for: ${found_list}."
   fi
 

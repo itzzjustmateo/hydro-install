@@ -136,8 +136,8 @@ The `wings` systemd service itself runs as `root` (see [Step 8](#step-8-systemd-
 groupadd --gid 9999 pterodactyl 2>/dev/null || true
 
 useradd --system --no-create-home --shell /usr/sbin/nologin --uid 9999 --gid 9999 pterodactyl 2>/dev/null || \
-useradd --system --no-create-home --shell /sbin/nologin --uid 9999 pterodactyl 2>/dev/null || \
-useradd --system --no-create-home --shell /bin/false --uid 9999 pterodactyl
+useradd --system --no-create-home --shell /sbin/nologin --uid 9999 --gid 9999 pterodactyl 2>/dev/null || \
+useradd --system --no-create-home --shell /bin/false --uid 9999 --gid 9999 pterodactyl
 
 usermod -aG docker pterodactyl
 ```
@@ -150,6 +150,15 @@ usermod -aG docker pterodactyl
 ```bash
 mkdir -p /etc/pterodactyl
 mkdir -p /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups
+```
+
+You don't need to `chown`/`chmod` these directories by hand: Wings runs as `root` and, by default, `check_permissions_on_boot: true` in its config makes it fix ownership and permissions on `/var/lib/pterodactyl/*` itself the first time it starts (Step 8). If you later disable that setting for faster boots, set ownership/permissions once yourself first:
+
+```bash
+chown -R 9999:9999 /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups /etc/pterodactyl
+chmod 755 /var/lib/pterodactyl
+chmod -R 777 /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups
+chmod 755 /etc/pterodactyl
 ```
 
 ### Download the Binary

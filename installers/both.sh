@@ -765,8 +765,8 @@ install_wings_daemon() {
   output "Creating pterodactyl system user..."
   if ! id -u pterodactyl >/dev/null 2>&1; then
     useradd --system --no-create-home --shell /usr/sbin/nologin --uid 9999 --gid 9999 pterodactyl 2>/dev/null || \
-    useradd --system --no-create-home --shell /sbin/nologin --uid 9999 pterodactyl 2>/dev/null || \
-    useradd --system --no-create-home --shell /bin/false --uid 9999 pterodactyl
+    useradd --system --no-create-home --shell /sbin/nologin --uid 9999 --gid 9999 pterodactyl 2>/dev/null || \
+    useradd --system --no-create-home --shell /bin/false --uid 9999 --gid 9999 pterodactyl
   fi
 
   # Add pterodactyl user to docker group for container management
