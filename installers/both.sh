@@ -755,24 +755,24 @@ install_wings_daemon() {
   mkdir -p /var/lib/pterodactyl/archives
   mkdir -p /var/lib/pterodactyl/backups
 
-  # Create hydrodactyl group first (required for user creation)
-  output "Creating hydrodactyl system group..."
-  if ! getent group hydrodactyl >/dev/null 2>&1; then
-    groupadd --gid 8888 hydrodactyl 2>/dev/null || true
+  # Create pterodactyl group first (required for user creation)
+  output "Creating pterodactyl system group..."
+  if ! getent group pterodactyl >/dev/null 2>&1; then
+    groupadd --gid 9999 pterodactyl 2>/dev/null || true
   fi
 
-  # Create hydrodactyl user for Wings (UID/GID 8888) if it doesn't exist
-  output "Creating hydrodactyl system user..."
-  if ! id -u hydrodactyl >/dev/null 2>&1; then
-    useradd --system --no-create-home --shell /usr/sbin/nologin --uid 8888 --gid 8888 hydrodactyl 2>/dev/null || \
-    useradd --system --no-create-home --shell /sbin/nologin --uid 8888 hydrodactyl 2>/dev/null || \
-    useradd --system --no-create-home --shell /bin/false --uid 8888 hydrodactyl
+  # Create pterodactyl user for Wings (UID/GID 9999) if it doesn't exist
+  output "Creating pterodactyl system user..."
+  if ! id -u pterodactyl >/dev/null 2>&1; then
+    useradd --system --no-create-home --shell /usr/sbin/nologin --uid 9999 --gid 9999 pterodactyl 2>/dev/null || \
+    useradd --system --no-create-home --shell /sbin/nologin --uid 9999 pterodactyl 2>/dev/null || \
+    useradd --system --no-create-home --shell /bin/false --uid 9999 pterodactyl
   fi
 
-  # Add hydrodactyl user to docker group for container management
+  # Add pterodactyl user to docker group for container management
   if getent group docker >/dev/null 2>&1; then
-    output "Adding hydrodactyl user to docker group..."
-    usermod -aG docker hydrodactyl 2>/dev/null || true
+    output "Adding pterodactyl user to docker group..."
+    usermod -aG docker pterodactyl 2>/dev/null || true
   fi
 
   # Determine architecture and asset name based on the selected Wings variant
@@ -907,7 +907,7 @@ install_wings_daemon() {
   mkdir -p /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups
 
   output "Setting final permissions on Wings data directories..."
-  chown -R 8888:8888 /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups "$WINGS_INSTALL_DIR" 2>/dev/null || true
+  chown -R 9999:9999 /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups "$WINGS_INSTALL_DIR" 2>/dev/null || true
 
   # Set full permissions so containers can read/write/execute
   # Note: 777 is required for containerized game servers to access these directories
