@@ -25,7 +25,7 @@ This installer is a fork of the [Pyrodactyl Installer](https://github.com/Muspel
 - **Firewall Configuration** — Automatic UFW/FirewallD setup
 - **OS Support** — Ubuntu 22.04/24.04, Debian 11/12, Rocky Linux 8/9, AlmaLinux 8/9
 - **Database Management** — Automated MariaDB setup and configuration
-- **Docker Integration** — Seamless Docker installation for Wings/Elytra
+- **Docker Integration** — Seamless Docker installation for Wings/Wings-RS/Elytra
 - **Repair Tool** — Built-in repair tool to fix common permission and service issues
 - **Health Checks** — Comprehensive health checking for panel, Wings, Elytra, and system resources
 - **System Requirements Check** — Automatic detection of system resources with recommendations
@@ -72,7 +72,7 @@ sudo bash install.sh
 
 > **Note:** The installer will display a warning if your system is below minimum requirements. Swap space is recommended for systems with limited RAM.
 
-> **Docker Compatibility:** Wings and Elytra both require Docker to run game servers. OpenVZ, LXC, or Virtuozzo virtualization are **not supported**. KVM, VMware, or dedicated servers work best. Run `systemd-detect-virt` to check your virtualization type.
+> **Docker Compatibility:** Wings, Wings-RS, and Elytra all require Docker to run game servers. OpenVZ, LXC, or Virtuozzo virtualization are **not supported**. KVM, VMware, or dedicated servers work best. Run `systemd-detect-virt` to check your virtualization type.
 
 ## Installation Options
 
@@ -89,7 +89,7 @@ bash <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/m
 The built-in repair tool can fix common issues:
 
 - **Fix Panel Permissions** — Corrects ownership and permissions for web server
-- **Fix Wings Permissions** — Sets correct permissions for Wings directories (`/etc/pterodactyl`, UID 8888)
+- **Fix Wings Permissions** — Sets correct permissions for Wings directories (`/etc/pterodactyl`, UID 9999)
 - **Fix Elytra Permissions** — Sets correct permissions for legacy Elytra directories (UID 8888)
 - **Clear Laravel Caches** — Clears config, cache, view, and route caches
 - **Restart All Services** — Restarts nginx, PHP-FPM, hydroq, redis, and wings/elytra (whichever is installed)

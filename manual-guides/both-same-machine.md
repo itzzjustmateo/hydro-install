@@ -349,7 +349,7 @@ systemctl restart nginx
 ```
 
 ### Queue Worker Service
-Create `/etc/systemd/system/pyroq.service`:
+Create `/etc/systemd/system/hydroq.service`:
 ```ini
 [Unit]
 Description=Hydrodactyl Queue Worker
@@ -371,7 +371,7 @@ WantedBy=multi-user.target
 Enable:
 ```bash
 systemctl daemon-reload
-systemctl enable --now pyroq
+systemctl enable --now hydroq
 ```
 
 ### Cron Job
@@ -387,7 +387,7 @@ crontab -e
 
 ### Create Directories
 ```bash
-mkdir -p /var/lib/hydrodactyl/volumes /var/lib/hydrodactyl/archives /var/lib/hydrodactyl/backups /etc/elytra
+mkdir -p /var/lib/elytra/volumes /var/lib/elytra/archives /var/lib/elytra/backups /etc/elytra
 ```
 
 ### Download Elytra
@@ -402,12 +402,12 @@ chmod +x /usr/local/bin/elytra
 groupadd --system --gid 8888 hydrodactyl 2>/dev/null || true
 useradd --system --no-create-home --shell /usr/sbin/nologin --uid 8888 --gid 8888 hydrodactyl 2>/dev/null || true
 
-chown -R 8888:8888 /var/lib/hydrodactyl /etc/elytra
+chown -R 8888:8888 /var/lib/elytra /etc/elytra
 
 # SECURITY NOTE: 777 is required because containerized game servers run as
 # various UIDs and must read/write game data. This grants all users access.
-# Ensure /var/lib/hydrodactyl parent directory restricts access.
-chmod -R 777 /var/lib/hydrodactyl/volumes /var/lib/hydrodactyl/archives /var/lib/hydrodactyl/backups
+# Ensure /var/lib/elytra parent directory restricts access.
+chmod -R 777 /var/lib/elytra/volumes /var/lib/elytra/archives /var/lib/elytra/backups
 chmod -R 755 /etc/elytra
 # SECURITY: Config contains daemon credentials - restrict to owner-only
 [ -f /etc/elytra/config.yml ] && chmod 600 /etc/elytra/config.yml
@@ -429,9 +429,9 @@ api:
     upload-limit: 100
 
 system:
-    data: /var/lib/hydrodactyl/volumes
-    archive: /var/lib/hydrodactyl/archives
-    backup: /var/lib/hydrodactyl/backups
+    data: /var/lib/elytra/volumes
+    archive: /var/lib/elytra/archives
+    backup: /var/lib/elytra/backups
 
 remote: https://panel.yourdomain.com
 
@@ -640,7 +640,7 @@ echo "=== Panel Services ==="
 systemctl status nginx | grep Active
 systemctl status php8.4-fpm | grep Active
 systemctl status mariadb | grep Active
-systemctl status pyroq | grep Active
+systemctl status hydroq | grep Active
 
 echo "=== Elytra/Docker ==="
 systemctl status elytra | grep Active
@@ -649,7 +649,7 @@ docker ps
 
 echo "=== Resources ==="
 free -h
-df -h /var/lib/hydrodactyl
+df -h /var/lib/elytra
 ```
 
 ### Test Panel Access

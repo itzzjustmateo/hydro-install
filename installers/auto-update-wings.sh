@@ -655,10 +655,10 @@ auto_fix_wings_issues() {
   info "Fixing data directory permissions..."
   mkdir -p /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups
 
-  chown -R 8888:8888 /var/lib/pterodactyl/volumes 2>/dev/null || true
-  chown -R 8888:8888 /var/lib/pterodactyl/archives 2>/dev/null || true
-  chown -R 8888:8888 /var/lib/pterodactyl/backups 2>/dev/null || true
-  chown -R 8888:8888 "$INSTALL_DIR" 2>/dev/null || true
+  chown -R 9999:9999 /var/lib/pterodactyl/volumes 2>/dev/null || true
+  chown -R 9999:9999 /var/lib/pterodactyl/archives 2>/dev/null || true
+  chown -R 9999:9999 /var/lib/pterodactyl/backups 2>/dev/null || true
+  chown -R 9999:9999 "$INSTALL_DIR" 2>/dev/null || true
 
   # Fix permissions
   info "Fixing Wings permissions..."
@@ -682,6 +682,7 @@ auto_fix_wings_issues() {
 
   if [ -f "$INSTALL_DIR/config.yml" ]; then
     info "Disabling permission checks in Wings config..."
+    sed -i 's/check_permissions_on_boot: true/check_permissions_on_boot: false/' "$INSTALL_DIR/config.yml" 2>/dev/null || true
   fi
 
   # Wings config directory - create if needed and set more restrictive permissions

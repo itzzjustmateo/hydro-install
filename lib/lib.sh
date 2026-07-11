@@ -3892,6 +3892,11 @@ save_wings_install_info() {
 
   output "Saving Wings installation information..."
 
+  # Pre-create with owner-only permissions so the file is never briefly
+  # world/group-readable under the process umask while it still contains
+  # GITHUB_TOKEN/PANEL_API_KEY/NODE_TOKEN, before the chmod 600 below.
+  install -m 600 /dev/null "$info_file"
+
   {
     echo "# Wings Daemon Installation Information"
     echo "# Generated: $(date)"
@@ -4600,10 +4605,10 @@ auto_fix_wings_issues() {
   info "Fixing data directory permissions..."
   mkdir -p /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups
 
-  chown -R 8888:8888 /var/lib/pterodactyl/volumes 2>/dev/null || true
-  chown -R 8888:8888 /var/lib/pterodactyl/archives 2>/dev/null || true
-  chown -R 8888:8888 /var/lib/pterodactyl/backups 2>/dev/null || true
-  chown -R 8888:8888 /etc/pterodactyl 2>/dev/null || true
+  chown -R 9999:9999 /var/lib/pterodactyl/volumes 2>/dev/null || true
+  chown -R 9999:9999 /var/lib/pterodactyl/archives 2>/dev/null || true
+  chown -R 9999:9999 /var/lib/pterodactyl/backups 2>/dev/null || true
+  chown -R 9999:9999 /etc/pterodactyl 2>/dev/null || true
 
   # Fix permissions
   info "Fixing Wings permissions..."
@@ -4625,11 +4630,13 @@ auto_fix_wings_issues() {
   chmod 777 /var/lib/pterodactyl/backups 2>/dev/null || true
   chmod -R 777 /var/lib/pterodactyl/backups/* 2>/dev/null || true
 
-  # Set ACL default permissions so new directories inherit 777
+  # Set ACL default permissions so new directories inherit 777 - matches the
+  # explicit chmod 777 above, since containers run as arbitrary UIDs and
+  # need read/write/execute on files other containers create later too.
   if command -v setfacl >/dev/null 2>&1; then
     info "Setting default ACL permissions for new files..."
-    setfacl -R -m d:o:rx /var/lib/pterodactyl/volumes 2>/dev/null || true
-    setfacl -R -m d:g:rx /var/lib/pterodactyl/volumes 2>/dev/null || true
+    setfacl -R -m d:o:rwx /var/lib/pterodactyl/volumes 2>/dev/null || true
+    setfacl -R -m d:g:rwx /var/lib/pterodactyl/volumes 2>/dev/null || true
   fi
 
   # Disable check_permissions_on_boot in Wings config to prevent permission resets

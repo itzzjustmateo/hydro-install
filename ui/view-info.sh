@@ -109,7 +109,7 @@ main() {
     has_health_check_failures=true
   fi
 
-  if [ -f "/etc/wings/update-health-check-failure.log" ]; then
+  if [ -f "/etc/pterodactyl/update-health-check-failure.log" ]; then
     has_health_check_failures=true
   fi
 
@@ -136,10 +136,10 @@ main() {
         echo ""
       fi
 
-      if [ -f "/etc/wings/update-health-check-failure.log" ]; then
+      if [ -f "/etc/pterodactyl/update-health-check-failure.log" ]; then
         output "Wings Health Check Failure Log:"
         echo "---"
-        cat "/etc/wings/update-health-check-failure.log" 2>/dev/null || echo "Could not read file"
+        cat "/etc/pterodactyl/update-health-check-failure.log" 2>/dev/null || echo "Could not read file"
         echo "---"
         echo ""
       fi

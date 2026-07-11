@@ -60,7 +60,7 @@ We also provide an [automated installer](../install.sh) that can:
 
 Before starting any manual installation, ensure you have:
 
-- **Root access** to a fresh Linux server (Ubuntu 22.04+, Debian 12+, Rocky Linux 9+, or AlmaLinux 9+)
+- **Root access** to a fresh Linux server (Ubuntu 22.04+, Debian 11+, Rocky Linux 8+, or AlmaLinux 8+)
 - **Domain name(s)** pointed to your server IP(s)
 - **Server specifications** meeting minimum requirements:
   - Panel Only: 2 cores, 2GB RAM, 20GB SSD
@@ -78,7 +78,7 @@ All installations require:
 - PHP 8.4 with required extensions
 - SSL/TLS certificates (Let's Encrypt recommended)
 
-Wings and Elytra additionally require:
+Wings/Wings-RS and Elytra additionally require:
 - Docker Engine
 - Swap accounting enabled (for game server containers)
 

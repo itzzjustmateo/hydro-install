@@ -89,13 +89,25 @@ dnf update -y                 # Rocky/AlmaLinux
 
 ## Step 2: Install Docker
 
-### Ubuntu/Debian
+### Ubuntu
 ```bash
 apt install -y apt-transport-https ca-certificates curl gnupg lsb-release
 
 mkdir -p /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+apt update
+apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+```
+
+### Debian
+```bash
+apt install -y apt-transport-https ca-certificates curl gnupg lsb-release
+
+mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 
 apt update
 apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
@@ -118,7 +130,7 @@ docker --version
 
 ## Step 3: Create the pterodactyl System User
 
-Wings runs game server containers under a dedicated `pterodactyl` system user/group (UID/GID 9999), and adds itself to the `docker` group so it can manage containers:
+The `wings` systemd service itself runs as `root` (see [Step 8](#step-8-systemd-service)) - it does not drop privileges. This dedicated `pterodactyl` system user/group (UID/GID 9999) exists only so it can be added to the `docker` group and used to own game server volumes/files on disk; create it now so it's in place before Wings starts managing containers:
 
 ```bash
 groupadd --gid 9999 pterodactyl 2>/dev/null || true
@@ -164,10 +176,14 @@ chmod +x /usr/local/bin/wings
 ```
 
 ### Record the Installed Version
-The panel/auto-updater tooling tracks the installed version via this file:
+The panel/auto-updater tooling tracks the installed version via this file. Capture the release tag you actually downloaded (e.g. `v1.11.13`) rather than typing a placeholder:
+
 ```bash
+# Replace pterodactyl/wings with calagopus/wings if you installed wings-rs
+WINGS_TAG=$(curl -sL https://api.github.com/repos/pterodactyl/wings/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+
 mkdir -p /etc/hydrodactyl
-echo "<version-you-installed>" > /etc/hydrodactyl/wings-version
+echo "$WINGS_TAG" > /etc/hydrodactyl/wings-version
 chmod 644 /etc/hydrodactyl/wings-version
 ```
 
@@ -206,10 +222,18 @@ This works identically for both the Go and Rust variants. Re-run the same comman
 
 If this node has its own FQDN pointing at it, obtain a Let's Encrypt certificate:
 
+**Ubuntu/Debian:**
 ```bash
-apt install -y certbot          # Ubuntu/Debian
-dnf install -y certbot          # Rocky/AlmaLinux
+apt install -y certbot
+```
 
+**Rocky Linux/AlmaLinux:**
+```bash
+dnf install -y certbot
+```
+
+**Then, on any OS:**
+```bash
 certbot certonly --standalone -d node.yourdomain.com --non-interactive --agree-tos --email your@email.com
 ```
 
@@ -319,7 +343,9 @@ journalctl -u wings -f
 
 ### Check the API
 ```bash
-curl -k https://localhost:8080/api/system
+# If you enabled SSL in Step 7, use https; otherwise use http
+curl -k https://localhost:8080/api/system   # SSL enabled
+curl http://localhost:8080/api/system       # SSL not configured
 # Should return JSON, not "connection refused"
 ```
 
@@ -358,8 +384,10 @@ Common causes:
 
 **Test from the panel server:**
 ```bash
-curl -v https://node.yourdomain.com:8080
-# Should get an SSL handshake or 401 Unauthorized, not "connection refused"
+# If you enabled SSL in Step 7, use https; otherwise use http
+curl -v https://node.yourdomain.com:8080   # SSL enabled
+curl -v http://node.yourdomain.com:8080    # SSL not configured
+# Should get an SSL handshake (https) or 401 Unauthorized, not "connection refused"
 ```
 
 ### Docker Permission Denied
@@ -384,12 +412,26 @@ systemctl restart wings
 
 ### Updating Wings
 
-Stop Wings, download the new binary over the old one, then restart:
+Stop Wings, download the new binary over the old one, then restart. Use the block matching the variant you actually installed in [Step 4](#step-4-download-and-install-wings) - downloading the wrong one will overwrite your binary with an incompatible variant.
+
+**Wings (Go):**
 ```bash
 systemctl stop wings
 
-ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')  # Go variant
+ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
 curl -Lo /usr/local/bin/wings "https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_${ARCH}"
+chmod +x /usr/local/bin/wings
+
+systemctl start wings
+systemctl status wings
+```
+
+**wings-rs (Rust):**
+```bash
+systemctl stop wings
+
+ARCH=$(uname -m)  # keeps x86_64 / aarch64 as-is
+curl -Lo /usr/local/bin/wings "https://github.com/calagopus/wings/releases/latest/download/wings-rs-${ARCH}-linux"
 chmod +x /usr/local/bin/wings
 
 systemctl start wings
