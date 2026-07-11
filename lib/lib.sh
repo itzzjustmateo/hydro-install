@@ -4474,11 +4474,12 @@ check_wings_health() {
   echo ""
 
   # Check binary exists
-  if [ -f "/usr/local/bin/wings" ]; then
-    output "✓ Wings binary exists at /usr/local/bin/wings"
+  local wings_binary
+  if wings_binary=$(detect_wings_binary 2>/dev/null); then
+    output "✓ Wings binary exists at $wings_binary"
 
     # Check binary is executable
-    if [ -x "/usr/local/bin/wings" ]; then
+    if [ -x "$wings_binary" ]; then
       output "✓ Wings binary is executable"
     else
       warning "Wings binary is not executable"
@@ -4487,12 +4488,12 @@ check_wings_health() {
 
     # Check binary version
     local version
-    version=$(/usr/local/bin/wings --version 2>/dev/null | head -1)
+    version=$("$wings_binary" --version 2>/dev/null | head -1)
     if [ -n "$version" ]; then
       output "✓ Wings version: $version"
     fi
   else
-    error "Wings binary not found at /usr/local/bin/wings"
+    error "Wings binary not found at /usr/local/bin/wings or /usr/bin/wings"
     has_errors=true
   fi
 
@@ -4639,11 +4640,15 @@ _auto_fix_daemon_issues() {
 # Auto-fix Elytra permission issues
 # Usage: auto_fix_elytra_issues [skip_restart]
 auto_fix_elytra_issues() {
-  _auto_fix_daemon_issues "Elytra" "/usr/local/bin/elytra" "/var/lib/elytra" "8888" "/etc/elytra" "elytra" "$1"
+  local binary_path
+  binary_path=$(detect_elytra_binary 2>/dev/null) || binary_path="/usr/local/bin/elytra"
+  _auto_fix_daemon_issues "Elytra" "$binary_path" "/var/lib/elytra" "8888" "/etc/elytra" "elytra" "$1"
 }
 
 # Auto-fix Wings permission issues
 # Usage: auto_fix_wings_issues [skip_restart]
 auto_fix_wings_issues() {
-  _auto_fix_daemon_issues "Wings" "/usr/local/bin/wings" "/var/lib/pterodactyl" "9999" "/etc/pterodactyl" "wings" "$1"
+  local binary_path
+  binary_path=$(detect_wings_binary 2>/dev/null) || binary_path="/usr/local/bin/wings"
+  _auto_fix_daemon_issues "Wings" "$binary_path" "/var/lib/pterodactyl" "9999" "/etc/pterodactyl" "wings" "$1"
 }

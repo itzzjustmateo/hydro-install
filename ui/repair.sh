@@ -189,11 +189,14 @@ fix_wings_permissions() {
 
   output "Found Wings binary at: $wings_binary"
 
-  # Reuse the shared fix routine from lib.sh (binary/data-dir/config
-  # permissions) instead of duplicating it here. Skip its restart step -
-  # restart_services() below is the single place Wings gets restarted,
-  # matching fix_elytra_permissions()'s design (permission fixes don't
-  # restart the service; "Restart All Services"/"Run All Fixes" does).
+  output "Setting binary permissions..."
+  chmod +x "$wings_binary"
+
+  # Reuse the shared fix routine from lib.sh (data-dir/config permissions)
+  # instead of duplicating it here. Skip its restart step - restart_services()
+  # below is the single place Wings gets restarted, matching
+  # fix_elytra_permissions()'s design (permission fixes don't restart the
+  # service; "Restart All Services"/"Run All Fixes" does).
   auto_fix_wings_issues skip_restart
 
   success "Wings permissions fixed"

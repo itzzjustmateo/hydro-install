@@ -643,6 +643,11 @@ post_update_health_check() {
 }
 
 auto_fix_wings_issues() {
+  # This is a standalone copy of lib.sh's _auto_fix_daemon_issues() (as
+  # instantiated by lib.sh's own auto_fix_wings_issues()). This file can't
+  # source lib.sh (invoked via `bash <(curl ...)`, isolated subshell), so it
+  # can't call the shared helper directly - lib.sh's version is canonical;
+  # keep both in sync when fixing bugs or changing behavior here.
   info "Attempting to auto-fix Wings issues..."
 
   # Fix binary permissions
