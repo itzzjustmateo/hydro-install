@@ -29,7 +29,7 @@ fi
 WINGS_VARIANT="${WINGS_VARIANT:-go}"
 WINGS_REPO="${WINGS_REPO:-pterodactyl/wings}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
-INSTALL_DIR="${INSTALL_DIR:-/etc/wings}"
+INSTALL_DIR="${INSTALL_DIR:-/etc/pterodactyl}"
 LOG_FILE="${LOG_FILE:-/var/log/hydrodactyl-wings-auto-update.log}"
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/wings}"
 LOCK_FILE="${LOCK_FILE:-/var/run/hydrodactyl-wings-update.lock}"
@@ -546,7 +546,7 @@ EOF
         echo "- Wings config file not found" >> "$INSTALL_DIR/update-health-check-failure.log"
       fi
 
-      for dir in /var/lib/wings/volumes /var/lib/wings/archives /var/lib/wings/backups; do
+      for dir in /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups; do
         if [ ! -d "$dir" ]; then
           echo "- Data directory missing: $dir" >> "$INSTALL_DIR/update-health-check-failure.log"
         fi
@@ -615,7 +615,7 @@ post_update_health_check() {
   fi
 
   debug "Checking data directories..."
-  for dir in /var/lib/wings/volumes /var/lib/wings/archives /var/lib/wings/backups; do
+  for dir in /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups; do
     if [ ! -d "$dir" ]; then
       warning "Data directory missing: $dir"
       has_errors=true
@@ -653,43 +653,43 @@ auto_fix_wings_issues() {
 
   # Fix data directory permissions
   info "Fixing data directory permissions..."
-  mkdir -p /var/lib/wings/volumes /var/lib/wings/archives /var/lib/wings/backups
+  mkdir -p /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups
 
-  chown -R 8888:8888 /var/lib/wings/volumes 2>/dev/null || true
-  chown -R 8888:8888 /var/lib/wings/archives 2>/dev/null || true
-  chown -R 8888:8888 /var/lib/wings/backups 2>/dev/null || true
-  chown -R 8888:8888 /etc/wings 2>/dev/null || true
+  chown -R 8888:8888 /var/lib/pterodactyl/volumes 2>/dev/null || true
+  chown -R 8888:8888 /var/lib/pterodactyl/archives 2>/dev/null || true
+  chown -R 8888:8888 /var/lib/pterodactyl/backups 2>/dev/null || true
+  chown -R 8888:8888 "$INSTALL_DIR" 2>/dev/null || true
 
   # Fix permissions
   info "Fixing Wings permissions..."
-  
+
   # Create directories if they don't exist
-  mkdir -p /var/lib/wings/volumes /var/lib/wings/archives /var/lib/wings/backups
-  
+  mkdir -p /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups
+
   # Set permissions for containerized game servers
   # Note: 777 is required because game server containers run as arbitrary UIDs
   # and must be able to read/write/execute in these directories
   info "Setting 777 permissions on data directories for container access..."
-  # Ensure parent /var/lib/wings is accessible
-  chmod 755 /var/lib/wings 2>/dev/null || true
+  # Ensure parent /var/lib/pterodactyl is accessible
+  chmod 755 /var/lib/pterodactyl 2>/dev/null || true
   # Ensure the volumes directory itself and all contents have 777
-  chmod 777 /var/lib/wings/volumes 2>/dev/null || true
-  chmod -R 777 /var/lib/wings/volumes/* 2>/dev/null || true
-  chmod 777 /var/lib/wings/archives 2>/dev/null || true
-  chmod -R 777 /var/lib/wings/archives/* 2>/dev/null || true
-  chmod 777 /var/lib/wings/backups 2>/dev/null || true
-  chmod -R 777 /var/lib/wings/backups/* 2>/dev/null || true
-  
-  if [ -f "/etc/wings/config.yml" ]; then
+  chmod 777 /var/lib/pterodactyl/volumes 2>/dev/null || true
+  chmod -R 777 /var/lib/pterodactyl/volumes/* 2>/dev/null || true
+  chmod 777 /var/lib/pterodactyl/archives 2>/dev/null || true
+  chmod -R 777 /var/lib/pterodactyl/archives/* 2>/dev/null || true
+  chmod 777 /var/lib/pterodactyl/backups 2>/dev/null || true
+  chmod -R 777 /var/lib/pterodactyl/backups/* 2>/dev/null || true
+
+  if [ -f "$INSTALL_DIR/config.yml" ]; then
     info "Disabling permission checks in Wings config..."
   fi
-  
+
   # Wings config directory - create if needed and set more restrictive permissions
-  mkdir -p /etc/wings
-  find /etc/wings -type d -exec chmod 755 {} \; 2>/dev/null || true
+  mkdir -p "$INSTALL_DIR"
+  find "$INSTALL_DIR" -type d -exec chmod 755 {} \; 2>/dev/null || true
   # SECURITY: Config contains daemon credentials - restrict to owner-only
-  find /etc/wings -type f -name "config.yml" -exec chmod 600 {} \; 2>/dev/null || true
-  find /etc/wings -type f ! -name "config.yml" -exec chmod 640 {} \; 2>/dev/null || true
+  find "$INSTALL_DIR" -type f -name "config.yml" -exec chmod 600 {} \; 2>/dev/null || true
+  find "$INSTALL_DIR" -type f ! -name "config.yml" -exec chmod 640 {} \; 2>/dev/null || true
 
   # Restart Wings service
   info "Restarting Wings service..."

@@ -619,7 +619,7 @@ main() {
   configure_mariadb_tcp
   setup_database_host "$PANEL_FQDN"
 
-  # Generate API key for Elytra setup
+  # Generate API key for node (Wings/Wings-RS/Elytra) setup
   output "Generating Application API Key for node automation..."
   PANEL_API_KEY=$(generate_api_key "$INSTALL_DIR" 2>/dev/null || echo "")
   if [ -n "$PANEL_API_KEY" ]; then
@@ -629,7 +629,7 @@ main() {
     echo "api_key:${PANEL_API_KEY}" >> /root/.config/hydrodactyl/db-credentials
     chmod 600 /root/.config/hydrodactyl/db-credentials
   else
-    warning "Failed to generate API key - you will need to create one manually for Elytra setup"
+    warning "Failed to generate API key - you will need to create one manually for node setup"
     warning "You can create one in Admin > API Keys after installation"
   fi
 
@@ -656,13 +656,14 @@ main() {
   echo ""
   if [ -n "$PANEL_API_KEY" ]; then
     output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    output "  API Key for Elytra Setup"
+    output "  API Key for Node Setup"
     output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     output "API Key: ${COLOR_ORANGE}${PANEL_API_KEY}${COLOR_NC}"
     echo ""
     output "Save this API key! You can use it to automatically configure"
-    output "Elytra without manually entering node ID and token."
-    output "When running elytra.sh, enter this API key when prompted."
+    output "your daemon without manually entering node ID and token."
+    output "When running wings.sh (or elytra.sh for legacy installs),"
+    output "enter this API key when prompted."
     echo ""
   fi
 

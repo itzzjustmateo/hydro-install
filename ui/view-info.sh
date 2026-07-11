@@ -6,7 +6,7 @@ set -e
 #                                                                                    #
 # Hydrodactyl Installation Info Viewer                                                #
 #                                                                                    #
-# Displays saved installation information for Panel and/or Elytra                    #
+# Displays saved installation information for Panel, Wings, and/or Elytra            #
 #                                                                                    #
 # Copyright (C) 2026, ItzzMateo Studios                                             #
 #                                                                                    #
@@ -40,11 +40,16 @@ main() {
   print_flame "Installation Information"
 
   local has_panel_info=false
+  local has_wings_info=false
   local has_elytra_info=false
 
   # Check what information is available
   if panel_install_info_exists; then
     has_panel_info=true
+  fi
+
+  if wings_install_info_exists; then
+    has_wings_info=true
   fi
 
   if elytra_install_info_exists; then
@@ -53,18 +58,13 @@ main() {
 
   # Show summary
   echo ""
-  if [ "$has_panel_info" == true ] && [ "$has_elytra_info" == true ]; then
-    output "Both Panel and Elytra installation information found."
-  elif [ "$has_panel_info" == true ]; then
-    output "Panel installation information found."
-  elif [ "$has_elytra_info" == true ]; then
-    output "Elytra installation information found."
-  else
+  if [ "$has_panel_info" == false ] && [ "$has_wings_info" == false ] && [ "$has_elytra_info" == false ]; then
     warning "No installation information found."
     echo ""
     output "Installation information is saved when you:"
     output "  - Install Hydrodactyl Panel"
-    output "  - Install Elytra Daemon"
+    output "  - Install Wings Daemon"
+    output "  - Install Elytra Daemon (legacy)"
     echo ""
     output "If you just completed an installation, the information"
     output "should be available. Try running the installer again."
@@ -72,6 +72,14 @@ main() {
     output "Press Enter to return to the menu..."
     read -r
     return 0
+  else
+    local found_parts=()
+    [ "$has_panel_info" == true ] && found_parts+=("Panel")
+    [ "$has_wings_info" == true ] && found_parts+=("Wings")
+    [ "$has_elytra_info" == true ] && found_parts+=("Elytra")
+    local found_list
+    found_list=$(IFS=', '; echo "${found_parts[*]}")
+    output "Installation information found for: ${found_list}."
   fi
 
   echo ""
@@ -79,6 +87,12 @@ main() {
   # Display panel info if available
   if [ "$has_panel_info" == true ]; then
     display_panel_install_info
+    echo ""
+  fi
+
+  # Display Wings info if available
+  if [ "$has_wings_info" == true ]; then
+    display_wings_install_info
     echo ""
   fi
 
@@ -90,15 +104,19 @@ main() {
 
   # Check for health check failure logs
   local has_health_check_failures=false
-  
+
   if [ -f "/etc/hydrodactyl/update-health-check-failure.log" ]; then
     has_health_check_failures=true
   fi
-  
+
+  if [ -f "/etc/wings/update-health-check-failure.log" ]; then
+    has_health_check_failures=true
+  fi
+
   if [ -f "/etc/elytra/update-health-check-failure.log" ]; then
     has_health_check_failures=true
   fi
-  
+
   if [ "$has_health_check_failures" == true ]; then
     echo ""
     warning "Health check failures detected!"
@@ -107,7 +125,7 @@ main() {
     echo -n "* View health check failure logs? [y/N]: "
     read -r view_health
     view_health=$(echo "$view_health" | tr '[:upper:]' '[:lower:]')
-    
+
     if [ "$view_health" == "y" ]; then
       echo ""
       if [ -f "/etc/hydrodactyl/update-health-check-failure.log" ]; then
@@ -117,7 +135,15 @@ main() {
         echo "---"
         echo ""
       fi
-      
+
+      if [ -f "/etc/wings/update-health-check-failure.log" ]; then
+        output "Wings Health Check Failure Log:"
+        echo "---"
+        cat "/etc/wings/update-health-check-failure.log" 2>/dev/null || echo "Could not read file"
+        echo "---"
+        echo ""
+      fi
+
       if [ -f "/etc/elytra/update-health-check-failure.log" ]; then
         output "Elytra Health Check Failure Log:"
         echo "---"
@@ -125,7 +151,7 @@ main() {
         echo "---"
         echo ""
       fi
-      
+
       output "To fix these issues, run the Repair Tool from the main menu."
       echo ""
     fi
@@ -143,6 +169,14 @@ main() {
       output "Panel Info File: $INSTALL_INFO_DIR/panel-info"
       echo "---"
       cat "$INSTALL_INFO_DIR/panel-info" 2>/dev/null || echo "Could not read file"
+      echo "---"
+      echo ""
+    fi
+
+    if [ "$has_wings_info" == true ]; then
+      output "Wings Info File: $INSTALL_INFO_DIR/wings-info"
+      echo "---"
+      cat "$INSTALL_INFO_DIR/wings-info" 2>/dev/null || echo "Could not read file"
       echo "---"
       echo ""
     fi

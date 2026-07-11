@@ -517,7 +517,7 @@ show_system_resources() {
   output "  ${COLOR_ORANGE}Swap:${COLOR_NC}   $swap_human"
 }
 
-# Check if system can run Docker (important for Elytra)
+# Check if system can run Docker (important for Wings/Elytra)
 check_docker_compatibility() {
   local has_warnings=false
 
@@ -983,7 +983,7 @@ validate_release_tag() {
 
 # Prompt user to select a release version
 # For panel: shows last 4 releases, accepts "latest", tag, or "Release <tag>"
-# For Elytra: asks latest vs specific, accepts "latest" or "vX.X.X"
+# For any other component (elytra, wings, ...): asks latest vs specific, accepts "latest" or "vX.X.X"
 # Usage: select_release_version <repo> [component_name] [token]
 # Returns: Selected version (tag_name or "latest") via stdout
 # User can press Ctrl+C to cancel at any prompt
@@ -1062,9 +1062,16 @@ select_release_version() {
     done
 
   else
-    # Elytra: Simple latest vs specific
+    # Non-panel component (elytra, wings, ...): simple latest vs specific
+    local component_label
+    case "$component" in
+      elytra) component_label="Elytra" ;;
+      wings) component_label="Wings" ;;
+      *) component_label="$component" ;;
+    esac
+
     echo "" >&2
-    output "Elytra is installed from binary releases." >&2
+    output "${component_label} is installed from binary releases." >&2
     output "Latest release: ${COLOR_ORANGE}${latest}${COLOR_NC}" >&2
     echo "" >&2
     output "[${COLOR_ORANGE}0${COLOR_NC}] Latest release (${latest})" >&2
@@ -2601,7 +2608,7 @@ setup_certbot_renewal() {
   # Create deploy hook script to restart services after renewal
   cat > /etc/letsencrypt/renewal-hooks/deploy/hydrodactyl-services.sh << 'EOF'
 #!/bin/bash
-# Hydrodactyl/Elytra service restart hook for Certbot
+# Hydrodactyl/Wings/Elytra service restart hook for Certbot
 # This script runs after successful certificate renewal
 
 # Log the renewal
@@ -2612,7 +2619,12 @@ if systemctl is-active --quiet nginx 2>/dev/null; then
     systemctl restart nginx 2>/dev/null && echo "[$(date)] nginx restarted successfully" >> /var/log/hydrodactyl-certbot-renewal.log
 fi
 
-# Restart Elytra if installed
+# Restart Wings if installed
+if systemctl is-active --quiet wings 2>/dev/null; then
+    systemctl restart wings 2>/dev/null && echo "[$(date)] Wings restarted successfully" >> /var/log/hydrodactyl-certbot-renewal.log
+fi
+
+# Restart Elytra if installed (legacy daemon)
 if systemctl is-active --quiet elytra 2>/dev/null; then
     systemctl restart elytra 2>/dev/null && echo "[$(date)] Elytra restarted successfully" >> /var/log/hydrodactyl-certbot-renewal.log
 fi
@@ -3535,6 +3547,10 @@ get_or_create_location() {
 }
 
 # Create node via API
+# daemon_type identifies which daemon this node runs, sent to the panel's
+# Pterodactyl-compatible node API as-is - "elytra" for the legacy daemon,
+# "wings" for Wings/Wings-RS (both variants speak the same Wings protocol,
+# so the panel doesn't distinguish go vs rs at the node level).
 create_node_via_api() {
   local api_key="$1"
   local panel_url="$2"
@@ -3544,6 +3560,14 @@ create_node_via_api() {
   local disk_mb="$6"
   local behind_proxy="${7:-false}"
   local panel_fqdn="${8:-}"
+  local daemon_type="${9:-elytra}"
+
+  local daemon_label
+  case "$daemon_type" in
+    elytra) daemon_label="Elytra" ;;
+    wings) daemon_label="Wings" ;;
+    *) daemon_label="$daemon_type" ;;
+  esac
 
   output "Creating node: ${COLOR_ORANGE}${node_name}${COLOR_NC}" >&2
 
@@ -3578,7 +3602,7 @@ create_node_via_api() {
 
   # Ensure node_name is not empty
   if [ -z "$node_name" ]; then
-    node_name="Elytra-Node-$(hostname -s)"
+    node_name="${daemon_label}-Node-$(hostname -s)"
   fi
 
   # Get server FQDN and sanitize it
@@ -3603,13 +3627,14 @@ create_node_via_api() {
     # Use jq for proper JSON construction
     if ! jq -n \
       --arg name "$node_name" \
-      --arg desc "Elytra node auto-created on $current_date" \
+      --arg desc "${daemon_label} node auto-created on $current_date" \
       --argjson location_id "$location_id" \
       --arg fqdn "$fqdn" \
       --argjson behind_proxy "$json_behind_proxy" \
       --argjson memory "$memory_mb" \
       --argjson disk "$disk_mb" \
-      '{name: $name, description: $desc, location_id: $location_id, fqdn: $fqdn, scheme: "https", behind_proxy: $behind_proxy, public: true, memory: $memory, memory_overallocate: 0, disk: $disk, disk_overallocate: 0, upload_size: 100, daemon_listen: 8080, daemon_sftp: 2022, maintenance_mode: false, daemon_type: "elytra", backup_disk: "rustic_local"}' > "$json_file" 2>&1; then
+      --arg daemon_type "$daemon_type" \
+      '{name: $name, description: $desc, location_id: $location_id, fqdn: $fqdn, scheme: "https", behind_proxy: $behind_proxy, public: true, memory: $memory, memory_overallocate: 0, disk: $disk, disk_overallocate: 0, upload_size: 100, daemon_listen: 8080, daemon_sftp: 2022, maintenance_mode: false, daemon_type: $daemon_type, backup_disk: "rustic_local"}' > "$json_file" 2>&1; then
       error "Failed to build JSON with jq"
       error "jq error: $(cat "$json_file")"
       rm -f "$json_file"
@@ -3617,8 +3642,8 @@ create_node_via_api() {
     fi
   else
     # Fallback: write JSON directly to file
-    printf '{"name":"%s","description":"Elytra node auto-created on %s","location_id":%s,"fqdn":"%s","scheme":"https","behind_proxy":%s,"public":true,"memory":%s,"memory_overallocate":0,"disk":%s,"disk_overallocate":0,"upload_size":100,"daemon_listen":8080,"daemon_sftp":2022,"maintenance_mode":false,"daemon_type":"elytra","backup_disk":"rustic_local"}' \
-      "$node_name" "$current_date" "$location_id" "$fqdn" "$json_behind_proxy" "$memory_mb" "$disk_mb" > "$json_file"
+    printf '{"name":"%s","description":"%s node auto-created on %s","location_id":%s,"fqdn":"%s","scheme":"https","behind_proxy":%s,"public":true,"memory":%s,"memory_overallocate":0,"disk":%s,"disk_overallocate":0,"upload_size":100,"daemon_listen":8080,"daemon_sftp":2022,"maintenance_mode":false,"daemon_type":"%s","backup_disk":"rustic_local"}' \
+      "$node_name" "$daemon_label" "$current_date" "$location_id" "$fqdn" "$json_behind_proxy" "$memory_mb" "$disk_mb" "$daemon_type" > "$json_file"
   fi
 
   output "DEBUG: POST ${panel_url}/api/application/nodes" >&2
@@ -3855,6 +3880,50 @@ save_elytra_install_info() {
   success "Elytra installation information saved to $info_file"
 }
 
+# Save Wings installation information
+save_wings_install_info() {
+  local install_type="${1:-install}"
+
+  # Create directory if it doesn't exist
+  mkdir -p "$INSTALL_INFO_DIR"
+  chmod 700 "$INSTALL_INFO_DIR"
+
+  local info_file="$INSTALL_INFO_DIR/wings-info"
+
+  output "Saving Wings installation information..."
+
+  {
+    echo "# Wings Daemon Installation Information"
+    echo "# Generated: $(date)"
+    echo "# Type: $install_type"
+    echo ""
+    echo "INSTALL_DATE=\"$(date)\""
+    echo "INSTALL_TYPE=\"$install_type\""
+    [ -n "$WINGS_VARIANT" ] && echo "WINGS_VARIANT=\"$WINGS_VARIANT\""
+    [ -n "$WINGS_REPO" ] && echo "WINGS_REPO=\"$WINGS_REPO\""
+    [ -n "$GITHUB_TOKEN" ] && echo "GITHUB_TOKEN=\"$GITHUB_TOKEN\""
+    [ -n "$PANEL_FQDN" ] && echo "PANEL_FQDN=\"$PANEL_FQDN\""
+    [ -n "$PANEL_URL" ] && echo "PANEL_URL=\"$PANEL_URL\""
+    [ -n "$NODE_NAME" ] && echo "NODE_NAME=\"$NODE_NAME\""
+    [ -n "$NODE_MEMORY" ] && echo "NODE_MEMORY=\"$NODE_MEMORY\""
+    [ -n "$NODE_DISK" ] && echo "NODE_DISK=\"$NODE_DISK\""
+    [ -n "$GAME_PORT_START" ] && echo "GAME_PORT_START=\"$GAME_PORT_START\""
+    [ -n "$GAME_PORT_END" ] && echo "GAME_PORT_END=\"$GAME_PORT_END\""
+    [ -n "$PANEL_API_KEY" ] && echo "PANEL_API_KEY=\"$PANEL_API_KEY\""
+    [ -n "$NODE_ID" ] && echo "NODE_ID=\"$NODE_ID\""
+    [ -n "$NODE_TOKEN" ] && echo "NODE_TOKEN=\"$NODE_TOKEN\""
+    [ -n "$FQDN" ] && echo "FQDN=\"$FQDN\""
+    [ -n "$CONFIGURE_LETSENCRYPT" ] && echo "CONFIGURE_LETSENCRYPT=\"$CONFIGURE_LETSENCRYPT\""
+    [ -n "$SSL_CERT_PATH" ] && echo "SSL_CERT_PATH=\"$SSL_CERT_PATH\""
+    [ -n "$SSL_KEY_PATH" ] && echo "SSL_KEY_PATH=\"$SSL_KEY_PATH\""
+    [ -n "$ASSUME_SSL" ] && echo "ASSUME_SSL=\"$ASSUME_SSL\""
+    echo "WINGS_INSTALL_DIR=\"$WINGS_INSTALL_DIR\""
+  } > "$info_file"
+
+  chmod 600 "$info_file"
+  success "Wings installation information saved to $info_file"
+}
+
 # Load panel installation information
 load_panel_install_info() {
   local info_file="$INSTALL_INFO_DIR/panel-info"
@@ -3879,6 +3948,18 @@ load_elytra_install_info() {
   return 1
 }
 
+# Load Wings installation information
+load_wings_install_info() {
+  local info_file="$INSTALL_INFO_DIR/wings-info"
+
+  if [ -f "$info_file" ]; then
+    # shellcheck source=/dev/null
+    source "$info_file"
+    return 0
+  fi
+  return 1
+}
+
 # Check if panel installation info exists
 panel_install_info_exists() {
   [ -f "$INSTALL_INFO_DIR/panel-info" ]
@@ -3887,6 +3968,11 @@ panel_install_info_exists() {
 # Check if Elytra installation info exists
 elytra_install_info_exists() {
   [ -f "$INSTALL_INFO_DIR/elytra-info" ]
+}
+
+# Check if Wings installation info exists
+wings_install_info_exists() {
+  [ -f "$INSTALL_INFO_DIR/wings-info" ]
 }
 
 # Display panel installation information
@@ -3969,6 +4055,41 @@ display_elytra_install_info() {
   echo ""
 }
 
+# Display Wings installation information
+display_wings_install_info() {
+  if ! wings_install_info_exists; then
+    warning "No Wings installation information found"
+    return 1
+  fi
+
+  # Load the info
+  load_wings_install_info
+
+  print_brake 70
+  echo ""
+  echo -e "  ${COLOR_ORANGE}Wings Daemon Installation Information${COLOR_NC}"
+  echo ""
+  print_brake 70
+  echo ""
+  [ -n "$INSTALL_DATE" ] && output "Installation Date: $INSTALL_DATE"
+  [ -n "$INSTALL_TYPE" ] && output "Type: $INSTALL_TYPE"
+  [ -n "$WINGS_VARIANT" ] && output "Variant: $([ "$WINGS_VARIANT" == "go" ] && echo 'Pterodactyl Wings (Go)' || echo 'wings-rs (Rust)')"
+  [ -n "$PANEL_FQDN" ] && output "Panel FQDN: $PANEL_FQDN"
+  [ -n "$PANEL_URL" ] && output "Panel URL: $PANEL_URL"
+  [ -n "$NODE_NAME" ] && output "Node Name: $NODE_NAME"
+  [ -n "$NODE_MEMORY" ] && output "Node Memory: $NODE_MEMORY MB"
+  [ -n "$NODE_DISK" ] && output "Node Disk: $NODE_DISK MB"
+  [ -n "$NODE_ID" ] && output "Node ID: $NODE_ID"
+  [ -n "$NODE_TOKEN" ] && output "Node Token: (hidden)"
+  [ -n "$WINGS_INSTALL_DIR" ] && output "Config Directory: $WINGS_INSTALL_DIR"
+  [ -n "$WINGS_REPO" ] && output "Repository: $WINGS_REPO"
+  echo ""
+  print_brake 70
+  echo ""
+  output "Information file: $INSTALL_INFO_DIR/wings-info"
+  echo ""
+}
+
 # Display completion screen for panel
 show_panel_completion() {
   local install_type="${1:-Installation}"
@@ -4019,6 +4140,35 @@ show_elytra_completion() {
   output "  1. Start Elytra: systemctl start elytra"
   output "  2. Check status: systemctl status elytra"
   output "  3. View logs: journalctl -u elytra -f"
+  echo ""
+  output "To view installation information later, run:"
+  output "  bash <(curl -sSL $GITHUB_BASE_URL/$GITHUB_SOURCE/install.sh)"
+  output "  and select 'View Installation Information'"
+  echo ""
+  print_brake 70
+  echo ""
+}
+
+# Display completion screen for Wings
+show_wings_completion() {
+  local install_type="${1:-Installation}"
+
+  print_brake 70
+  echo ""
+  echo -e "  ${COLOR_GREEN}✓ $install_type Completed Successfully!${COLOR_NC}"
+  echo ""
+  print_brake 70
+  echo ""
+  output "Your Wings daemon has been installed and configured."
+  echo ""
+  [ -n "$PANEL_URL" ] && output "Panel URL: $PANEL_URL"
+  [ -n "$NODE_NAME" ] && output "Node Name: $NODE_NAME"
+  [ -n "$NODE_ID" ] && output "Node ID: $NODE_ID"
+  echo ""
+  output "Next Steps:"
+  output "  1. Start Wings: systemctl start wings"
+  output "  2. Check status: systemctl status wings"
+  output "  3. View logs: journalctl -u wings -f"
   echo ""
   output "To view installation information later, run:"
   output "  bash <(curl -sSL $GITHUB_BASE_URL/$GITHUB_SOURCE/install.sh)"
@@ -4431,6 +4581,80 @@ auto_fix_elytra_issues() {
     success "Elytra is now running"
   else
     warning "Elytra may still have issues - manual intervention may be required"
+  fi
+
+  success "Auto-fix completed"
+}
+
+# Auto-fix Wings permission issues
+auto_fix_wings_issues() {
+  info "Attempting to auto-fix Wings issues..."
+
+  # Fix binary permissions
+  if [ -f "/usr/local/bin/wings" ]; then
+    info "Fixing binary permissions..."
+    chmod +x /usr/local/bin/wings
+  fi
+
+  # Fix data directory permissions
+  info "Fixing data directory permissions..."
+  mkdir -p /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups
+
+  chown -R 8888:8888 /var/lib/pterodactyl/volumes 2>/dev/null || true
+  chown -R 8888:8888 /var/lib/pterodactyl/archives 2>/dev/null || true
+  chown -R 8888:8888 /var/lib/pterodactyl/backups 2>/dev/null || true
+  chown -R 8888:8888 /etc/pterodactyl 2>/dev/null || true
+
+  # Fix permissions
+  info "Fixing Wings permissions..."
+
+  # Create directories if they don't exist
+  mkdir -p /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups
+
+  # Set permissions for containerized game servers
+  # Note: 777 is required because game server containers run as arbitrary UIDs
+  # and must be able to read/write/execute in these directories
+  info "Setting 777 permissions on data directories for container access..."
+  # Ensure parent /var/lib/pterodactyl is accessible
+  chmod 755 /var/lib/pterodactyl 2>/dev/null || true
+  # Ensure the volumes directory itself and all contents have 777
+  chmod 777 /var/lib/pterodactyl/volumes 2>/dev/null || true
+  chmod -R 777 /var/lib/pterodactyl/volumes/* 2>/dev/null || true
+  chmod 777 /var/lib/pterodactyl/archives 2>/dev/null || true
+  chmod -R 777 /var/lib/pterodactyl/archives/* 2>/dev/null || true
+  chmod 777 /var/lib/pterodactyl/backups 2>/dev/null || true
+  chmod -R 777 /var/lib/pterodactyl/backups/* 2>/dev/null || true
+
+  # Set ACL default permissions so new directories inherit 777
+  if command -v setfacl >/dev/null 2>&1; then
+    info "Setting default ACL permissions for new files..."
+    setfacl -R -m d:o:rx /var/lib/pterodactyl/volumes 2>/dev/null || true
+    setfacl -R -m d:g:rx /var/lib/pterodactyl/volumes 2>/dev/null || true
+  fi
+
+  # Disable check_permissions_on_boot in Wings config to prevent permission resets
+  if [ -f "/etc/pterodactyl/config.yml" ]; then
+    info "Disabling permission checks in Wings config..."
+    sed -i 's/check_permissions_on_boot: true/check_permissions_on_boot: false/' /etc/pterodactyl/config.yml 2>/dev/null || true
+  fi
+
+  # Wings config directory - create if needed and set more restrictive permissions
+  mkdir -p /etc/pterodactyl
+  find /etc/pterodactyl -type d -exec chmod 755 {} \; 2>/dev/null || true
+  # SECURITY: Config contains daemon credentials - restrict to owner-only
+  find /etc/pterodactyl -type f -name "config.yml" -exec chmod 600 {} \; 2>/dev/null || true
+  find /etc/pterodactyl -type f ! -name "config.yml" -exec chmod 640 {} \; 2>/dev/null || true
+
+  # Restart Wings service
+  info "Restarting Wings service..."
+  systemctl restart wings 2>/dev/null || true
+
+  # Verify Wings started
+  sleep 3
+  if systemctl is-active --quiet wings 2>/dev/null; then
+    success "Wings is now running"
+  else
+    warning "Wings may still have issues - manual intervention may be required"
   fi
 
   success "Auto-fix completed"

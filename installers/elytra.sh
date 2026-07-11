@@ -424,7 +424,7 @@ auto_configure_elytra() {
     fi
   fi
 
-  if ! NODE_ID=$(create_node_via_api "$api_key" "$panel_url" "$location_id" "$node_name" "$memory_mb" "$disk_mb" "false" "$node_fqdn"); then
+  if ! NODE_ID=$(create_node_via_api "$api_key" "$panel_url" "$location_id" "$node_name" "$memory_mb" "$disk_mb" "false" "$node_fqdn" "elytra"); then
     error "Failed to create node"
     return 1
   fi

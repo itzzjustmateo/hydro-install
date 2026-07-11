@@ -36,7 +36,7 @@ done
 #                                                                                    #
 # Hydrodactyl Installer                                                               #
 #                                                                                    #
-# One-command installer for Hydrodactyl Panel and Elytra Daemon                       #
+# One-command installer for Hydrodactyl Panel and Wings Daemon                        #
 #                                                                                    #
 # Copyright (C) 2026, ItzzMateo Studios                                             #
 #                                                                                    #
@@ -251,9 +251,9 @@ execute_ui() {
 # Check installations and set state variables
 check_installations() {
   PANEL_INSTALLED=false
-  ELYTRA_INSTALLED=false
+  WINGS_INSTALLED=false
   PANEL_VERSION=""
-  ELYTRA_VERSION=""
+  WINGS_VERSION=""
 
   # Check for Hydrodactyl
   if [ -d "/var/www/hydrodactyl" ]; then
@@ -265,9 +265,9 @@ check_installations() {
 
   # Check for Wings
   if [ -f "/usr/local/bin/wings" ]; then
-    ELYTRA_INSTALLED=true
+    WINGS_INSTALLED=true
     if [ -f "/etc/hydrodactyl/wings-version" ]; then
-      ELYTRA_VERSION=$(cat "/etc/hydrodactyl/wings-version" 2>/dev/null || echo "")
+      WINGS_VERSION=$(cat "/etc/hydrodactyl/wings-version" 2>/dev/null || echo "")
     fi
   fi
 }
@@ -295,8 +295,8 @@ show_welcome() {
     echo -e "  ${COLOR_RED}✗${COLOR_NC} Panel not installed"
   fi
 
-  if [ "$ELYTRA_INSTALLED" == true ]; then
-    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Wings installed${ELYTRA_VERSION:+ ($ELYTRA_VERSION)}"
+  if [ "$WINGS_INSTALLED" == true ]; then
+    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Wings installed${WINGS_VERSION:+ ($WINGS_VERSION)}"
   else
     echo -e "  ${COLOR_RED}✗${COLOR_NC} Wings not installed"
   fi
@@ -341,7 +341,7 @@ run_panel_update() {
   read -r
 }
 
-run_elytra_update() {
+run_wings_update() {
   print_header
   print_flame "Update Wings Daemon"
 
@@ -389,7 +389,7 @@ run_both_updates() {
 
   run_panel_update
   echo ""
-  run_elytra_update
+  run_wings_update
 }
 
 
@@ -417,13 +417,13 @@ show_menu() {
       echo -e "* [3] ${COLOR_DARK_GRAY}Update Hydrodactyl Panel (not installed)${COLOR_NC}"
     fi
 
-    if [ "$ELYTRA_INSTALLED" == true ]; then
+    if [ "$WINGS_INSTALLED" == true ]; then
       output "[${COLOR_ORANGE}4${COLOR_NC}] Update Wings Daemon"
     else
       echo -e "* [4] ${COLOR_DARK_GRAY}Update Wings Daemon (not installed)${COLOR_NC}"
     fi
 
-    if [ "$PANEL_INSTALLED" == true ] && [ "$ELYTRA_INSTALLED" == true ]; then
+    if [ "$PANEL_INSTALLED" == true ] && [ "$WINGS_INSTALLED" == true ]; then
       output "[${COLOR_ORANGE}5${COLOR_NC}] Update both Panel and Wings"
     else
       echo -e "* [5] ${COLOR_DARK_GRAY}Update both Panel and Wings (not available)${COLOR_NC}"
@@ -469,16 +469,16 @@ show_menu() {
         continue
         ;;
       4)
-        if [ "$ELYTRA_INSTALLED" == false ]; then
+        if [ "$WINGS_INSTALLED" == false ]; then
           error "Wings Daemon is not installed"
           sleep 2
           continue
         fi
-        run_elytra_update
+        run_wings_update
         continue
         ;;
       5)
-        if [ "$PANEL_INSTALLED" == false ] || [ "$ELYTRA_INSTALLED" == false ]; then
+        if [ "$PANEL_INSTALLED" == false ] || [ "$WINGS_INSTALLED" == false ]; then
           error "Both Panel and Wings must be installed to use this option"
           sleep 2
           continue
@@ -492,11 +492,11 @@ show_menu() {
         ;;
       7)
         # Health Check - runs based on what's installed
-        if [ "$PANEL_INSTALLED" == true ] && [ "$ELYTRA_INSTALLED" == true ]; then
+        if [ "$PANEL_INSTALLED" == true ] && [ "$WINGS_INSTALLED" == true ]; then
           check_both_health
         elif [ "$PANEL_INSTALLED" == true ]; then
           check_panel_health
-        elif [ "$ELYTRA_INSTALLED" == true ]; then
+        elif [ "$WINGS_INSTALLED" == true ]; then
           check_wings_health
         else
           error "Nothing installed to check. Install Hydrodactyl or Wings first."
@@ -613,7 +613,7 @@ main() {
     fi
   fi
 
-  # Check Docker compatibility for Elytra installations
+  # Check Docker compatibility for Wings/Elytra installations
   echo ""
   output "${COLOR_ORANGE}Checking Docker compatibility...${COLOR_NC}"
   check_docker_compatibility || true

@@ -163,7 +163,7 @@ configure_release_version() {
   print_flame "Release Version Selection"
 
   local selected_version
-  selected_version=$(select_release_version "$WINGS_REPO" "elytra" "$GITHUB_TOKEN")
+  selected_version=$(select_release_version "$WINGS_REPO" "wings" "$GITHUB_TOKEN")
 
   if [ -z "$selected_version" ]; then
     error "Failed to select release version"

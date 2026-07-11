@@ -6,7 +6,7 @@ set -e
 #                                                                                    #
 # Hydrodactyl Repair Tool UI                                                          #
 #                                                                                    #
-# Repair and fix common issues with Hydrodactyl Panel and Elytra                      #
+# Repair and fix common issues with Hydrodactyl Panel, Wings, and Elytra             #
 #                                                                                    #
 # Copyright (C) 2026, ItzzMateo Studios                                             #
 #                                                                                    #
@@ -92,15 +92,29 @@ detect_elytra_config_dir() {
     echo "/etc/elytra"
     return 0
   fi
-  
+
   if [ -n "$ELYTRA_DIR" ] && [ -d "$ELYTRA_DIR" ] && [ -f "$ELYTRA_DIR/config.yml" ]; then
     echo "$ELYTRA_DIR"
     return 0
   fi
-  
+
   # Default fallback
   echo "/etc/elytra"
   return 0
+}
+
+detect_wings_binary() {
+  if [ -f "/usr/local/bin/wings" ]; then
+    echo "/usr/local/bin/wings"
+    return 0
+  fi
+
+  if [ -f "/usr/bin/wings" ]; then
+    echo "/usr/bin/wings"
+    return 0
+  fi
+
+  return 1
 }
 
 # ------------------ Repair Functions ----------------- #
@@ -190,6 +204,25 @@ fix_elytra_permissions() {
   return 0
 }
 
+fix_wings_permissions() {
+  print_flame "Fixing Wings Permissions"
+
+  local wings_binary
+  wings_binary=$(detect_wings_binary) || {
+    error "Wings binary not found at /usr/local/bin/wings or /usr/bin/wings"
+    return 1
+  }
+
+  output "Found Wings binary at: $wings_binary"
+
+  # Reuse the shared fix routine from lib.sh (binary/data-dir/config
+  # permissions plus a service restart) instead of duplicating it here.
+  auto_fix_wings_issues
+
+  success "Wings permissions fixed"
+  return 0
+}
+
 clear_caches() {
   print_flame "Clearing Laravel Caches"
 
@@ -240,6 +273,13 @@ restart_services() {
   systemctl restart redis-server 2>/dev/null || \
   systemctl restart redis 2>/dev/null || \
   warning "Failed to restart redis (may not be installed)"
+
+  local wings_binary
+  wings_binary=$(detect_wings_binary 2>/dev/null)
+  if [ -n "$wings_binary" ]; then
+    output "Restarting Wings..."
+    systemctl restart wings 2>/dev/null || warning "Failed to restart wings (may not be installed)"
+  fi
 
   local elytra_binary
   elytra_binary=$(detect_elytra_binary 2>/dev/null)
@@ -410,6 +450,9 @@ run_all_fixes() {
   fix_panel_permissions || has_errors=true
   echo ""
 
+  fix_wings_permissions || has_errors=true
+  echo ""
+
   fix_elytra_permissions || has_errors=true
   echo ""
 
@@ -449,17 +492,18 @@ show_repair_menu() {
     output "${COLOR_ORANGE}What would you like to repair?${COLOR_NC}"
     echo ""
     output "[${COLOR_ORANGE}0${COLOR_NC}] Fix Panel Permissions"
-    output "[${COLOR_ORANGE}1${COLOR_NC}] Fix Elytra Permissions"
-    output "[${COLOR_ORANGE}2${COLOR_NC}] Clear Laravel Caches"
-    output "[${COLOR_ORANGE}3${COLOR_NC}] Restart All Services"
-    output "[${COLOR_ORANGE}4${COLOR_NC}] Fix Database Permissions"
-    output "[${COLOR_ORANGE}5${COLOR_NC}] Run All Fixes (Recommended)"
-    output "[${COLOR_ORANGE}6${COLOR_NC}] Setup Swap File${swap_status}"
+    output "[${COLOR_ORANGE}1${COLOR_NC}] Fix Wings Permissions"
+    output "[${COLOR_ORANGE}2${COLOR_NC}] Fix Elytra Permissions (legacy)"
+    output "[${COLOR_ORANGE}3${COLOR_NC}] Clear Laravel Caches"
+    output "[${COLOR_ORANGE}4${COLOR_NC}] Restart All Services"
+    output "[${COLOR_ORANGE}5${COLOR_NC}] Fix Database Permissions"
+    output "[${COLOR_ORANGE}6${COLOR_NC}] Run All Fixes (Recommended)"
+    output "[${COLOR_ORANGE}7${COLOR_NC}] Setup Swap File${swap_status}"
     echo ""
-    output "[${COLOR_ORANGE}7${COLOR_NC}] Back to Main Menu"
+    output "[${COLOR_ORANGE}8${COLOR_NC}] Back to Main Menu"
     echo ""
 
-    echo -n "* Select an option [0-7]: "
+    echo -n "* Select an option [0-8]: "
     read -r choice
 
     case "$choice" in
@@ -470,42 +514,48 @@ show_repair_menu() {
         continue
         ;;
       1)
-        fix_elytra_permissions
+        fix_wings_permissions
         output "Press Enter to return to the menu..."
         read -r
         continue
         ;;
       2)
-        clear_caches
+        fix_elytra_permissions
         output "Press Enter to return to the menu..."
         read -r
         continue
         ;;
       3)
-        restart_services
+        clear_caches
         output "Press Enter to return to the menu..."
         read -r
         continue
         ;;
       4)
-        fix_database_permissions
+        restart_services
         output "Press Enter to return to the menu..."
         read -r
         continue
         ;;
       5)
-        run_all_fixes
+        fix_database_permissions
+        output "Press Enter to return to the menu..."
+        read -r
         continue
         ;;
       6)
-        setup_swap_menu
+        run_all_fixes
         continue
         ;;
       7)
+        setup_swap_menu
+        continue
+        ;;
+      8)
         return 0
         ;;
       *)
-        error "Invalid option. Please select 0-7."
+        error "Invalid option. Please select 0-8."
         sleep 1
         ;;
     esac
