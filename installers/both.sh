@@ -78,6 +78,7 @@ esac
 # is resolved in install_wings_daemon() - do not default it here, or a
 # variant-specific default below would never apply once this is non-empty.
 WINGS_REPO="${WINGS_REPO:-}"
+WINGS_RELEASE_VERSION="${WINGS_RELEASE_VERSION:-latest}"
 NODE_NAME="${NODE_NAME:-local}"
 NODE_DESCRIPTION="${NODE_DESCRIPTION:-Local Node}"
 NODE_TOKEN="${NODE_TOKEN:-$(gen_passwd 32)}"
@@ -787,21 +788,29 @@ install_wings_daemon() {
     WINGS_REPO="${WINGS_REPO:-pterodactyl/wings}"
   fi
 
-  # Get latest release
-  output "Fetching latest Wings release..."
-  local latest_release
-  latest_release=$(get_latest_release "$WINGS_REPO" "$GITHUB_TOKEN_WINGS")
+  # Get the release to install - respects WINGS_RELEASE_VERSION if the user
+  # selected a specific version in ui/both.sh, otherwise fetches latest.
+  local target_release="$WINGS_RELEASE_VERSION"
+  if [ "$target_release" == "latest" ]; then
+    output "Fetching latest Wings release..."
+    target_release=$(get_latest_release "$WINGS_REPO" "$GITHUB_TOKEN_WINGS")
+  else
+    output "Fetching Wings release ${WINGS_RELEASE_VERSION}..."
+  fi
 
-  if [ -z "$latest_release" ] || [ "$latest_release" == "null" ]; then
-    error "Could not fetch latest release from $WINGS_REPO"
+  if [ -z "$target_release" ] || [ "$target_release" == "null" ]; then
+    error "Could not fetch release from $WINGS_REPO"
+    if [ "$WINGS_RELEASE_VERSION" != "latest" ]; then
+      error "Release ${WINGS_RELEASE_VERSION} may not exist."
+    fi
     exit 1
   fi
 
-  info "Latest release: $latest_release"
+  info "Installing release: $target_release"
 
   # Download binary
   output "Downloading Wings binary..."
-  if ! download_release_asset "$WINGS_REPO" "$asset_name" "/usr/local/bin/wings" "$GITHUB_TOKEN_WINGS"; then
+  if ! download_release_asset "$WINGS_REPO" "$asset_name" "/usr/local/bin/wings" "$GITHUB_TOKEN_WINGS" "$target_release"; then
     error "Failed to download Wings binary"
     exit 1
   fi
@@ -810,7 +819,7 @@ install_wings_daemon() {
 
   # Save version from GitHub release tag for auto-updater tracking
   mkdir -p /etc/hydrodactyl
-  echo "$latest_release" > /etc/hydrodactyl/wings-version
+  echo "$target_release" > /etc/hydrodactyl/wings-version
   chmod 644 /etc/hydrodactyl/wings-version
 
   # Persist the installed variant/repo for the manual update menu

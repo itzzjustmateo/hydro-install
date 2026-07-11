@@ -46,8 +46,10 @@ body:
       multiple: false
       options:
         - Panel only
-        - Elytra only
-        - Both (panel + Elytra)
+        - Wings only
+        - Elytra only (legacy)
+        - Both (panel + Wings)
+        - Both (panel + Elytra, legacy)
         - Other
     validations:
       required: true

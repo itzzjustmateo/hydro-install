@@ -1,6 +1,8 @@
 # Elytra Daemon - Manual Installation Guide
 
-This guide provides step-by-step instructions for manually installing the Elytra Daemon on your game server nodes. Elytra is the game server management daemon that communicates with the Hydrodactyl Panel and manages Docker containers for game servers.
+> **Elytra is deprecated.** Elytra is no longer maintained upstream. For new installations, we recommend [Wings or Wings-RS](./wings-manual.md) instead - see the [Wings Daemon Manual Installation Guide](./wings-manual.md), or use the automated installer's "Install Wings Daemon" option. This guide remains available for maintaining existing legacy Elytra installations.
+
+This guide provides step-by-step instructions for manually installing the legacy Elytra Daemon on your game server nodes. Elytra is a game server management daemon that communicates with the Hydrodactyl Panel and manages Docker containers for game servers.
 
 ## Table of Contents
 

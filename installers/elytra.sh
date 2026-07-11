@@ -105,10 +105,6 @@ parse_arguments() {
         ELYTRA_REPO="$2"
         shift 2
         ;;
-      --skip-wings-setup)
-        SKIP_WINGS_SETUP="true"
-        shift
-        ;;
       --assume-ssl)
         ASSUME_SSL="true"
         shift
@@ -163,7 +159,6 @@ Options:
   --ssl-email <email>            Email for Let's Encrypt registration
   --github-token, -g <token>     GitHub token for private repos
   --elytra-repo <repo>           Elytra repo (default: pyrohost/elytra)
-  --skip-wings-setup             Skip Wings detection/setup
   --help, -h                     Show this help message
 
 Examples:
@@ -220,7 +215,6 @@ NODE_DISK="${NODE_DISK:-}"
 PANEL_FQDN="${PANEL_FQDN:-}"
 
 # Mode flags
-export SKIP_WINGS_SETUP="${SKIP_WINGS_SETUP:-false}"
 export ASSUME_SSL="${ASSUME_SSL:-false}"
 export CONFIGURE_LETSENCRYPT="${CONFIGURE_LETSENCRYPT:-false}"
 export SSL_EMAIL="${SSL_EMAIL:-}"

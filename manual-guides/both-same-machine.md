@@ -1,5 +1,7 @@
 # Hydrodactyl Panel + Elytra Daemon - Same Machine Installation Guide
 
+> **Elytra is deprecated.** This guide walks through the legacy Elytra daemon specifically. For a new same-machine setup, we recommend combining the [Hydrodactyl Panel Manual](./hydrodactyl-panel-manual.md) with the [Wings Daemon Manual](./wings-manual.md) instead, or simply using the automated installer's "Install both Panel and Wings" option. This guide remains available for maintaining existing legacy Elytra installations.
+
 This guide covers installing both the Hydrodactyl Panel and Elytra Daemon on the same physical or virtual server. This setup is suitable for small deployments, development environments, or single-node installations.
 
 ## Table of Contents
@@ -239,7 +241,7 @@ FLUSH PRIVILEGES;
 EOF
 ```
 
-Save the password - you'll need it twice (for Panel and Elytra doesn't need it but Panel does).
+Save this password - you'll need it when configuring the Panel's `.env` file below. The daemon (Elytra or Wings) does not use this database, so it isn't needed there.
 
 ---
 
@@ -400,12 +402,12 @@ chmod +x /usr/local/bin/elytra
 groupadd --system --gid 8888 hydrodactyl 2>/dev/null || true
 useradd --system --no-create-home --shell /usr/sbin/nologin --uid 8888 --gid 8888 hydrodactyl 2>/dev/null || true
 
-chown -R 8888:8888 /var/lib/elytra /etc/elytra
+chown -R 8888:8888 /var/lib/hydrodactyl /etc/elytra
 
 # SECURITY NOTE: 777 is required because containerized game servers run as
 # various UIDs and must read/write game data. This grants all users access.
-# Ensure /var/lib/elytra parent directory restricts access.
-chmod -R 777 /var/lib/elytra/volumes /var/lib/elytra/archives /var/lib/elytra/backups
+# Ensure /var/lib/hydrodactyl parent directory restricts access.
+chmod -R 777 /var/lib/hydrodactyl/volumes /var/lib/hydrodactyl/archives /var/lib/hydrodactyl/backups
 chmod -R 755 /etc/elytra
 # SECURITY: Config contains daemon credentials - restrict to owner-only
 [ -f /etc/elytra/config.yml ] && chmod 600 /etc/elytra/config.yml
@@ -844,7 +846,9 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ## Support
 
 - Hydrodactyl Issues: https://github.com/BlueprintFramework/hydrodactyl/issues
-- Elytra Issues: https://github.com/pyrohost/elytra/issues
+- Wings Issues: https://github.com/pterodactyl/wings/issues
+- Wings-RS Issues: https://github.com/calagopus/wings/issues
+- Elytra Issues (legacy): https://github.com/pyrohost/elytra/issues
 - Docker Docs: https://docs.docker.com/
 - Community Discord: [Hydrodactyl Community]
 
