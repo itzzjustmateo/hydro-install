@@ -418,7 +418,7 @@ auto_configure_elytra() {
     fi
   fi
 
-  if ! NODE_ID=$(create_node_via_api "$api_key" "$panel_url" "$location_id" "$node_name" "$memory_mb" "$disk_mb" "false" "$node_fqdn" "elytra"); then
+  if ! NODE_ID=$(create_node_via_api "$api_key" "$panel_url" "$location_id" "$node_name" "$memory_mb" "$disk_mb" "false" "$node_fqdn" "elytra" "$(daemon_scheme)"); then
     error "Failed to create node"
     return 1
   fi
@@ -644,6 +644,11 @@ configure_elytra() {
     sed -i "s|key: .*|key: ${ssl_key_path}|" "${ELYTRA_INSTALL_DIR}/config.yml"
     success "SSL configured for Elytra"
   else
+    # No usable cert - force SSL off regardless of what 'elytra configure'
+    # defaulted to, so Elytra never tries to load a certificate that
+    # doesn't exist (defense in depth alongside the daemon_scheme() fix in
+    # create_node_via_api()).
+    sed -i 's/enabled: true/enabled: false/' "${ELYTRA_INSTALL_DIR}/config.yml"
     if [ -z "$node_fqdn" ]; then
       warning "Skipping SSL - node FQDN not configured"
     else

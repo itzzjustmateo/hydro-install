@@ -409,7 +409,7 @@ auto_configure_wings() {
     fi
   fi
 
-  if ! NODE_ID=$(create_node_via_api "$api_key" "$panel_url" "$location_id" "$node_name" "$memory_mb" "$disk_mb" "false" "$node_fqdn" "wings"); then
+  if ! NODE_ID=$(create_node_via_api "$api_key" "$panel_url" "$location_id" "$node_name" "$memory_mb" "$disk_mb" "false" "$node_fqdn" "wings" "$(daemon_scheme)"); then
     error "Failed to create node"
     return 1
   fi
@@ -579,18 +579,25 @@ configure_wings() {
     output "Found Let's Encrypt certificates at /etc/letsencrypt/live/${node_fqdn}/"
   fi
 
-  if [ -n "$ssl_cert_path" ] && [ -n "$ssl_key_path" ]; then
-    if [ -f "${WINGS_INSTALL_DIR}/config.yml" ]; then
+  if [ -f "${WINGS_INSTALL_DIR}/config.yml" ]; then
+    if [ -n "$ssl_cert_path" ] && [ -n "$ssl_key_path" ]; then
+      # A real cert is available - make sure config.yml actually uses it,
+      # regardless of what 'wings configure' assumed from the node's scheme.
       sed -i 's/enabled: false/enabled: true/' "${WINGS_INSTALL_DIR}/config.yml" 2>/dev/null || true
       sed -i "s|certificate: .*|certificate: ${ssl_cert_path}|" "${WINGS_INSTALL_DIR}/config.yml" 2>/dev/null || true
       sed -i "s|key: .*|key: ${ssl_key_path}|" "${WINGS_INSTALL_DIR}/config.yml" 2>/dev/null || true
-    fi
-    success "SSL configured for Wings"
-  else
-    if [ -z "$node_fqdn" ]; then
-      warning "Skipping SSL - node FQDN not configured"
+      success "SSL configured for Wings"
     else
-      warning "SSL certificates not found for ${node_fqdn}"
+      # No usable cert - force SSL off regardless of what 'wings configure'
+      # defaulted to, so Wings never tries to load a certificate that
+      # doesn't exist (defense in depth alongside the daemon_scheme() fix
+      # in create_node_via_api()).
+      sed -i 's/enabled: true/enabled: false/' "${WINGS_INSTALL_DIR}/config.yml" 2>/dev/null || true
+      if [ -z "$node_fqdn" ]; then
+        warning "Skipping SSL - node FQDN not configured"
+      else
+        warning "SSL certificates not found for ${node_fqdn}"
+      fi
     fi
   fi
 

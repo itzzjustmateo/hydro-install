@@ -809,16 +809,39 @@ has_custom_ssl_cert() {
   [ -n "${SSL_CERT_PATH:-}" ] && [ -n "${SSL_KEY_PATH:-}" ]
 }
 
-# Determine whether the panel should be addressed over https or http, based
-# on the same SSL/TLS variables used to build the Laravel APP_URL
-# (configure_panel/configure_panel_environment in installers/panel.sh and
-# installers/both.sh). Echoes "https" or "http".
-panel_scheme() {
+# Shared "should this be https" check from the standard SSL/TLS variables
+# (CONFIGURE_LETSENCRYPT/ASSUME_SSL/has_custom_ssl_cert). panel_scheme() and
+# daemon_scheme() below both wrap this - they're kept as separate named
+# functions because the SAME variable names mean different things depending
+# on which script sources this file: the panel's own SSL in
+# installers/both.sh/panel.sh, vs. a standalone daemon's own SSL in
+# installers/wings.sh/elytra.sh. Echoes "https" or "http".
+_scheme_from_ssl_vars() {
   if [ "${CONFIGURE_LETSENCRYPT:-false}" == true ] || [ "${ASSUME_SSL:-false}" == true ] || has_custom_ssl_cert; then
     echo "https"
   else
     echo "http"
   fi
+}
+
+# Determine whether the panel should be addressed over https or http, based
+# on the same SSL/TLS variables used to build the Laravel APP_URL
+# (configure_panel/configure_panel_environment in installers/panel.sh and
+# installers/both.sh). Echoes "https" or "http".
+panel_scheme() {
+  _scheme_from_ssl_vars
+}
+
+# Determine whether a standalone daemon installer (installers/wings.sh,
+# installers/elytra.sh) should report its node as SSL-terminated to the
+# panel, based on that installer's own daemon-local SSL/TLS variables.
+# installers/both.sh has no separate daemon SSL flow (Wings shares the
+# panel's own cert story on a combined install) and should keep using
+# panel_scheme() instead - the two only diverge when the daemon genuinely
+# runs on a different host/cert than the panel, which is the standalone-
+# installer case this function is for. Echoes "https" or "http".
+daemon_scheme() {
+  _scheme_from_ssl_vars
 }
 
 # Load existing database credentials from previous run
@@ -3587,6 +3610,12 @@ get_or_create_location() {
 # Pterodactyl-compatible node API as-is - "elytra" for the legacy daemon,
 # "wings" for Wings/Wings-RS (both variants speak the same Wings protocol,
 # so the panel doesn't distinguish go vs rs at the node level).
+# node_scheme is the "scheme" the panel should assume for talking to this
+# node's daemon (http/https) - callers should pass panel_scheme() for a
+# combined install (installers/both.sh) or daemon_scheme() for a standalone
+# daemon install (installers/wings.sh, installers/elytra.sh). Defaults to
+# "https" only for backward compatibility with any caller that doesn't pass
+# it; every in-repo caller now passes an explicit value.
 create_node_via_api() {
   local api_key="$1"
   local panel_url="$2"
@@ -3597,6 +3626,7 @@ create_node_via_api() {
   local behind_proxy="${7:-false}"
   local panel_fqdn="${8:-}"
   local daemon_type="${9:-elytra}"
+  local node_scheme="${10:-https}"
 
   local daemon_label
   daemon_label=$(daemon_display_name "$daemon_type")
@@ -3666,7 +3696,8 @@ create_node_via_api() {
       --argjson memory "$memory_mb" \
       --argjson disk "$disk_mb" \
       --arg daemon_type "$daemon_type" \
-      '{name: $name, description: $desc, location_id: $location_id, fqdn: $fqdn, scheme: "https", behind_proxy: $behind_proxy, public: true, memory: $memory, memory_overallocate: 0, disk: $disk, disk_overallocate: 0, upload_size: 100, daemon_listen: 8080, daemon_sftp: 2022, maintenance_mode: false, daemon_type: $daemon_type, backup_disk: "rustic_local"}' > "$json_file" 2>&1; then
+      --arg scheme "$node_scheme" \
+      '{name: $name, description: $desc, location_id: $location_id, fqdn: $fqdn, scheme: $scheme, behind_proxy: $behind_proxy, public: true, memory: $memory, memory_overallocate: 0, disk: $disk, disk_overallocate: 0, upload_size: 100, daemon_listen: 8080, daemon_sftp: 2022, maintenance_mode: false, daemon_type: $daemon_type, backup_disk: "rustic_local"}' > "$json_file" 2>&1; then
       error "Failed to build JSON with jq"
       error "jq error: $(cat "$json_file")"
       rm -f "$json_file"
@@ -3674,8 +3705,8 @@ create_node_via_api() {
     fi
   else
     # Fallback: write JSON directly to file
-    printf '{"name":"%s","description":"%s node auto-created on %s","location_id":%s,"fqdn":"%s","scheme":"https","behind_proxy":%s,"public":true,"memory":%s,"memory_overallocate":0,"disk":%s,"disk_overallocate":0,"upload_size":100,"daemon_listen":8080,"daemon_sftp":2022,"maintenance_mode":false,"daemon_type":"%s","backup_disk":"rustic_local"}' \
-      "$node_name" "$daemon_label" "$current_date" "$location_id" "$fqdn" "$json_behind_proxy" "$memory_mb" "$disk_mb" "$daemon_type" > "$json_file"
+    printf '{"name":"%s","description":"%s node auto-created on %s","location_id":%s,"fqdn":"%s","scheme":"%s","behind_proxy":%s,"public":true,"memory":%s,"memory_overallocate":0,"disk":%s,"disk_overallocate":0,"upload_size":100,"daemon_listen":8080,"daemon_sftp":2022,"maintenance_mode":false,"daemon_type":"%s","backup_disk":"rustic_local"}' \
+      "$node_name" "$daemon_label" "$current_date" "$location_id" "$fqdn" "$node_scheme" "$json_behind_proxy" "$memory_mb" "$disk_mb" "$daemon_type" > "$json_file"
   fi
 
   output "DEBUG: POST ${panel_url}/api/application/nodes" >&2
