@@ -254,6 +254,7 @@ check_installations() {
   WINGS_INSTALLED=false
   PANEL_VERSION=""
   WINGS_VERSION=""
+  WINGS_VARIANT=""
 
   # Check for Hydrodactyl
   if [ -d "/var/www/hydrodactyl" ]; then
@@ -268,6 +269,16 @@ check_installations() {
     WINGS_INSTALLED=true
     if [ -f "/etc/hydrodactyl/wings-version" ]; then
       WINGS_VERSION=$(cat "/etc/hydrodactyl/wings-version" 2>/dev/null || echo "")
+    fi
+    # auto-update-wings.env tracks the installed variant (go/rs) and is the
+    # more reliable of the two info sources here: install.sh itself
+    # self-heals it (see run_wings_update()) whenever it's missing, while
+    # install-info/wings-info has no such fallback for older installs.
+    # Grep the single field instead of sourcing the file, since it also
+    # holds GITHUB_TOKEN - no need to pull that into this shell just to
+    # read the variant.
+    if [ -f "/etc/hydrodactyl/auto-update-wings.env" ]; then
+      WINGS_VARIANT=$(grep '^WINGS_VARIANT=' "/etc/hydrodactyl/auto-update-wings.env" 2>/dev/null | head -1 | cut -d'"' -f2)
     fi
   fi
 }
@@ -296,7 +307,9 @@ show_welcome() {
   fi
 
   if [ "$WINGS_INSTALLED" == true ]; then
-    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Wings installed${WINGS_VERSION:+ ($WINGS_VERSION)}"
+    local wings_label="Wings"
+    [ "$WINGS_VARIANT" == "rs" ] && wings_label="Wings-RS"
+    echo -e "  ${COLOR_GREEN}✓${COLOR_NC} ${wings_label} installed${WINGS_VERSION:+ ($WINGS_VERSION)}"
   else
     echo -e "  ${COLOR_RED}✗${COLOR_NC} Wings not installed"
   fi
