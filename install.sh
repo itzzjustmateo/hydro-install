@@ -265,7 +265,7 @@ check_installations() {
   fi
 
   # Check for Wings
-  if [ -f "/usr/local/bin/wings" ]; then
+  if detect_wings_binary >/dev/null 2>&1; then
     WINGS_INSTALLED=true
     if [ -f "/etc/hydrodactyl/wings-version" ]; then
       WINGS_VERSION=$(cat "/etc/hydrodactyl/wings-version" 2>/dev/null || echo "")

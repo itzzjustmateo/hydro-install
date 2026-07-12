@@ -583,7 +583,11 @@ configure_wings() {
     if [ -n "$ssl_cert_path" ] && [ -n "$ssl_key_path" ]; then
       # A real cert is available - make sure config.yml actually uses it,
       # regardless of what 'wings configure' assumed from the node's scheme.
-      sed -i 's/enabled: false/enabled: true/' "${WINGS_INSTALL_DIR}/config.yml" 2>/dev/null || true
+      # The "enabled:" flip is scoped to the api.ssl block (the /ssl:/,/certificate:/
+      # address range) - a bare `s/enabled: false/enabled: true/` would also
+      # match unrelated "enabled:" keys elsewhere in config.yml (e.g.
+      # throttles.enabled).
+      sed -i '/ssl:/,/certificate:/{s/enabled: false/enabled: true/}' "${WINGS_INSTALL_DIR}/config.yml" 2>/dev/null || true
       sed -i "s|certificate: .*|certificate: ${ssl_cert_path}|" "${WINGS_INSTALL_DIR}/config.yml" 2>/dev/null || true
       sed -i "s|key: .*|key: ${ssl_key_path}|" "${WINGS_INSTALL_DIR}/config.yml" 2>/dev/null || true
       success "SSL configured for Wings"
@@ -591,8 +595,8 @@ configure_wings() {
       # No usable cert - force SSL off regardless of what 'wings configure'
       # defaulted to, so Wings never tries to load a certificate that
       # doesn't exist (defense in depth alongside the daemon_scheme() fix
-      # in create_node_via_api()).
-      sed -i 's/enabled: true/enabled: false/' "${WINGS_INSTALL_DIR}/config.yml" 2>/dev/null || true
+      # in create_node_via_api()). Same api.ssl-scoped range as above.
+      sed -i '/ssl:/,/certificate:/{s/enabled: true/enabled: false/}' "${WINGS_INSTALL_DIR}/config.yml" 2>/dev/null || true
       if [ -z "$node_fqdn" ]; then
         warning "Skipping SSL - node FQDN not configured"
       else
