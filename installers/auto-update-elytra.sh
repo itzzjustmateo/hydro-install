@@ -28,7 +28,12 @@ fi
 # Default config (can be overridden by /etc/hydrodactyl/auto-update-elytra.env)
 ELYTRA_REPO="${ELYTRA_REPO:-pyrohost/elytra}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
-INSTALL_DIR="${INSTALL_DIR:-/etc/elytra}"
+# Use ELYTRA_INSTALL_DIR (not INSTALL_DIR) to avoid collision with lib.sh's
+# exported INSTALL_DIR (/var/www/hydrodactyl, the panel's dir) - this script
+# is spawned via install.sh's get_script() as a child process that inherits
+# that export, so a plain INSTALL_DIR here would silently pick up the
+# panel's path instead of its own default.
+ELYTRA_INSTALL_DIR="${ELYTRA_INSTALL_DIR:-/etc/elytra}"
 LOG_FILE="${LOG_FILE:-/var/log/hydrodactyl-elytra-auto-update.log}"
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/elytra}"
 LOCK_FILE="${LOCK_FILE:-/var/run/hydrodactyl-elytra-update.lock}"
@@ -252,8 +257,8 @@ create_backup() {
 
   # Backup configuration
   debug "Backing up configuration..."
-  if [ -d "$INSTALL_DIR" ]; then
-    tar -czf "${backup_path}.tar.gz" -C "$INSTALL_DIR" . 2>/dev/null || {
+  if [ -d "$ELYTRA_INSTALL_DIR" ]; then
+    tar -czf "${backup_path}.tar.gz" -C "$ELYTRA_INSTALL_DIR" . 2>/dev/null || {
       warning "Failed to backup configuration"
     }
   fi
@@ -504,8 +509,8 @@ perform_update() {
       error "Auto-fix failed to resolve all issues"
 
       # Log failure information
-      mkdir -p "$INSTALL_DIR"
-      cat > "$INSTALL_DIR/update-health-check-failure.log" << EOF
+      mkdir -p "$ELYTRA_INSTALL_DIR"
+      cat > "$ELYTRA_INSTALL_DIR/update-health-check-failure.log" << EOF
 [$(date)] Elytra Update Health Check Failed
 Version: ${new_version}
 Status: Auto-fix applied but issues persist
@@ -515,35 +520,35 @@ EOF
 
       # Append specific failed checks to log
       if [ ! -f "/usr/local/bin/elytra" ]; then
-        echo "- Elytra binary not found" >> "$INSTALL_DIR/update-health-check-failure.log"
+        echo "- Elytra binary not found" >> "$ELYTRA_INSTALL_DIR/update-health-check-failure.log"
       elif [ ! -x "/usr/local/bin/elytra" ]; then
-        echo "- Elytra binary is not executable" >> "$INSTALL_DIR/update-health-check-failure.log"
+        echo "- Elytra binary is not executable" >> "$ELYTRA_INSTALL_DIR/update-health-check-failure.log"
       fi
 
-      if [ ! -f "$INSTALL_DIR/config.yml" ]; then
-        echo "- Elytra config file not found" >> "$INSTALL_DIR/update-health-check-failure.log"
+      if [ ! -f "$ELYTRA_INSTALL_DIR/config.yml" ]; then
+        echo "- Elytra config file not found" >> "$ELYTRA_INSTALL_DIR/update-health-check-failure.log"
       fi
 
       for dir in /var/lib/elytra/volumes /var/lib/elytra/archives /var/lib/elytra/backups; do
         if [ ! -d "$dir" ]; then
-          echo "- Data directory missing: $dir" >> "$INSTALL_DIR/update-health-check-failure.log"
+          echo "- Data directory missing: $dir" >> "$ELYTRA_INSTALL_DIR/update-health-check-failure.log"
         fi
       done
 
       if ! systemctl is-active --quiet docker 2>/dev/null; then
-        echo "- Docker is not running" >> "$INSTALL_DIR/update-health-check-failure.log"
+        echo "- Docker is not running" >> "$ELYTRA_INSTALL_DIR/update-health-check-failure.log"
       fi
 
       if ! systemctl is-active --quiet elytra 2>/dev/null; then
-        echo "- Elytra service is not running" >> "$INSTALL_DIR/update-health-check-failure.log"
+        echo "- Elytra service is not running" >> "$ELYTRA_INSTALL_DIR/update-health-check-failure.log"
       fi
 
-      echo "" >> "$INSTALL_DIR/update-health-check-failure.log"
-      echo "Please run the Repair Tool or check manually:" >> "$INSTALL_DIR/update-health-check-failure.log"
-      echo "bash <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)" >> "$INSTALL_DIR/update-health-check-failure.log"
-      echo "And select option [7] Repair / Fix Common Issues" >> "$INSTALL_DIR/update-health-check-failure.log"
+      echo "" >> "$ELYTRA_INSTALL_DIR/update-health-check-failure.log"
+      echo "Please run the Repair Tool or check manually:" >> "$ELYTRA_INSTALL_DIR/update-health-check-failure.log"
+      echo "bash <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)" >> "$ELYTRA_INSTALL_DIR/update-health-check-failure.log"
+      echo "And select option [7] Repair / Fix Common Issues" >> "$ELYTRA_INSTALL_DIR/update-health-check-failure.log"
 
-      error "Update completed but health check failed. See: $INSTALL_DIR/update-health-check-failure.log"
+      error "Update completed but health check failed. See: $ELYTRA_INSTALL_DIR/update-health-check-failure.log"
       
       # Attempt rollback since health check failed
       error "Attempting rollback..."
@@ -587,7 +592,7 @@ post_update_health_check() {
   fi
 
   debug "Checking Elytra config..."
-  if [ ! -f "$INSTALL_DIR/config.yml" ]; then
+  if [ ! -f "$ELYTRA_INSTALL_DIR/config.yml" ]; then
     warning "Elytra config file not found"
     has_errors=true
   fi
@@ -700,7 +705,7 @@ send_notification() {
 check_for_updates() {
   info "Checking for Elytra updates..."
   debug "Repository: $ELYTRA_REPO"
-  debug "Install directory: $INSTALL_DIR"
+  debug "Install directory: $ELYTRA_INSTALL_DIR"
 
   local current_version
   current_version=$(get_current_version)
