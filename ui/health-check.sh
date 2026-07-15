@@ -6,7 +6,7 @@ set -e
 #                                                                                    #
 # Hydrodactyl Health Check UI                                                         #
 #                                                                                    #
-# Health check and diagnostics for Hydrodactyl Panel and Elytra                       #
+# Health check and diagnostics for Hydrodactyl Panel, Wings, and Elytra              #
 #                                                                                    #
 # Copyright (C) 2026, ItzzMateo Studios                                             #
 #                                                                                    #
@@ -95,7 +95,7 @@ check_system_resources_health() {
     output "  ✓ Swap is configured"
   fi
   
-  # Check Docker compatibility for Elytra
+  # Check Docker compatibility for Wings/Elytra
   echo ""
   output "Docker Compatibility:"
   if ! check_docker_compatibility; then
@@ -141,19 +141,7 @@ detect_panel_location() {
   return 1
 }
 
-detect_elytra_binary() {
-  if [ -f "/usr/local/bin/elytra" ]; then
-    echo "/usr/local/bin/elytra"
-    return 0
-  fi
-
-  if [ -f "/usr/bin/elytra" ]; then
-    echo "/usr/bin/elytra"
-    return 0
-  fi
-
-  return 1
-}
+# detect_elytra_binary() and detect_wings_binary() are shared, defined in lib.sh.
 
 # ------------------ Menu Functions ----------------- #
 
@@ -168,14 +156,15 @@ show_health_menu() {
     output "${COLOR_ORANGE}What would you like to check?${COLOR_NC}"
     echo ""
     output "[${COLOR_ORANGE}0${COLOR_NC}] Check Panel Health"
-    output "[${COLOR_ORANGE}1${COLOR_NC}] Check Elytra Health"
-    output "[${COLOR_ORANGE}2${COLOR_NC}] Check Both"
-    output "[${COLOR_ORANGE}3${COLOR_NC}] Check System Resources"
+    output "[${COLOR_ORANGE}1${COLOR_NC}] Check Wings Health"
+    output "[${COLOR_ORANGE}2${COLOR_NC}] Check Elytra Health (legacy)"
+    output "[${COLOR_ORANGE}3${COLOR_NC}] Check All Installed Components"
+    output "[${COLOR_ORANGE}4${COLOR_NC}] Check System Resources"
     echo ""
-    output "[${COLOR_ORANGE}4${COLOR_NC}] Back to Main Menu"
+    output "[${COLOR_ORANGE}5${COLOR_NC}] Back to Main Menu"
     echo ""
 
-    echo -n "* Select an option [0-4]: "
+    echo -n "* Select an option [0-5]: "
     read -r choice
 
     case "$choice" in
@@ -193,6 +182,18 @@ show_health_menu() {
         continue
         ;;
       1)
+        local wings_binary
+        wings_binary=$(detect_wings_binary) || {
+          error "Wings installation not found"
+          sleep 2
+          continue
+        }
+        check_wings_health
+        output "Press Enter to return to the menu..."
+        read -r
+        continue
+        ;;
+      2)
         local elytra_binary
         elytra_binary=$(detect_elytra_binary) || {
           error "Elytra installation not found"
@@ -204,23 +205,30 @@ show_health_menu() {
         read -r
         continue
         ;;
-      2)
+      3)
         local panel_dir
+        local wings_binary
         local elytra_binary
         local has_panel=false
+        local has_wings=false
         local has_elytra=false
 
         panel_dir=$(detect_panel_location) && has_panel=true
+        wings_binary=$(detect_wings_binary) && has_wings=true
         elytra_binary=$(detect_elytra_binary) && has_elytra=true
 
-        if [ "$has_panel" == false ] && [ "$has_elytra" == false ]; then
-          error "Neither Panel nor Elytra installation found"
+        if [ "$has_panel" == false ] && [ "$has_wings" == false ] && [ "$has_elytra" == false ]; then
+          error "No Panel, Wings, or Elytra installation found"
           sleep 2
           continue
         fi
 
         if [ "$has_panel" == true ]; then
           check_panel_health "$panel_dir"
+        fi
+
+        if [ "$has_wings" == true ]; then
+          check_wings_health
         fi
 
         if [ "$has_elytra" == true ]; then
@@ -231,17 +239,17 @@ show_health_menu() {
         read -r
         continue
         ;;
-      3)
+      4)
         check_system_resources_health
         output "Press Enter to return to the menu..."
         read -r
         continue
         ;;
-      4)
+      5)
         return 0
         ;;
       *)
-        error "Invalid option. Please select 0-4."
+        error "Invalid option. Please select 0-5."
         sleep 1
         ;;
     esac

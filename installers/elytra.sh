@@ -105,10 +105,6 @@ parse_arguments() {
         ELYTRA_REPO="$2"
         shift 2
         ;;
-      --skip-wings-setup)
-        SKIP_WINGS_SETUP="true"
-        shift
-        ;;
       --assume-ssl)
         ASSUME_SSL="true"
         shift
@@ -163,7 +159,6 @@ Options:
   --ssl-email <email>            Email for Let's Encrypt registration
   --github-token, -g <token>     GitHub token for private repos
   --elytra-repo <repo>           Elytra repo (default: pyrohost/elytra)
-  --skip-wings-setup             Skip Wings detection/setup
   --help, -h                     Show this help message
 
 Examples:
@@ -220,7 +215,6 @@ NODE_DISK="${NODE_DISK:-}"
 PANEL_FQDN="${PANEL_FQDN:-}"
 
 # Mode flags
-export SKIP_WINGS_SETUP="${SKIP_WINGS_SETUP:-false}"
 export ASSUME_SSL="${ASSUME_SSL:-false}"
 export CONFIGURE_LETSENCRYPT="${CONFIGURE_LETSENCRYPT:-false}"
 export SSL_EMAIL="${SSL_EMAIL:-}"
@@ -296,8 +290,8 @@ install_elytra() {
   output "Creating hydrodactyl system user..."
   if ! id -u hydrodactyl >/dev/null 2>&1; then
     useradd --system --no-create-home --shell /usr/sbin/nologin --uid 8888 --gid 8888 hydrodactyl 2>/dev/null || \
-    useradd --system --no-create-home --shell /sbin/nologin --uid 8888 hydrodactyl 2>/dev/null || \
-    useradd --system --no-create-home --shell /bin/false --uid 8888 hydrodactyl
+    useradd --system --no-create-home --shell /sbin/nologin --uid 8888 --gid 8888 hydrodactyl 2>/dev/null || \
+    useradd --system --no-create-home --shell /bin/false --uid 8888 --gid 8888 hydrodactyl
   fi
 
   # Add hydrodactyl user to docker group for container management
@@ -424,7 +418,7 @@ auto_configure_elytra() {
     fi
   fi
 
-  if ! NODE_ID=$(create_node_via_api "$api_key" "$panel_url" "$location_id" "$node_name" "$memory_mb" "$disk_mb" "false" "$node_fqdn"); then
+  if ! NODE_ID=$(create_node_via_api "$api_key" "$panel_url" "$location_id" "$node_name" "$memory_mb" "$disk_mb" "false" "$node_fqdn" "elytra" "$(daemon_scheme)"); then
     error "Failed to create node"
     return 1
   fi
@@ -650,6 +644,11 @@ configure_elytra() {
     sed -i "s|key: .*|key: ${ssl_key_path}|" "${ELYTRA_INSTALL_DIR}/config.yml"
     success "SSL configured for Elytra"
   else
+    # No usable cert - force SSL off regardless of what 'elytra configure'
+    # defaulted to, so Elytra never tries to load a certificate that
+    # doesn't exist (defense in depth alongside the daemon_scheme() fix in
+    # create_node_via_api()).
+    sed -i 's/enabled: true/enabled: false/' "${ELYTRA_INSTALL_DIR}/config.yml"
     if [ -z "$node_fqdn" ]; then
       warning "Skipping SSL - node FQDN not configured"
     else

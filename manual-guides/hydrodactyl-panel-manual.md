@@ -410,7 +410,7 @@ chmod +x /etc/letsencrypt/renewal-hooks/deploy/hydrodactyl-services.sh
 Create the service file:
 
 ```bash
-nano /etc/systemd/system/pyroq.service
+nano /etc/systemd/system/hydroq.service
 ```
 
 Add the following content:
@@ -455,13 +455,13 @@ WantedBy=multi-user.target
 
 ```bash
 systemctl daemon-reload
-systemctl enable --now pyroq
+systemctl enable --now hydroq
 ```
 
 Verify it's running:
 
 ```bash
-systemctl status pyroq
+systemctl status hydroq
 ```
 
 ---
@@ -523,7 +523,7 @@ systemctl status mariadb
 systemctl status redis-server
 
 # Check Queue Worker
-systemctl status pyroq
+systemctl status hydroq
 ```
 
 ### Test Panel Accessibility
@@ -586,13 +586,13 @@ mysql -u hydrodactyl -p -h 127.0.0.1 panel -e "SELECT 1"
 
 Check logs:
 ```bash
-journalctl -u pyroq -f
+journalctl -u hydroq -f
 ```
 
 Restart and check status:
 ```bash
-systemctl restart pyroq
-systemctl status pyroq
+systemctl restart hydroq
+systemctl status hydroq
 ```
 
 ---
@@ -638,9 +638,9 @@ Now that your panel is installed, you can:
 1. Log in with your admin credentials
 2. Create locations and nodes
 3. Configure your first game server
-4. Install Elytra (the daemon) on your game server nodes
+4. Install Wings (the daemon) on your game server nodes
 
-For Elytra installation, refer to the [Elytra Manual Installation Guide](./elytra-manual.md).
+For Wings installation, refer to the [Wings Manual Installation Guide](./wings-manual.md). If you need to maintain an existing legacy Elytra node instead, see the [Elytra Manual Installation Guide](./elytra-manual.md) (legacy).
 
 ---
 

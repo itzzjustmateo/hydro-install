@@ -103,17 +103,18 @@ remove_daemon_common() {
     done
 
     # Success message is printed by the caller, not here - remove_elytra()
-    # has an extra user-removal step after this returns, and printing
-    # "removed" before that step completes would be misleading.
+    # and remove_wings() both have an extra user-removal step after this
+    # returns, and printing "removed" before that step completes would be
+    # misleading.
 }
 
 remove_elytra() {
     remove_daemon_common "Elytra" "elytra" "/usr/local/bin/elytra" "$ELYTRA_DIR" \
         "/var/lib/elytra" "/etc/hydrodactyl/elytra-version"
 
-    # Remove hydrodactyl user (if it exists). Elytra-specific: remove_wings()
-    # deliberately does not do this, since its system user may be shared
-    # with a still-installed panel (see remove_wings() below).
+    # Remove hydrodactyl user (if it exists). This is Elytra's own dedicated
+    # system user, distinct from Wings' "pterodactyl" user (see
+    # remove_wings() below) - each daemon cleans up only its own identity.
     if id -u hydrodactyl >/dev/null 2>&1; then
         output "Removing hydrodactyl user..."
         userdel hydrodactyl 2>/dev/null || true
@@ -128,12 +129,17 @@ remove_wings() {
     remove_daemon_common "Wings" "wings" "/usr/local/bin/wings" "$WINGS_DIR" \
         "/var/lib/pterodactyl" "/etc/hydrodactyl/wings-version" "/etc/hydrodactyl/auto-update-wings.env"
 
-    # Note: unlike remove_elytra(), this intentionally does not delete a
-    # system user. installers/wings.sh (standalone) creates a dedicated
-    # "pterodactyl" user, but installers/both.sh (combined) instead reuses
-    # the "hydrodactyl" user shared with the panel - deleting it here would
-    # break a still-installed panel. Which one applies isn't knowable from
-    # an uninstall script alone, so neither is touched.
+    # Remove pterodactyl user (if it exists). Both installers/wings.sh
+    # (standalone) and installers/both.sh (combined) create this same
+    # dedicated user solely for Wings directory ownership/docker-group
+    # membership - it is never used by the panel (which runs as $WEBUSER),
+    # so it's always safe to remove here regardless of which installer
+    # created it or whether a panel is also installed on this system.
+    if id -u pterodactyl >/dev/null 2>&1; then
+        output "Removing pterodactyl user..."
+        userdel pterodactyl 2>/dev/null || true
+        groupdel pterodactyl 2>/dev/null || true
+    fi
 
     success "Wings removed"
 }

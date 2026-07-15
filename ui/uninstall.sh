@@ -56,7 +56,7 @@ detect_installed_components() {
   ELYTRA_INSTALLED=false
   WINGS_INSTALLED=false
   PANEL_UPDATER_INSTALLED=false
-  ELYTRA_UPDATER_INSTALLED=false
+  DAEMON_UPDATER_INSTALLED=false
 
   if [ -d "/var/www/hydrodactyl" ]; then
     PANEL_INSTALLED=true
@@ -77,8 +77,11 @@ detect_installed_components() {
     PANEL_UPDATER_INSTALLED=true
   fi
 
-  if systemctl is-enabled --quiet hydrodactyl-elytra-auto-update.timer 2>/dev/null; then
-    ELYTRA_UPDATER_INSTALLED=true
+  # Daemon auto-updater timer - installs from before the Wings/Elytra rename
+  # (or a Wings-only install) may have either naming convention, so check both.
+  if systemctl is-enabled --quiet hydrodactyl-elytra-auto-update.timer 2>/dev/null || \
+     systemctl is-enabled --quiet hydrodactyl-wings-auto-update.timer 2>/dev/null; then
+    DAEMON_UPDATER_INSTALLED=true
   fi
 }
 
@@ -109,7 +112,7 @@ show_main_menu() {
     echo -e "  ${COLOR_RED}✗${COLOR_NC} Elytra Daemon (legacy)"
   fi
 
-  if [ "$PANEL_UPDATER_INSTALLED" == true ] || [ "$ELYTRA_UPDATER_INSTALLED" == true ]; then
+  if [ "$PANEL_UPDATER_INSTALLED" == true ] || [ "$DAEMON_UPDATER_INSTALLED" == true ]; then
     echo -e "  ${COLOR_GREEN}✓${COLOR_NC} Auto-updaters"
   else
     echo -e "  ${COLOR_RED}✗${COLOR_NC} Auto-updaters"
@@ -163,7 +166,7 @@ show_main_menu() {
         return
         ;;
       3)
-        if [ "$PANEL_UPDATER_INSTALLED" == false ] && [ "$ELYTRA_UPDATER_INSTALLED" == false ]; then
+        if [ "$PANEL_UPDATER_INSTALLED" == false ] && [ "$DAEMON_UPDATER_INSTALLED" == false ]; then
           error "No auto-updaters are installed"
           continue
         fi
@@ -279,7 +282,7 @@ export_variables() {
 main() {
   detect_installed_components
 
-  if [ "$PANEL_INSTALLED" == false ] && [ "$ELYTRA_INSTALLED" == false ] && [ "$WINGS_INSTALLED" == false ] && [ "$PANEL_UPDATER_INSTALLED" == false ] && [ "$ELYTRA_UPDATER_INSTALLED" == false ]; then
+  if [ "$PANEL_INSTALLED" == false ] && [ "$ELYTRA_INSTALLED" == false ] && [ "$WINGS_INSTALLED" == false ] && [ "$PANEL_UPDATER_INSTALLED" == false ] && [ "$DAEMON_UPDATER_INSTALLED" == false ]; then
     print_header
     print_flame "Nothing to Uninstall"
     output "No Hydrodactyl components were detected on this system."

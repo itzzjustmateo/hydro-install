@@ -4,9 +4,9 @@ set -e
 
 ######################################################################################
 #                                                                                    #
-# Hydrodactyl + Elytra Combined Installer                                             #
+# Hydrodactyl + Wings Combined Installer                                             #
 #                                                                                    #
-# Installs both Panel and Elytra on the same machine with automatic configuration    #
+# Installs both Panel and Wings on the same machine with automatic configuration     #
 #                                                                                    #
 ######################################################################################
 
@@ -78,6 +78,7 @@ esac
 # is resolved in install_wings_daemon() - do not default it here, or a
 # variant-specific default below would never apply once this is non-empty.
 WINGS_REPO="${WINGS_REPO:-}"
+WINGS_RELEASE_VERSION="${WINGS_RELEASE_VERSION:-latest}"
 NODE_NAME="${NODE_NAME:-local}"
 NODE_DESCRIPTION="${NODE_DESCRIPTION:-Local Node}"
 NODE_TOKEN="${NODE_TOKEN:-$(gen_passwd 32)}"
@@ -100,11 +101,8 @@ GITHUB_TOKEN_WINGS="${GITHUB_TOKEN_WINGS:-$GITHUB_TOKEN}"
 
 # Paths
 INSTALL_DIR="${INSTALL_DIR:-/var/www/hydrodactyl}"
-# This script only ever installs Wings, never legacy Elytra - always use the
-# Wings config dir. lib.sh unconditionally exports ELYTRA_DIR="/etc/elytra"
-# for the legacy Elytra flow, so a "${ELYTRA_DIR:-...}" default here would
-# never apply (it's already non-empty by the time this line runs).
-ELYTRA_DIR="/etc/pterodactyl"
+# This script only ever installs Wings, never legacy Elytra.
+WINGS_INSTALL_DIR="/etc/pterodactyl"
 PANEL_CONFIG_DIR="${PANEL_CONFIG_DIR:-/etc/hydrodactyl}"
 
 # Node ID (will be set during installation)
@@ -676,7 +674,7 @@ create_node_in_panel() {
       memory_mb=$(get_system_memory)
       disk_mb=$(df -m / | awk 'NR==2 {print $2}')
 
-      if ! NODE_ID=$(create_node_via_api "$PANEL_API_KEY" "$panel_url" "$location_id" "$NODE_NAME" "$memory_mb" "$disk_mb" "$BEHIND_PROXY" "$PANEL_FQDN"); then
+      if ! NODE_ID=$(create_node_via_api "$PANEL_API_KEY" "$panel_url" "$location_id" "$NODE_NAME" "$memory_mb" "$disk_mb" "$BEHIND_PROXY" "$PANEL_FQDN" "wings" "$(panel_scheme)"); then
         error "Failed to create node via API, falling back to manual method"
         # Fall through to manual method below
       else
@@ -742,7 +740,7 @@ create_node_in_panel() {
   success "Node created in panel (ID: ${NODE_ID})"
 }
 
-# ---------------- Elytra Installation ---------------- #
+# ---------------- Wings Installation ---------------- #
 
 install_wings_daemon() {
   print_flame "Installing Wings Daemon"
@@ -751,30 +749,30 @@ install_wings_daemon() {
   install_docker
 
   # Create directories
-  mkdir -p "$ELYTRA_DIR"
+  mkdir -p "$WINGS_INSTALL_DIR"
   mkdir -p "$PANEL_CONFIG_DIR"
   mkdir -p /var/lib/pterodactyl/volumes
   mkdir -p /var/lib/pterodactyl/archives
   mkdir -p /var/lib/pterodactyl/backups
 
-  # Create hydrodactyl group first (required for user creation)
-  output "Creating hydrodactyl system group..."
-  if ! getent group hydrodactyl >/dev/null 2>&1; then
-    groupadd --gid 8888 hydrodactyl 2>/dev/null || true
+  # Create pterodactyl group first (required for user creation)
+  output "Creating pterodactyl system group..."
+  if ! getent group pterodactyl >/dev/null 2>&1; then
+    groupadd --gid 9999 pterodactyl 2>/dev/null || true
   fi
 
-  # Create hydrodactyl user for Elytra (UID/GID 8888) if it doesn't exist
-  output "Creating hydrodactyl system user..."
-  if ! id -u hydrodactyl >/dev/null 2>&1; then
-    useradd --system --no-create-home --shell /usr/sbin/nologin --uid 8888 --gid 8888 hydrodactyl 2>/dev/null || \
-    useradd --system --no-create-home --shell /sbin/nologin --uid 8888 hydrodactyl 2>/dev/null || \
-    useradd --system --no-create-home --shell /bin/false --uid 8888 hydrodactyl
+  # Create pterodactyl user for Wings (UID/GID 9999) if it doesn't exist
+  output "Creating pterodactyl system user..."
+  if ! id -u pterodactyl >/dev/null 2>&1; then
+    useradd --system --no-create-home --shell /usr/sbin/nologin --uid 9999 --gid 9999 pterodactyl 2>/dev/null || \
+    useradd --system --no-create-home --shell /sbin/nologin --uid 9999 --gid 9999 pterodactyl 2>/dev/null || \
+    useradd --system --no-create-home --shell /bin/false --uid 9999 --gid 9999 pterodactyl
   fi
 
-  # Add hydrodactyl user to docker group for container management
+  # Add pterodactyl user to docker group for container management
   if getent group docker >/dev/null 2>&1; then
-    output "Adding hydrodactyl user to docker group..."
-    usermod -aG docker hydrodactyl 2>/dev/null || true
+    output "Adding pterodactyl user to docker group..."
+    usermod -aG docker pterodactyl 2>/dev/null || true
   fi
 
   # Determine architecture and asset name based on the selected Wings variant
@@ -790,21 +788,29 @@ install_wings_daemon() {
     WINGS_REPO="${WINGS_REPO:-pterodactyl/wings}"
   fi
 
-  # Get latest release
-  output "Fetching latest Wings release..."
-  local latest_release
-  latest_release=$(get_latest_release "$WINGS_REPO" "$GITHUB_TOKEN_WINGS")
+  # Get the release to install - respects WINGS_RELEASE_VERSION if the user
+  # selected a specific version in ui/both.sh, otherwise fetches latest.
+  local target_release="$WINGS_RELEASE_VERSION"
+  if [ "$target_release" == "latest" ]; then
+    output "Fetching latest Wings release..."
+    target_release=$(get_latest_release "$WINGS_REPO" "$GITHUB_TOKEN_WINGS")
+  else
+    output "Fetching Wings release ${WINGS_RELEASE_VERSION}..."
+  fi
 
-  if [ -z "$latest_release" ] || [ "$latest_release" == "null" ]; then
-    error "Could not fetch latest release from $WINGS_REPO"
+  if [ -z "$target_release" ] || [ "$target_release" == "null" ]; then
+    error "Could not fetch release from $WINGS_REPO"
+    if [ "$WINGS_RELEASE_VERSION" != "latest" ]; then
+      error "Release ${WINGS_RELEASE_VERSION} may not exist."
+    fi
     exit 1
   fi
 
-  info "Latest release: $latest_release"
+  info "Installing release: $target_release"
 
   # Download binary
   output "Downloading Wings binary..."
-  if ! download_release_asset "$WINGS_REPO" "$asset_name" "/usr/local/bin/wings" "$GITHUB_TOKEN_WINGS"; then
+  if ! download_release_asset "$WINGS_REPO" "$asset_name" "/usr/local/bin/wings" "$GITHUB_TOKEN_WINGS" "$target_release"; then
     error "Failed to download Wings binary"
     exit 1
   fi
@@ -813,17 +819,17 @@ install_wings_daemon() {
 
   # Save version from GitHub release tag for auto-updater tracking
   mkdir -p /etc/hydrodactyl
-  echo "$latest_release" > /etc/hydrodactyl/wings-version
+  echo "$target_release" > /etc/hydrodactyl/wings-version
   chmod 644 /etc/hydrodactyl/wings-version
 
   # Persist the installed variant/repo for the manual update menu
   save_wings_update_config
 
-  # Create Elytra config directory
-  output "Creating Elytra config directory at ${ELYTRA_DIR}..."
-  mkdir -p "${ELYTRA_DIR}"
-  if [ ! -d "${ELYTRA_DIR}" ]; then
-    error "Failed to create Elytra config directory at ${ELYTRA_DIR}"
+  # Create Wings config directory
+  output "Creating Wings config directory at ${WINGS_INSTALL_DIR}..."
+  mkdir -p "${WINGS_INSTALL_DIR}"
+  if [ ! -d "${WINGS_INSTALL_DIR}" ]; then
+    error "Failed to create Wings config directory at ${WINGS_INSTALL_DIR}"
     exit 1
   fi
 
@@ -832,44 +838,44 @@ install_wings_daemon() {
   panel_url="$(panel_scheme)://$(panel_url_host "$PANEL_FQDN")"
 
   # Debug output
-  output "DEBUG: Elytra configuration values:"
+  output "DEBUG: Wings configuration values:"
   output "DEBUG: NODE_ID=${NODE_ID}"
   output "DEBUG: PANEL_FQDN=${PANEL_FQDN}"
-  output "DEBUG: ELYTRA_DIR=${ELYTRA_DIR}"
+  output "DEBUG: WINGS_INSTALL_DIR=${WINGS_INSTALL_DIR}"
 
   # Configure Wings using the official configure command
   output "Configuring Wings using 'wings configure' command..."
-  if ! (cd "${ELYTRA_DIR}" && wings configure --panel-url "${panel_url}" --token "${PANEL_API_KEY}" --node "${NODE_ID}"); then
+  if ! (cd "${WINGS_INSTALL_DIR}" && wings configure --panel-url "${panel_url}" --token "${PANEL_API_KEY}" --node "${NODE_ID}"); then
     error "Failed to configure Wings"
     exit 1
   fi
 
   output "DEBUG: Wings configured successfully"
 
-  # Disable permission checking to prevent Elytra from resetting permissions
-  output "Disabling permission checks in Elytra config..."
-  sed -i 's/check_permissions_on_boot: true/check_permissions_on_boot: false/' "${ELYTRA_DIR}/config.yml" 2>/dev/null || true
+  # Disable permission checking to prevent Wings from resetting permissions
+  output "Disabling permission checks in Wings config..."
+  sed -i 's/check_permissions_on_boot: true/check_permissions_on_boot: false/' "${WINGS_INSTALL_DIR}/config.yml" 2>/dev/null || true
 
   # Update container limits for better game server compatibility
-  output "Updating container limits in Elytra config..."
-  sed -i 's/container_pid_limit: 512/container_pid_limit: 2048/' "${ELYTRA_DIR}/config.yml" 2>/dev/null || true
+  output "Updating container limits in Wings config..."
+  sed -i 's/container_pid_limit: 512/container_pid_limit: 2048/' "${WINGS_INSTALL_DIR}/config.yml" 2>/dev/null || true
   # Update installer_limits memory and cpu values
-  sed -i 's/memory: 1024/memory: 2048/' "${ELYTRA_DIR}/config.yml" 2>/dev/null || true
-  sed -i 's/cpu: 100/cpu: 200/' "${ELYTRA_DIR}/config.yml" 2>/dev/null || true
+  sed -i 's/memory: 1024/memory: 2048/' "${WINGS_INSTALL_DIR}/config.yml" 2>/dev/null || true
+  sed -i 's/cpu: 100/cpu: 200/' "${WINGS_INSTALL_DIR}/config.yml" 2>/dev/null || true
 
-  # Configure SSL for Elytra using Let's Encrypt certificates
-  output "Configuring SSL for Elytra..."
+  # Configure SSL for Wings using Let's Encrypt certificates
+  output "Configuring SSL for Wings..."
   if [ -f "/etc/letsencrypt/live/${PANEL_FQDN}/fullchain.pem" ] && [ -f "/etc/letsencrypt/live/${PANEL_FQDN}/privkey.pem" ]; then
     # Enable SSL and set certificate paths
-    sed -i 's/enabled: false/enabled: true/' "${ELYTRA_DIR}/config.yml"
-    sed -i "s|certificate: .*|certificate: /etc/letsencrypt/live/${PANEL_FQDN}/fullchain.pem|" "${ELYTRA_DIR}/config.yml"
-    sed -i "s|key: .*|key: /etc/letsencrypt/live/${PANEL_FQDN}/privkey.pem|" "${ELYTRA_DIR}/config.yml"
-    success "SSL configured for Elytra using Let's Encrypt certificates"
+    sed -i 's/enabled: false/enabled: true/' "${WINGS_INSTALL_DIR}/config.yml"
+    sed -i "s|certificate: .*|certificate: /etc/letsencrypt/live/${PANEL_FQDN}/fullchain.pem|" "${WINGS_INSTALL_DIR}/config.yml"
+    sed -i "s|key: .*|key: /etc/letsencrypt/live/${PANEL_FQDN}/privkey.pem|" "${WINGS_INSTALL_DIR}/config.yml"
+    success "SSL configured for Wings using Let's Encrypt certificates"
   else
     warning "Let's Encrypt certificates not found, SSL may need manual configuration"
   fi
 
-  # Step 4: Create allocations via API (after Elytra configure)
+  # Step 4: Create allocations via API (after Wings configure)
   output "Creating allocations via API..."
   create_node_allocations "$PANEL_API_KEY" "$panel_url" "$NODE_ID" "$GAME_PORT_START" "$GAME_PORT_END" || true
 
@@ -896,12 +902,12 @@ install_wings_daemon() {
     warning "Wings service may not have started properly"
   fi
 
-  # Set proper ownership and permissions on Elytra data directories (after service starts)
-  output "Ensuring Elytra data directories exist..."
+  # Set proper ownership and permissions on Wings data directories (after service starts)
+  output "Ensuring Wings data directories exist..."
   mkdir -p /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups
 
-  output "Setting final permissions on Elytra data directories..."
-  chown -R 8888:8888 /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups "$ELYTRA_DIR" 2>/dev/null || true
+  output "Setting final permissions on Wings data directories..."
+  chown -R 9999:9999 /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups "$WINGS_INSTALL_DIR" 2>/dev/null || true
 
   # Set full permissions so containers can read/write/execute
   # Note: 777 is required for containerized game servers to access these directories
@@ -914,20 +920,20 @@ install_wings_daemon() {
   chmod -R 777 /var/lib/pterodactyl/archives/* 2>/dev/null || true
   chmod 777 /var/lib/pterodactyl/backups 2>/dev/null || true
   chmod -R 777 /var/lib/pterodactyl/backups/* 2>/dev/null || true
-  chmod -R 755 "$ELYTRA_DIR" 2>/dev/null || true
-  [ -f "$ELYTRA_DIR/config.yml" ] && chmod 600 "$ELYTRA_DIR/config.yml" 2>/dev/null || true
+  chmod -R 755 "$WINGS_INSTALL_DIR" 2>/dev/null || true
+  [ -f "$WINGS_INSTALL_DIR/config.yml" ] && chmod 600 "$WINGS_INSTALL_DIR/config.yml" 2>/dev/null || true
 
-  # Disable check_permissions_on_boot to prevent Elytra from resetting permissions
-  if [ -f "$ELYTRA_DIR/config.yml" ]; then
-    output "Disabling permission checks in Elytra config..."
-    sed -i 's/check_permissions_on_boot: true/check_permissions_on_boot: false/' "$ELYTRA_DIR/config.yml" 2>/dev/null || true
+  # Disable check_permissions_on_boot to prevent Wings from resetting permissions
+  if [ -f "$WINGS_INSTALL_DIR/config.yml" ]; then
+    output "Disabling permission checks in Wings config..."
+    sed -i 's/check_permissions_on_boot: true/check_permissions_on_boot: false/' "$WINGS_INSTALL_DIR/config.yml" 2>/dev/null || true
   fi
 
   # Run auto-fix to ensure proper permissions (fixes container access issues)
-  output "Running Elytra permission fix..."
-  auto_fix_elytra_issues || true
+  output "Running Wings permission fix..."
+  auto_fix_wings_issues || true
 
-  success "Elytra installed and started"
+  success "Wings installed and started"
 }
 
 # ---------------- Final Configuration ---------------- #
@@ -941,7 +947,7 @@ configure_firewall() {
     output "Opening ports for panel and game servers..."
     output "  • 22 (SSH)"
     output "  • 80, 443 (HTTP/HTTPS)"
-    output "  • 8080 (Elytra API)"
+    output "  • 8080 (Wings API)"
     output "  • 2022 (SFTP)"
     output "  • 25565-25665 (Minecraft)"
     output "  • 27015-27150 (Source Engine - CS:GO, TF2, GMod)"
@@ -1147,8 +1153,8 @@ main() {
   user_password="$PANEL_ADMIN_PASSWORD"
   save_panel_install_info "install"
 
-  # Save Elytra installation information
-  save_elytra_install_info "install"
+  # Save Wings installation information
+  save_wings_install_info "install"
 
   # Show completion screen
   show_both_completion

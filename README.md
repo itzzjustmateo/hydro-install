@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/shell-bash-4EAA25?style=for-the-badge&logo=gnu-bash&color=orange" alt="Shell">
 </p>
 
-A beautiful, modern, and feature-rich installer for the **Hydrodactyl** game server management panel and **Elytra** daemon. Built with an elegant flame-inspired UI and designed for ease of use.
+A beautiful, modern, and feature-rich installer for the **Hydrodactyl** game server management panel and **Wings**/**Wings-RS** daemon (with legacy **Elytra** support). Built with an elegant flame-inspired UI and designed for ease of use.
 
 This installer is a fork of the [Pyrodactyl Installer](https://github.com/Muspelheim-Hosting/pyrodactyl-installer), adapted for use with the [Hydrodactyl Panel](https://github.com/BlueprintFramework/hydrodactyl).
 
@@ -17,16 +17,17 @@ This installer is a fork of the [Pyrodactyl Installer](https://github.com/Muspel
 ## Features
 
 - **Beautiful Flame UI** — Orange gradient interface
-- **Flexible Installation** — Install panel, Elytra, or both on the same machine
+- **Flexible Installation** — Install panel, Wings/Wings-RS, or both on the same machine (legacy Elytra also supported)
+- **Wings & Wings-RS** — Choose between the official Go daemon or the lightweight Rust reimplementation
 - **Private Repository Support** — Full support for private GitHub repositories with token validation
-- **On-Demand Updates** — Update panel and Wings anytime from the menu
+- **On-Demand Updates** — Update panel and Wings (or legacy Elytra) anytime from the menu
 - **SSL/TLS Ready** — Let's Encrypt integration with automatic renewal and service restart hooks
 - **Firewall Configuration** — Automatic UFW/FirewallD setup
 - **OS Support** — Ubuntu 22.04/24.04, Debian 11/12, Rocky Linux 8/9, AlmaLinux 8/9
 - **Database Management** — Automated MariaDB setup and configuration
-- **Docker Integration** — Seamless Docker installation for Elytra
+- **Docker Integration** — Seamless Docker installation for Wings/Wings-RS/Elytra
 - **Repair Tool** — Built-in repair tool to fix common permission and service issues
-- **Health Checks** — Comprehensive health checking for panel, Elytra, and system resources
+- **Health Checks** — Comprehensive health checking for panel, Wings, Elytra, and system resources
 - **System Requirements Check** — Automatic detection of system resources with recommendations
 
 ## Quick Start
@@ -71,7 +72,7 @@ sudo bash install.sh
 
 > **Note:** The installer will display a warning if your system is below minimum requirements. Swap space is recommended for systems with limited RAM.
 
-> **Docker Compatibility:** Elytra requires Docker to run game servers. OpenVZ, LXC, or Virtuozzo virtualization are **not supported**. KVM, VMware, or dedicated servers work best. Run `systemd-detect-virt` to check your virtualization type.
+> **Docker Compatibility:** Wings, Wings-RS, and Elytra all require Docker to run game servers. OpenVZ, LXC, or Virtuozzo virtualization are **not supported**. KVM, VMware, or dedicated servers work best. Run `systemd-detect-virt` to check your virtualization type.
 
 ## Installation Options
 
@@ -83,23 +84,25 @@ bash <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/m
 
 ## Maintenance Tools
 
-### Repair Tool (Option 7)
+### Repair Tool (Option 6)
 
 The built-in repair tool can fix common issues:
 
 - **Fix Panel Permissions** — Corrects ownership and permissions for web server
-- **Fix Elytra Permissions** — Sets correct permissions for Elytra directories (UID 8888)
+- **Fix Wings Permissions** — Sets correct permissions for Wings directories (`/etc/pterodactyl`, UID 9999)
+- **Fix Elytra Permissions** — Sets correct permissions for legacy Elytra directories (UID 8888)
 - **Clear Laravel Caches** — Clears config, cache, view, and route caches
-- **Restart All Services** — Restarts nginx, PHP-FPM, hydroq, redis, and elytra
+- **Restart All Services** — Restarts nginx, PHP-FPM, hydroq, redis, and wings/elytra (whichever is installed)
 - **Fix Database Permissions** — Re-grants privileges to hydrodactyl database user
 - **Setup Swap File** — Configure swap space for systems with limited RAM (1GB, 2GB, 4GB, or custom)
 
-### Health Check (Option 8)
+### Health Check (Option 7)
 
 Comprehensive diagnostics for your installation:
 
 - **Panel Health** — Checks directory structure, permissions, services (nginx, PHP-FPM, Redis, MariaDB, hydroq)
-- **Elytra Health** — Validates binary, configuration, data directories, Docker, and service status
+- **Wings Health** — Validates binary, configuration, data directories, Docker, and service status
+- **Elytra Health** — Same checks as above for legacy Elytra installations
 - **System Resources** — Displays CPU, RAM, disk, and swap information with requirement checking
 
 ### System Requirements Monitoring
@@ -116,7 +119,7 @@ The installer automatically displays system resources on startup:
 When Let's Encrypt is configured, the installer automatically sets up:
 
 - **Automatic Renewal** — Certificates renewed twice daily (as recommended by Let's Encrypt)
-- **Service Restart Hooks** — nginx and Elytra automatically restart after successful renewal
+- **Service Restart Hooks** — nginx, Wings, and Elytra (whichever are installed) automatically restart after successful renewal
 - **Renewal Logging** — All renewal activity logged to `/var/log/hydrodactyl-certbot-renewal.log`
 - **Health Verification** — Dry-run testing to ensure renewal configuration is valid
 
@@ -144,7 +147,9 @@ You can install from custom forks or private builds:
 ### Default Repositories
 
 - **Panel**: `BlueprintFramework/hydrodactyl`
-- **Elytra**: `pyrohost/elytra`
+- **Wings (Go)**: `pterodactyl/wings`
+- **Wings-RS (Rust)**: `calagopus/wings`
+- **Elytra (legacy)**: `pyrohost/elytra`
 
 ### Using Custom Repositories
 
@@ -159,27 +164,35 @@ During installation, select "Use custom repository" and provide:
 - Repository must have published releases
 - Release must contain the expected assets:
   - Panel: `panel.tar.gz`
-  - Elytra: `elytra_linux_amd64` or `elytra_linux_arm64`
+  - Wings (Go): `wings_linux_amd64` or `wings_linux_arm64`
+  - Wings-RS (Rust): `wings-rs-x86_64-linux` or `wings-rs-aarch64-linux`
+  - Elytra (legacy): `elytra_linux_amd64` or `elytra_linux_arm64`
 
 ### Uninstall Options
 
 - **Panel only**: Removes panel files, database (optional), web server config
-- **Elytra only**: Removes binary, configuration, Docker containers
-- **Both**: Complete removal of all components
-- **Auto-updaters only**: Removes update scripts and timers
+- **Wings only**: Removes binary, configuration, Docker containers
+- **Elytra only (legacy)**: Removes binary, configuration, Docker containers
+- **Both**: Complete removal of panel and whichever daemon(s) are installed
+- **Auto-updaters only**: Removes update scripts and any leftover timers from older installs
 
 ## Directory Structure
 
 ```
 /var/www/hydrodactyl/         # Panel installation
-/etc/elytra/                 # Elytra configuration
 /etc/hydrodactyl/             # Panel configuration
-/var/lib/elytra/volumes      # Game server data (containers)
-/var/lib/elytra/archives     # Server archives
-/var/lib/elytra/backups      # Server backups
+/etc/pterodactyl/             # Wings configuration
+/var/lib/pterodactyl/volumes  # Game server data (containers, Wings)
+/var/lib/pterodactyl/archives # Server archives (Wings)
+/var/lib/pterodactyl/backups  # Server backups (Wings)
+/etc/elytra/                  # Legacy Elytra configuration
+/var/lib/elytra/volumes       # Game server data (containers, legacy Elytra)
+/var/lib/elytra/archives      # Server archives (legacy Elytra)
+/var/lib/elytra/backups       # Server backups (legacy Elytra)
 /var/log/hydrodactyl-*.log    # Installation/update logs
 /var/backups/hydrodactyl/     # Panel backups
-/var/backups/elytra/         # Elytra backups
+/var/backups/wings/           # Wings backups
+/var/backups/elytra/          # Legacy Elytra backups
 ```
 
 ## Troubleshooting
@@ -207,7 +220,7 @@ During installation, select "Use custom repository" and provide:
 **Panel not accessible**
 
 ```bash
-# Use the built-in Repair Tool (Option 7)
+# Use the built-in Repair Tool (Option 6)
 sudo bash <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)
 
 # Or manually check services:
@@ -216,10 +229,22 @@ systemctl status hydroq
 journalctl -u hydroq -f
 ```
 
-**Elytra not connecting**
+**Wings not connecting**
 
 ```bash
-# Check Elytra health via Health Check (Option 8)
+# Check Wings health via Health Check (Option 7)
+sudo bash <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)
+
+# Or manually check:
+systemctl status wings
+journalctl -u wings -f
+cat /etc/pterodactyl/config.yml
+```
+
+**Elytra not connecting (legacy)**
+
+```bash
+# Check Elytra health via Health Check (Option 7)
 sudo bash <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)
 
 # Or manually check:
@@ -241,7 +266,7 @@ mysql -u root -p -e "SHOW DATABASES;"
 # Check if swap is configured
 free -h
 
-# Use Repair Tool (Option 7) to set up swap if needed
+# Use Repair Tool (Option 6) to set up swap if needed
 # Or manually create swap:
 sudo fallocate -l 2G /swapfile
 sudo chmod 600 /swapfile
@@ -305,9 +330,10 @@ All installation and update operations are logged:
 
 - **Installation**: `/var/log/hydrodactyl-installer.log`
 - **Panel Updates**: `/var/log/hydrodactyl-panel-auto-update.log`
-- **Elytra Updates**: `/var/log/hydrodactyl-elytra-auto-update.log`
+- **Wings Updates**: `/var/log/hydrodactyl-wings-auto-update.log`
+- **Elytra Updates (legacy)**: `/var/log/hydrodactyl-elytra-auto-update.log`
 - **SSL Renewal**: `/var/log/hydrodactyl-certbot-renewal.log`
-- **Health Check Failures**: `/etc/hydrodactyl/update-health-check-failure.log` (Panel) or `/etc/elytra/update-health-check-failure.log` (Elytra)
+- **Health Check Failures**: `/etc/hydrodactyl/update-health-check-failure.log` (Panel), `/etc/pterodactyl/update-health-check-failure.log` (Wings), or `/etc/elytra/update-health-check-failure.log` (legacy Elytra)
 
 ## Game Server Ports
 
@@ -359,7 +385,8 @@ With all port ranges combined (approximately 2,000+ ports), you can host:
                    │ HTTP/HTTPS
                    ▼
 ┌─────────────────────────────────────┐
-│           Elytra Daemon             │
+│   Wings / Wings-RS Daemon           │
+│   (or legacy Elytra Daemon)         │
 │   ┌─────────────────────────────┐   │
 │   │     HTTP API (Port 8080)    │   │
 │   └─────────────────────────────┘   │
@@ -393,7 +420,9 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 - [Hydrodactyl Panel](https://github.com/BlueprintFramework/hydrodactyl) — The game server management panel (based on Pyrodactyl)
 - [Pyrodactyl](https://github.com/pyrodactyl-oss/pyrodactyl) — The original panel software
-- [Elytra](https://github.com/pyrohost/elytra) — The daemon software
+- [Wings](https://github.com/pterodactyl/wings) — The official (Go) daemon software
+- [wings-rs](https://github.com/calagopus/wings) — The Rust reimplementation of the Wings daemon
+- [Elytra](https://github.com/pyrohost/elytra) — The legacy daemon software
 - [Pyrodactyl Installer](https://github.com/Muspelheim-Hosting/pyrodactyl-installer) — The upstream installer that this project is forked from
 - [Pterodactyl Installer](https://github.com/pterodactyl-installer/pterodactyl-installer) — Original inspiration
 

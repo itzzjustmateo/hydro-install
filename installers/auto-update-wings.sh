@@ -29,7 +29,12 @@ fi
 WINGS_VARIANT="${WINGS_VARIANT:-go}"
 WINGS_REPO="${WINGS_REPO:-pterodactyl/wings}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
-INSTALL_DIR="${INSTALL_DIR:-/etc/wings}"
+# Use WINGS_INSTALL_DIR (not INSTALL_DIR) to avoid collision with lib.sh's
+# exported INSTALL_DIR (/var/www/hydrodactyl, the panel's dir) - this script
+# is spawned via install.sh's get_script() as a child process that inherits
+# that export, so a plain INSTALL_DIR here would silently pick up the
+# panel's path instead of its own default.
+WINGS_INSTALL_DIR="${WINGS_INSTALL_DIR:-/etc/pterodactyl}"
 LOG_FILE="${LOG_FILE:-/var/log/hydrodactyl-wings-auto-update.log}"
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/wings}"
 LOCK_FILE="${LOCK_FILE:-/var/run/hydrodactyl-wings-update.lock}"
@@ -253,8 +258,8 @@ create_backup() {
 
   # Backup configuration
   debug "Backing up configuration..."
-  if [ -d "$INSTALL_DIR" ]; then
-    tar -czf "${backup_path}.tar.gz" -C "$INSTALL_DIR" . 2>/dev/null || {
+  if [ -d "$WINGS_INSTALL_DIR" ]; then
+    tar -czf "${backup_path}.tar.gz" -C "$WINGS_INSTALL_DIR" . 2>/dev/null || {
       warning "Failed to backup configuration"
     }
   fi
@@ -293,12 +298,20 @@ cleanup_old_backups() {
 
 stop_wings() {
   info "Stopping Wings service..."
+  # Always issue the stop, even if systemctl doesn't currently report the
+  # unit as active - wings.service has Restart=on-failure (configs/wings.service),
+  # so a crash-looping daemon can sit in a transient "activating"/"deactivating"
+  # state between restart attempts that `is-active --quiet` treats as "not
+  # active", which previously made this function skip the stop entirely and
+  # left the binary in use. `systemctl stop` is safe/idempotent to call even
+  # when the unit is already stopped.
+  systemctl stop wings 2>/dev/null || true
+  sleep 2
+
   if systemctl is-active --quiet wings 2>/dev/null; then
-    systemctl stop wings
-    sleep 2
-    success "Wings stopped"
+    warning "Wings did not stop cleanly - it may still be holding its binary open"
   else
-    info "Wings was not running"
+    success "Wings stopped"
   fi
 }
 
@@ -328,6 +341,39 @@ restart_wings() {
     error "Wings failed to restart"
     return 1
   fi
+}
+
+# Restore the Wings binary from the most recent backup. Stops the service
+# first (and waits for confirmation) so the binary isn't "Text file busy"
+# while a running - or systemd Restart=on-failure retrying - wings process
+# still has it open, then restores via a temp-file + atomic mv, mirroring
+# the same safe-replace pattern the primary update path already uses for
+# installing the new binary, instead of overwriting the target in place
+# with cp.
+# Usage: restore_wings_backup
+# Returns: 0 if a backup was restored (regardless of whether wings restarts
+# cleanly afterward), 1 if no backup was found.
+restore_wings_backup() {
+  local latest_backup
+  latest_backup=$(ls -t ${BACKUP_DIR}/wings-backup-*.binary 2>/dev/null | head -1)
+
+  if [ -z "$latest_backup" ]; then
+    warning "No backup found to restore"
+    return 1
+  fi
+
+  info "Restoring from backup: $latest_backup"
+
+  stop_wings
+
+  local restore_temp
+  restore_temp=$(mktemp)
+  cp "$latest_backup" "$restore_temp"
+  chmod +x "$restore_temp"
+  mv "$restore_temp" "/usr/local/bin/wings"
+
+  restart_wings || true
+  return 0
 }
 
 # ------------------ Update Functions ----------------- #
@@ -499,17 +545,7 @@ perform_update() {
   if ! start_wings; then
     error "Failed to start Wings after update"
     error "Attempting rollback..."
-
-    # Attempt rollback
-    local latest_backup
-    latest_backup=$(ls -t ${BACKUP_DIR}/wings-backup-*.binary 2>/dev/null | head -1)
-
-    if [ -n "$latest_backup" ]; then
-      info "Restoring from backup: $latest_backup"
-      cp "$latest_backup" "/usr/local/bin/wings"
-      chmod +x "/usr/local/bin/wings"
-      restart_wings || true
-    fi
+    restore_wings_backup
 
     return $EXIT_UPDATE_FAILED
   fi
@@ -526,8 +562,8 @@ perform_update() {
       error "Auto-fix failed to resolve all issues"
 
       # Log failure information
-      mkdir -p "$INSTALL_DIR"
-      cat > "$INSTALL_DIR/update-health-check-failure.log" << EOF
+      mkdir -p "$WINGS_INSTALL_DIR"
+      cat > "$WINGS_INSTALL_DIR/update-health-check-failure.log" << EOF
 [$(date)] Wings Update Health Check Failed
 Version: ${new_version}
 Status: Auto-fix applied but issues persist
@@ -537,47 +573,40 @@ EOF
 
       # Append specific failed checks to log
       if [ ! -f "/usr/local/bin/wings" ]; then
-        echo "- Wings binary not found" >> "$INSTALL_DIR/update-health-check-failure.log"
+        echo "- Wings binary not found" >> "$WINGS_INSTALL_DIR/update-health-check-failure.log"
       elif [ ! -x "/usr/local/bin/wings" ]; then
-        echo "- Wings binary is not executable" >> "$INSTALL_DIR/update-health-check-failure.log"
+        echo "- Wings binary is not executable" >> "$WINGS_INSTALL_DIR/update-health-check-failure.log"
       fi
 
-      if [ ! -f "$INSTALL_DIR/config.yml" ]; then
-        echo "- Wings config file not found" >> "$INSTALL_DIR/update-health-check-failure.log"
+      if [ ! -f "$WINGS_INSTALL_DIR/config.yml" ]; then
+        echo "- Wings config file not found" >> "$WINGS_INSTALL_DIR/update-health-check-failure.log"
       fi
 
-      for dir in /var/lib/wings/volumes /var/lib/wings/archives /var/lib/wings/backups; do
+      for dir in /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups; do
         if [ ! -d "$dir" ]; then
-          echo "- Data directory missing: $dir" >> "$INSTALL_DIR/update-health-check-failure.log"
+          echo "- Data directory missing: $dir" >> "$WINGS_INSTALL_DIR/update-health-check-failure.log"
         fi
       done
 
       if ! systemctl is-active --quiet docker 2>/dev/null; then
-        echo "- Docker is not running" >> "$INSTALL_DIR/update-health-check-failure.log"
+        echo "- Docker is not running" >> "$WINGS_INSTALL_DIR/update-health-check-failure.log"
       fi
 
       if ! systemctl is-active --quiet wings 2>/dev/null; then
-        echo "- Wings service is not running" >> "$INSTALL_DIR/update-health-check-failure.log"
+        echo "- Wings service is not running" >> "$WINGS_INSTALL_DIR/update-health-check-failure.log"
       fi
 
-      echo "" >> "$INSTALL_DIR/update-health-check-failure.log"
-      echo "Please run the Repair Tool or check manually:" >> "$INSTALL_DIR/update-health-check-failure.log"
-      echo "bash <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)" >> "$INSTALL_DIR/update-health-check-failure.log"
-      echo "And select option [7] Repair / Fix Common Issues" >> "$INSTALL_DIR/update-health-check-failure.log"
+      echo "" >> "$WINGS_INSTALL_DIR/update-health-check-failure.log"
+      echo "Please run the Repair Tool or check manually:" >> "$WINGS_INSTALL_DIR/update-health-check-failure.log"
+      echo "bash <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)" >> "$WINGS_INSTALL_DIR/update-health-check-failure.log"
+      echo "And select option [7] Repair / Fix Common Issues" >> "$WINGS_INSTALL_DIR/update-health-check-failure.log"
 
-      error "Update completed but health check failed. See: $INSTALL_DIR/update-health-check-failure.log"
+      error "Update completed but health check failed. See: $WINGS_INSTALL_DIR/update-health-check-failure.log"
       
       # Attempt rollback since health check failed
       error "Attempting rollback..."
-      local latest_backup
-      latest_backup=$(ls -t ${BACKUP_DIR}/wings-backup-*.binary 2>/dev/null | head -1)
-      if [ -n "$latest_backup" ]; then
-        info "Restoring from backup: $latest_backup"
-        cp "$latest_backup" "/usr/local/bin/wings"
-        chmod +x "/usr/local/bin/wings"
-        restart_wings || true
-      fi
-      
+      restore_wings_backup
+
       return $EXIT_UPDATE_FAILED
     fi
   fi
@@ -609,13 +638,13 @@ post_update_health_check() {
   fi
 
   debug "Checking Wings config..."
-  if [ ! -f "$INSTALL_DIR/config.yml" ]; then
+  if [ ! -f "$WINGS_INSTALL_DIR/config.yml" ]; then
     warning "Wings config file not found"
     has_errors=true
   fi
 
   debug "Checking data directories..."
-  for dir in /var/lib/wings/volumes /var/lib/wings/archives /var/lib/wings/backups; do
+  for dir in /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups; do
     if [ ! -d "$dir" ]; then
       warning "Data directory missing: $dir"
       has_errors=true
@@ -643,7 +672,12 @@ post_update_health_check() {
 }
 
 auto_fix_wings_issues() {
-  info "Attempting to auto-fix issues..."
+  # This is a standalone copy of lib.sh's _auto_fix_daemon_issues() (as
+  # instantiated by lib.sh's own auto_fix_wings_issues()). This file can't
+  # source lib.sh (invoked via `bash <(curl ...)`, isolated subshell), so it
+  # can't call the shared helper directly - lib.sh's version is canonical;
+  # keep both in sync when fixing bugs or changing behavior here.
+  info "Attempting to auto-fix Wings issues..."
 
   # Fix binary permissions
   if [ -f "/usr/local/bin/wings" ]; then
@@ -653,43 +687,53 @@ auto_fix_wings_issues() {
 
   # Fix data directory permissions
   info "Fixing data directory permissions..."
-  mkdir -p /var/lib/wings/volumes /var/lib/wings/archives /var/lib/wings/backups
+  mkdir -p /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups
 
-  chown -R 8888:8888 /var/lib/wings/volumes 2>/dev/null || true
-  chown -R 8888:8888 /var/lib/wings/archives 2>/dev/null || true
-  chown -R 8888:8888 /var/lib/wings/backups 2>/dev/null || true
-  chown -R 8888:8888 /etc/wings 2>/dev/null || true
+  chown -R 9999:9999 /var/lib/pterodactyl/volumes 2>/dev/null || true
+  chown -R 9999:9999 /var/lib/pterodactyl/archives 2>/dev/null || true
+  chown -R 9999:9999 /var/lib/pterodactyl/backups 2>/dev/null || true
+  chown -R 9999:9999 "$WINGS_INSTALL_DIR" 2>/dev/null || true
 
   # Fix permissions
   info "Fixing Wings permissions..."
-  
+
   # Create directories if they don't exist
-  mkdir -p /var/lib/wings/volumes /var/lib/wings/archives /var/lib/wings/backups
-  
+  mkdir -p /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups
+
   # Set permissions for containerized game servers
   # Note: 777 is required because game server containers run as arbitrary UIDs
   # and must be able to read/write/execute in these directories
   info "Setting 777 permissions on data directories for container access..."
-  # Ensure parent /var/lib/wings is accessible
-  chmod 755 /var/lib/wings 2>/dev/null || true
+  # Ensure parent /var/lib/pterodactyl is accessible
+  chmod 755 /var/lib/pterodactyl 2>/dev/null || true
   # Ensure the volumes directory itself and all contents have 777
-  chmod 777 /var/lib/wings/volumes 2>/dev/null || true
-  chmod -R 777 /var/lib/wings/volumes/* 2>/dev/null || true
-  chmod 777 /var/lib/wings/archives 2>/dev/null || true
-  chmod -R 777 /var/lib/wings/archives/* 2>/dev/null || true
-  chmod 777 /var/lib/wings/backups 2>/dev/null || true
-  chmod -R 777 /var/lib/wings/backups/* 2>/dev/null || true
-  
-  if [ -f "/etc/wings/config.yml" ]; then
-    info "Disabling permission checks in Wings config..."
+  chmod 777 /var/lib/pterodactyl/volumes 2>/dev/null || true
+  chmod -R 777 /var/lib/pterodactyl/volumes/* 2>/dev/null || true
+  chmod 777 /var/lib/pterodactyl/archives 2>/dev/null || true
+  chmod -R 777 /var/lib/pterodactyl/archives/* 2>/dev/null || true
+  chmod 777 /var/lib/pterodactyl/backups 2>/dev/null || true
+  chmod -R 777 /var/lib/pterodactyl/backups/* 2>/dev/null || true
+
+  # Set ACL default permissions so new directories inherit 777 - matches the
+  # explicit chmod 777 above, since containers run as arbitrary UIDs and
+  # need read/write/execute on files other containers create later too.
+  if command -v setfacl >/dev/null 2>&1; then
+    info "Setting default ACL permissions for new files..."
+    setfacl -R -m d:o:rwx,d:g:rwx /var/lib/pterodactyl/volumes /var/lib/pterodactyl/archives /var/lib/pterodactyl/backups 2>/dev/null || true
   fi
-  
+
+  # Disable check_permissions_on_boot in Wings config to prevent permission resets
+  if [ -f "$WINGS_INSTALL_DIR/config.yml" ]; then
+    info "Disabling permission checks in Wings config..."
+    sed -i 's/check_permissions_on_boot: true/check_permissions_on_boot: false/' "$WINGS_INSTALL_DIR/config.yml" 2>/dev/null || true
+  fi
+
   # Wings config directory - create if needed and set more restrictive permissions
-  mkdir -p /etc/wings
-  find /etc/wings -type d -exec chmod 755 {} \; 2>/dev/null || true
+  mkdir -p "$WINGS_INSTALL_DIR"
+  find "$WINGS_INSTALL_DIR" -type d -exec chmod 755 {} \; 2>/dev/null || true
   # SECURITY: Config contains daemon credentials - restrict to owner-only
-  find /etc/wings -type f -name "config.yml" -exec chmod 600 {} \; 2>/dev/null || true
-  find /etc/wings -type f ! -name "config.yml" -exec chmod 640 {} \; 2>/dev/null || true
+  find "$WINGS_INSTALL_DIR" -type f -name "config.yml" -exec chmod 600 {} \; 2>/dev/null || true
+  find "$WINGS_INSTALL_DIR" -type f ! -name "config.yml" -exec chmod 640 {} \; 2>/dev/null || true
 
   # Restart Wings service
   info "Restarting Wings service..."
@@ -720,7 +764,7 @@ send_notification() {
 check_for_updates() {
   info "Checking for Wings updates..."
   debug "Repository: $WINGS_REPO"
-  debug "Install directory: $INSTALL_DIR"
+  debug "Install directory: $WINGS_INSTALL_DIR"
 
   local current_version
   current_version=$(get_current_version)

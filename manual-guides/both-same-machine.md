@@ -1,5 +1,7 @@
 # Hydrodactyl Panel + Elytra Daemon - Same Machine Installation Guide
 
+> **Elytra is deprecated.** This guide walks through the legacy Elytra daemon specifically. For a new same-machine setup, we recommend combining the [Hydrodactyl Panel Manual](./hydrodactyl-panel-manual.md) with the [Wings Daemon Manual](./wings-manual.md) instead, or simply using the automated installer's "Install both Panel and Wings" option. This guide remains available for maintaining existing legacy Elytra installations.
+
 This guide covers installing both the Hydrodactyl Panel and Elytra Daemon on the same physical or virtual server. This setup is suitable for small deployments, development environments, or single-node installations.
 
 ## Table of Contents
@@ -239,7 +241,7 @@ FLUSH PRIVILEGES;
 EOF
 ```
 
-Save the password - you'll need it twice (for Panel and Elytra doesn't need it but Panel does).
+Save this password - you'll need it when configuring the Panel's `.env` file below. The daemon (Elytra or Wings) does not use this database, so it isn't needed there.
 
 ---
 
@@ -347,7 +349,7 @@ systemctl restart nginx
 ```
 
 ### Queue Worker Service
-Create `/etc/systemd/system/pyroq.service`:
+Create `/etc/systemd/system/hydroq.service`:
 ```ini
 [Unit]
 Description=Hydrodactyl Queue Worker
@@ -369,7 +371,7 @@ WantedBy=multi-user.target
 Enable:
 ```bash
 systemctl daemon-reload
-systemctl enable --now pyroq
+systemctl enable --now hydroq
 ```
 
 ### Cron Job
@@ -385,7 +387,7 @@ crontab -e
 
 ### Create Directories
 ```bash
-mkdir -p /var/lib/hydrodactyl/volumes /var/lib/hydrodactyl/archives /var/lib/hydrodactyl/backups /etc/elytra
+mkdir -p /var/lib/elytra/volumes /var/lib/elytra/archives /var/lib/elytra/backups /etc/elytra
 ```
 
 ### Download Elytra
@@ -427,9 +429,9 @@ api:
     upload-limit: 100
 
 system:
-    data: /var/lib/hydrodactyl/volumes
-    archive: /var/lib/hydrodactyl/archives
-    backup: /var/lib/hydrodactyl/backups
+    data: /var/lib/elytra/volumes
+    archive: /var/lib/elytra/archives
+    backup: /var/lib/elytra/backups
 
 remote: https://panel.yourdomain.com
 
@@ -638,7 +640,7 @@ echo "=== Panel Services ==="
 systemctl status nginx | grep Active
 systemctl status php8.4-fpm | grep Active
 systemctl status mariadb | grep Active
-systemctl status pyroq | grep Active
+systemctl status hydroq | grep Active
 
 echo "=== Elytra/Docker ==="
 systemctl status elytra | grep Active
@@ -647,7 +649,7 @@ docker ps
 
 echo "=== Resources ==="
 free -h
-df -h /var/lib/hydrodactyl
+df -h /var/lib/elytra
 ```
 
 ### Test Panel Access
@@ -844,7 +846,9 @@ bash <(curl -Ss https://my-netdata.io/kickstart.sh)
 ## Support
 
 - Hydrodactyl Issues: https://github.com/BlueprintFramework/hydrodactyl/issues
-- Elytra Issues: https://github.com/pyrohost/elytra/issues
+- Wings Issues: https://github.com/pterodactyl/wings/issues
+- Wings-RS Issues: https://github.com/calagopus/wings/issues
+- Elytra Issues (legacy): https://github.com/pyrohost/elytra/issues
 - Docker Docs: https://docs.docker.com/
 - Community Discord: [Hydrodactyl Community]
 

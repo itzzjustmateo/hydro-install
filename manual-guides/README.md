@@ -1,14 +1,17 @@
 # Hydrodactyl Manual Installation Guides
 
-This directory contains comprehensive manual installation guides for Hydrodactyl Panel and Elytra Daemon. These guides are designed for users who prefer to install and configure each component manually, or for those who want to understand the installation process in detail.
+This directory contains comprehensive manual installation guides for Hydrodactyl Panel and the Wings/wings-rs daemon (with legacy Elytra guides also available). These guides are designed for users who prefer to install and configure each component manually, or for those who want to understand the installation process in detail.
+
+> **New installations should use Wings or wings-rs.** Elytra is no longer maintained upstream and is deprecated - see the root [README's Elytra Support Notice](../README.md). The Elytra and "Both Same Machine" guides below remain available for maintaining existing legacy installations.
 
 ## 📚 Available Guides
 
 | Guide | Description | Use Case |
 |-------|-------------|----------|
 | [Hydrodactyl Panel Manual](./hydrodactyl-panel-manual.md) | Complete standalone Panel installation | Control panel only, separate from game servers |
-| [Elytra Daemon Manual](./elytra-manual.md) | Complete standalone Daemon installation | Game server node only, connects to existing Panel |
-| [Both Same Machine](./both-same-machine.md) | Combined Panel + Daemon installation | Single-server setup for small deployments |
+| [Wings Daemon Manual](./wings-manual.md) | Complete standalone Wings/wings-rs installation | Game server node only, connects to existing Panel (**recommended for new nodes**) |
+| [Elytra Daemon Manual](./elytra-manual.md) (legacy) | Complete standalone legacy Daemon installation | Maintaining an existing legacy Elytra node |
+| [Both Same Machine](./both-same-machine.md) (legacy) | Combined Panel + legacy Elytra installation | Single-server setup using the legacy daemon |
 
 ## 🤔 Which Guide Should I Use?
 
@@ -16,19 +19,21 @@ This directory contains comprehensive manual installation guides for Hydrodactyl
 - You want a dedicated control panel server
 - You plan to have multiple game server nodes
 - You're setting up a distributed architecture
-- You already have Elytra installed elsewhere
+- You already have a daemon installed elsewhere
 
-### Use the **Elytra Only** guide if:
+### Use the **Wings Daemon** guide if:
 - You already have a Hydrodactyl Panel running
 - You're adding a new game server node
 - You want dedicated game server hardware
 - You're expanding an existing setup
 
-### Use the **Both Same Machine** guide if:
-- You're setting up a small deployment
-- You're testing or developing
-- You have limited server resources
-- You want everything on one server for simplicity
+### Use the **Elytra Only** guide (legacy) if:
+- You're maintaining an existing legacy Elytra node
+- You are not setting up a new installation
+
+### Use the **Both Same Machine** guide (legacy) if:
+- You're maintaining an existing single-server legacy Elytra deployment
+- For a **new** single-server setup, combine the [Panel Manual](./hydrodactyl-panel-manual.md) with the [Wings Manual](./wings-manual.md) instead, or use the automated installer's "Install both Panel and Wings" option
 
 ## 🔄 Manual vs Automated Installer
 
@@ -55,13 +60,14 @@ We also provide an [automated installer](../install.sh) that can:
 
 Before starting any manual installation, ensure you have:
 
-- **Root access** to a fresh Linux server (Ubuntu 22.04+, Debian 12+, Rocky Linux 9+, or AlmaLinux 9+)
+- **Root access** to a fresh Linux server (Ubuntu 22.04+, Debian 11+, Rocky Linux 8+, or AlmaLinux 8+)
 - **Domain name(s)** pointed to your server IP(s)
 - **Server specifications** meeting minimum requirements:
   - Panel Only: 2 cores, 2GB RAM, 20GB SSD
-  - Elytra Only: 2 cores, 2GB RAM, 20GB SSD
-  - Both Same Machine: 4 cores, 4GB RAM, 50GB SSD
-- **Supported virtualization** (KVM, VMware, Xen - OpenVZ/LXC not supported for Elytra)
+  - Wings Only: 2 cores, 2GB RAM, 20GB SSD
+  - Elytra Only (legacy): 2 cores, 2GB RAM, 20GB SSD
+  - Both Same Machine (legacy): 4 cores, 4GB RAM, 50GB SSD
+- **Supported virtualization** (KVM, VMware, Xen - OpenVZ/LXC not supported for Wings or Elytra)
 
 ## 🔧 Common Configuration
 
@@ -72,7 +78,7 @@ All installations require:
 - PHP 8.4 with required extensions
 - SSL/TLS certificates (Let's Encrypt recommended)
 
-Elytra additionally requires:
+Wings/Wings-RS and Elytra additionally require:
 - Docker Engine
 - Swap accounting enabled (for game server containers)
 
@@ -84,7 +90,9 @@ If you encounter issues with manual installation:
 2. **Review logs**: `journalctl -u <service>` for systemd services
 3. **Check our GitHub Issues**:
    - [Hydrodactyl Issues](https://github.com/BlueprintFramework/hydrodactyl/issues)
-   - [Elytra Issues](https://github.com/pyrohost/elytra/issues)
+   - [Wings Issues](https://github.com/pterodactyl/wings/issues)
+   - [Wings-RS Issues](https://github.com/calagopus/wings/issues)
+   - [Elytra Issues (legacy)](https://github.com/pyrohost/elytra/issues)
 4. **Community Support**: Join our Discord community
 
 ## 📖 Guide Structure
@@ -101,7 +109,7 @@ Each manual guide follows this structure:
 
 New to Hydrodactyl? Follow this path:
 
-1. **Start with the "Both Same Machine" guide** - Get everything running quickly
+1. **Start with the [Panel Manual](./hydrodactyl-panel-manual.md) and [Wings Manual](./wings-manual.md)** - Get Panel and Wings running (or use the automated installer's "Install both Panel and Wings" option for a quicker start)
 2. **Experiment and learn** - Understand how components interact
 3. **Read individual guides** - Dive deeper into each component
 4. **Plan your architecture** - Decide if you need separate servers
@@ -119,8 +127,9 @@ Found an error in a guide? Want to improve documentation?
 
 - [Main Installer](../install.sh) - Automated one-command installer
 - [Panel Guide](./hydrodactyl-panel-manual.md) - Panel-only installation
-- [Elytra Guide](./elytra-manual.md) - Daemon-only installation
-- [Combined Guide](./both-same-machine.md) - Both on same server
+- [Wings Guide](./wings-manual.md) - Daemon-only installation (recommended)
+- [Elytra Guide](./elytra-manual.md) (legacy) - Legacy daemon-only installation
+- [Combined Guide](./both-same-machine.md) (legacy) - Panel + legacy Elytra on same server
 
 ---
 

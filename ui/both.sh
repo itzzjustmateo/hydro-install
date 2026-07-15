@@ -4,7 +4,7 @@ set -e
 
 ######################################################################################
 #                                                                                    #
-# Hydrodactyl Panel + Elytra Combined Installation UI                                 #
+# Hydrodactyl Panel + Wings Combined Installation UI                                 #
 #                                                                                    #
 # Copyright (C) 2026, ItzzMateo Studios                                             #
 #                                                                                    #
@@ -55,12 +55,12 @@ DB_NAME="panel"
 DB_USER="hydrodactyl"
 DB_PASSWORD=""
 
-# Elytra Configuration
+# Wings Configuration
 WINGS_VARIANT=""
-ELYTRA_REPO=""
-ELYTRA_REPO_PRIVATE=false
-GITHUB_TOKEN_ELYTRA=""
-ELYTRA_RELEASE_VERSION="${ELYTRA_RELEASE_VERSION:-latest}"
+WINGS_REPO=""
+WINGS_REPO_PRIVATE=false
+GITHUB_TOKEN_WINGS=""
+WINGS_RELEASE_VERSION="${WINGS_RELEASE_VERSION:-latest}"
 NODE_NAME="local"
 NODE_DESCRIPTION="Local Node"
 BEHIND_PROXY=false
@@ -342,25 +342,25 @@ configure_wings_variant() {
 
   if [ "$variant_choice" == "0" ]; then
     WINGS_VARIANT="go"
-    ELYTRA_REPO="$DEFAULT_WINGS_REPO"
-    output "Selected: Wings (Go) - ${COLOR_ORANGE}${ELYTRA_REPO}${COLOR_NC}"
+    WINGS_REPO="$DEFAULT_WINGS_REPO"
+    output "Selected: Pterodactyl Wings (Go) - ${COLOR_ORANGE}${WINGS_REPO}${COLOR_NC}"
   else
     WINGS_VARIANT="rs"
-    ELYTRA_REPO="$DEFAULT_WINGS_RS_REPO"
-    output "Selected: Wings-RS (Rust) - ${COLOR_ORANGE}${ELYTRA_REPO}${COLOR_NC}"
+    WINGS_REPO="$DEFAULT_WINGS_RS_REPO"
+    output "Selected: wings-rs (Rust) - ${COLOR_ORANGE}${WINGS_REPO}${COLOR_NC}"
   fi
 }
 
-# ------------------ Elytra Configuration ----------------- #
+# ------------------ Wings Configuration ----------------- #
 
-configure_elytra_settings() {
+configure_wings_settings() {
   configure_wings_variant
 
   print_header
   print_flame "Wings Daemon Repository Configuration"
 
   output "The default repository for this variant is:"
-  output "  ${COLOR_ORANGE}${ELYTRA_REPO}${COLOR_NC}"
+  output "  ${COLOR_ORANGE}${WINGS_REPO}${COLOR_NC}"
   echo ""
 
   local use_default=""
@@ -369,28 +369,28 @@ configure_elytra_settings() {
   if [ "$use_default" == "y" ]; then
     : # Keep the repository selected by configure_wings_variant
   else
-    required_input ELYTRA_REPO "Enter the GitHub repository (format: owner/repo): " "Repository cannot be empty"
+    required_input WINGS_REPO "Enter the GitHub repository (format: owner/repo): " "Repository cannot be empty"
 
-    if [[ ! "$ELYTRA_REPO" =~ ^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$ ]]; then
+    if [[ ! "$WINGS_REPO" =~ ^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$ ]]; then
       error "Invalid repository format. Must be 'owner/repo'"
       exit 1
     fi
   fi
 
   echo ""
-  output "Repository: ${COLOR_ORANGE}${ELYTRA_REPO}${COLOR_NC}"
+  output "Repository: ${COLOR_ORANGE}${WINGS_REPO}${COLOR_NC}"
 
   # Only ask about private repo if not using default (default is public)
   if [ "$use_default" == "n" ]; then
     local is_private=""
     bool_input is_private "Is this a private repository?" "n" || true
     if [ "$is_private" == "y" ]; then
-      ELYTRA_REPO_PRIVATE="true"
+      WINGS_REPO_PRIVATE="true"
     else
-      ELYTRA_REPO_PRIVATE="false"
+      WINGS_REPO_PRIVATE="false"
     fi
 
-    if [ "$ELYTRA_REPO_PRIVATE" == "true" ]; then
+    if [ "$WINGS_REPO_PRIVATE" == "true" ]; then
       echo ""
       output "A GitHub Personal Access Token is required for private repositories."
       output "Create one at: https://github.com/settings/tokens"
@@ -398,10 +398,10 @@ configure_elytra_settings() {
 
       local token_valid=false
       while [ "$token_valid" == false ]; do
-        password_input GITHUB_TOKEN_ELYTRA "Enter your GitHub token: " "Token cannot be empty"
+        password_input GITHUB_TOKEN_WINGS "Enter your GitHub token: " "Token cannot be empty"
 
         output "Validating token..."
-        if validate_github_token "$GITHUB_TOKEN_ELYTRA" "$ELYTRA_REPO"; then
+        if validate_github_token "$GITHUB_TOKEN_WINGS" "$WINGS_REPO"; then
           success "Token validated successfully"
           token_valid=true
         else
@@ -410,46 +410,46 @@ configure_elytra_settings() {
       done
     fi
   else
-    ELYTRA_REPO_PRIVATE="false"
+    WINGS_REPO_PRIVATE="false"
   fi
 
   output "Checking for releases in repository..."
-  if ! check_releases_exist "$ELYTRA_REPO" "$GITHUB_TOKEN_ELYTRA"; then
+  if ! check_releases_exist "$WINGS_REPO" "$GITHUB_TOKEN_WINGS"; then
     echo ""
-    error "No releases found in repository: ${ELYTRA_REPO}"
-    warning "Elytra must be installed from a release."
+    error "No releases found in repository: ${WINGS_REPO}"
+    warning "Wings must be installed from a release."
     exit 1
   fi
 
   local latest_release
-  latest_release=$(get_latest_release "$ELYTRA_REPO" "$GITHUB_TOKEN_ELYTRA")
+  latest_release=$(get_latest_release "$WINGS_REPO" "$GITHUB_TOKEN_WINGS")
   success "Found releases in repository"
 
-  # Select Elytra release version (skip interactive if already set via env)
+  # Select Wings release version (skip interactive if already set via env)
   local selected_version
-  if [ "$ELYTRA_RELEASE_VERSION" != "latest" ]; then
-    selected_version="$ELYTRA_RELEASE_VERSION"
-    info "Using Elytra release version from environment: $selected_version"
+  if [ "$WINGS_RELEASE_VERSION" != "latest" ]; then
+    selected_version="$WINGS_RELEASE_VERSION"
+    info "Using Wings release version from environment: $selected_version"
   else
     echo ""
-    selected_version=$(select_release_version "$ELYTRA_REPO" "elytra" "$GITHUB_TOKEN_ELYTRA")
+    selected_version=$(select_release_version "$WINGS_REPO" "wings" "$GITHUB_TOKEN_WINGS")
     if [ -z "$selected_version" ]; then
       error "Failed to select release version"
       exit 1
     fi
   fi
-  ELYTRA_RELEASE_VERSION="$selected_version"
-  if [ "$ELYTRA_RELEASE_VERSION" == "latest" ]; then
-    success "Will install latest Elytra release: ${latest_release}"
+  WINGS_RELEASE_VERSION="$selected_version"
+  if [ "$WINGS_RELEASE_VERSION" == "latest" ]; then
+    success "Will install latest Wings release: ${latest_release}"
   else
-    success "Will install Elytra release: ${ELYTRA_RELEASE_VERSION}"
+    success "Will install Wings release: ${WINGS_RELEASE_VERSION}"
   fi
 
   echo ""
-  print_flame "Elytra Node Configuration"
+  print_flame "Wings Node Configuration"
   echo ""
 
-  output "Configuring Elytra to connect to the panel at: ${COLOR_ORANGE}$(panel_scheme)://$(panel_url_host "$PANEL_FQDN")${COLOR_NC}"
+  output "Configuring Wings to connect to the panel at: ${COLOR_ORANGE}$(panel_scheme)://$(panel_url_host "$PANEL_FQDN")${COLOR_NC}"
   output "(This will be set automatically - no panel URL input needed)"
   echo ""
 
@@ -520,9 +520,9 @@ show_summary() {
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   output "  Wings Daemon Configuration"
   output "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  echo -e "  ${COLOR_ORANGE}Variant:${COLOR_NC}           $([ "$WINGS_VARIANT" == "go" ] && echo 'Wings (Go)' || echo 'Wings-RS (Rust)')"
-  echo -e "  ${COLOR_ORANGE}Repository:${COLOR_NC}        ${ELYTRA_REPO} $([ "$ELYTRA_REPO_PRIVATE" == "true" ] && echo '(private)' || echo '(public)')"
-  echo -e "  ${COLOR_ORANGE}Release Version:${COLOR_NC}   ${ELYTRA_RELEASE_VERSION}"
+  echo -e "  ${COLOR_ORANGE}Variant:${COLOR_NC}           $([ "$WINGS_VARIANT" == "go" ] && echo 'Pterodactyl Wings (Go)' || echo 'wings-rs (Rust)')"
+  echo -e "  ${COLOR_ORANGE}Repository:${COLOR_NC}        ${WINGS_REPO} $([ "$WINGS_REPO_PRIVATE" == "true" ] && echo '(private)' || echo '(public)')"
+  echo -e "  ${COLOR_ORANGE}Release Version:${COLOR_NC}   ${WINGS_RELEASE_VERSION}"
   echo -e "  ${COLOR_ORANGE}Panel URL:${COLOR_NC}         $(panel_scheme)://$(panel_url_host "$PANEL_FQDN") (auto-configured)"
   echo -e "  ${COLOR_ORANGE}Node Name:${COLOR_NC}         ${NODE_NAME}"
   echo -e "  ${COLOR_ORANGE}Node Description:${COLOR_NC}  ${NODE_DESCRIPTION}"
@@ -583,13 +583,12 @@ export_variables() {
   export DB_USER
   export DB_PASSWORD
 
-  # Elytra variables
+  # Wings variables
   export WINGS_VARIANT
-  export WINGS_REPO="$ELYTRA_REPO"
-  export ELYTRA_REPO
-  export WINGS_REPO_PRIVATE="$ELYTRA_REPO_PRIVATE"
-  export GITHUB_TOKEN_WINGS="$GITHUB_TOKEN_ELYTRA"
-  export ELYTRA_RELEASE_VERSION
+  export WINGS_REPO
+  export WINGS_REPO_PRIVATE
+  export GITHUB_TOKEN_WINGS
+  export WINGS_RELEASE_VERSION
   export NODE_NAME
   export NODE_DESCRIPTION
   export BEHIND_PROXY
@@ -604,11 +603,11 @@ export_variables() {
 # ------------------ Main ----------------- #
 
 main() {
-  print_flame "Welcome to the Hydrodactyl + Elytra Combined Installer"
+  print_flame "Welcome to the Hydrodactyl + Wings Combined Installer"
 
   configure_panel_repository
   configure_panel_settings
-  configure_elytra_settings
+  configure_wings_settings
   configure_minecraft_server
   configure_firewall_settings
   show_summary

@@ -6,6 +6,12 @@ contact_links:
   - name: Hydrodactyl Panel
     url: https://github.com/BlueprintFramework/hydrodactyl
     about: Issues related to the Hydrodactyl panel software itself
-  - name: Elytra Daemon
+  - name: Wings Daemon (Go)
+    url: https://github.com/pterodactyl/wings
+    about: Issues related to the Wings daemon software itself
+  - name: Wings-RS Daemon (Rust)
+    url: https://github.com/calagopus/wings
+    about: Issues related to the wings-rs daemon software itself
+  - name: Elytra Daemon (legacy)
     url: https://github.com/pyrohost/elytra
-    about: Issues related to the Elytra daemon
+    about: Issues related to the legacy Elytra daemon
