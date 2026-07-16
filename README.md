@@ -1,11 +1,15 @@
 <p align="center">
-  <img width="1467" height="401" alt="Hydrodactyl Installer" src="https://github.com/user-attachments/assets/7d5138a4-acd0-43e5-932b-419c5125c0d7" />
+  <img width="600" alt="Hydro Install Banner" src="https://github.com/user-attachments/assets/d0993836-3a16-46da-ad2c-d4bafdeab734" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/itzzjustmateo/hydro-install/blob/main/LICENSE"><img src="https://img.shields.io/github/license/itzzjustmateo/hydro-install?style=for-the-badge&color=orange" alt="License"></a>
-  <a href="https://github.com/itzzjustmateo/hydro-install/actions"><img src="https://img.shields.io/github/actions/workflow/status/itzzjustmateo/hydro-install/ci.yml?style=for-the-badge&color=orange" alt="CI"></a>
-  <img src="https://img.shields.io/badge/shell-bash-4EAA25?style=for-the-badge&logo=gnu-bash&color=orange" alt="Shell">
+  <a href="https://github.com/itzzjustmateo/hydro-install/blob/main/LICENSE">
+    <img src="https://shieldcn.dev/github/license/itzzjustmateo/hydro-install.svg?variant=outline" alt="License">
+  </a>
+  <a href="https://github.com/itzzjustmateo/hydro-install/actions">
+    <img src="https://shieldcn.dev/github/ci/itzzjustmateo/hydro-install.svg?variant=outline" alt="CI">
+  </a>
+  <img src="https://shieldcn.dev/badge/shell-bash.svg?variant=outline&logo=gnu-bash" alt="Shell">
 </p>
 
 A beautiful, modern, and feature-rich installer for the **Hydrodactyl** game server management panel and **Wings**/**Wings-RS** daemon (with legacy **Elytra** support). Built with an elegant flame-inspired UI and designed for ease of use.
@@ -75,8 +79,6 @@ sudo bash install.sh
 > **Docker Compatibility:** Wings, Wings-RS, and Elytra all require Docker to run game servers. OpenVZ, LXC, or Virtuozzo virtualization are **not supported**. KVM, VMware, or dedicated servers work best. Run `systemd-detect-virt` to check your virtualization type.
 
 ## Installation Options
-
-<img width="848" height="504" alt="Installation menu" src="https://github.com/user-attachments/assets/9974e217-f667-4488-8a13-8745a9d2498f" />
 
 ```bash
 bash <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)
