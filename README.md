@@ -36,9 +36,9 @@ This installer is a fork of the [Pyrodactyl Installer](https://github.com/Muspel
 bash <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)
 ```
 
-**Zsh:**
+**Zsh users:** run the Bash installer from your Zsh shell:
 ```zsh
-zsh <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)
+bash <(curl -sSL https://raw.githubusercontent.com/itzzjustmateo/hydro-install/main/install.sh)
 ```
 
 Or download and run:
@@ -130,7 +130,7 @@ The installer fully supports private GitHub repositories:
 1. Select "private repository" during setup
 2. Provide a GitHub Personal Access Token
 3. The token is validated for repository access
-4. Token is securely stored for auto-updaters
+4. Token is securely stored for on-demand update checks
 
 ### Creating a GitHub Token
 

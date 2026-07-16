@@ -358,10 +358,12 @@ run_wings_update() {
   print_header
   print_flame "Update Wings Daemon"
 
-  if [ ! -f "/usr/local/bin/wings" ]; then
-    error "Wings is not installed at /usr/local/bin/wings"
+  local wings_binary
+  if ! wings_binary=$(detect_wings_binary); then
+    error "Wings is not installed at /usr/local/bin/wings or /usr/bin/wings"
     return 1
   fi
+  output "Detected Wings binary at ${wings_binary}"
 
   # Check if a complete auto-updater env file exists (installs from before
   # variant tracking was added may have no file, or one missing WINGS_VARIANT)

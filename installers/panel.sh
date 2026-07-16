@@ -54,11 +54,14 @@ DB_HOST="${DB_HOST:-127.0.0.1}"
 DB_PORT="${DB_PORT:-3306}"
 DB_NAME="${DB_NAME:-panel}"
 DB_USER="${DB_USER:-hydrodactyl}"
-# Load existing credentials or generate new ones
+# Load existing root credentials when available, but always ensure the panel
+# database user has a password. Re-runs commonly have saved root credentials;
+# leaving DB_PASSWORD empty there would create/alter the application database
+# user with a blank password and write an unusable .env.
+DB_PASSWORD="${DB_PASSWORD:-$(gen_passwd 64)}"
 if saved_pass=$(load_existing_db_credentials); then
   MYSQL_ROOT_PASSWORD="${saved_pass}"
 else
-  DB_PASSWORD="${DB_PASSWORD:-$(gen_passwd 64)}"
   MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-$(gen_passwd 64)}"
 fi
 
